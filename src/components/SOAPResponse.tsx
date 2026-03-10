@@ -33,10 +33,10 @@ export default function SOAPResponse({ content, isLoading = false, errorMessage 
   const soap = parseSOAP(content);
 
   const soapFields = [
-    { key: 'S', label: 'Subjetivo (Queixa e HDA)', icon: '👤' },
-    { key: 'O', label: 'Objetivo (Sinais Vitais e Exames)', icon: '📊' },
-    { key: 'A', label: 'Avaliação (Diagnóstico)', icon: '🔍' },
-    { key: 'P', label: 'Plano (Conduta)', icon: '📋' },
+    { key: 'S', label: 'Subjetivo — Queixa e HDA' },
+    { key: 'O', label: 'Objetivo — Sinais vitais e exames' },
+    { key: 'A', label: 'Avaliação — Diagnóstico' },
+    { key: 'P', label: 'Plano — Conduta' },
   ];
 
   const copyToClipboard = (text: string) => {
@@ -45,17 +45,17 @@ export default function SOAPResponse({ content, isLoading = false, errorMessage 
   };
 
   return (
-    <div className="w-full bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 shadow-sm hover:shadow-md transition-shadow">
-      <div className="flex items-center justify-between mb-6 flex-col sm:flex-row gap-3">
-        <h2 className="text-xl sm:text-2xl font-bold text-blue-900 flex items-center gap-2">
-          <span className="text-2xl">📋</span> Resultado SOAP
-        </h2>
+    <div className="w-full bg-white rounded-xl border border-[#dde2e8] p-6 sm:p-8">
+      <div className="flex items-center justify-between mb-5 flex-col sm:flex-row gap-3">
+        <p className="text-xs font-semibold text-[#607080] tracking-widest uppercase">
+          Resultado SOAP
+        </p>
         {!isLoading && content && (
           <button
             onClick={() => copyToClipboard(content)}
-            className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-semibold text-sm shadow-sm hover:shadow-md"
+            className="w-full sm:w-auto px-4 py-2 bg-[#1a2e45] hover:bg-[#234060] text-white rounded-md transition font-medium text-sm tracking-wide"
           >
-            📋 Copiar Tudo
+            Copiar tudo
           </button>
         )}
       </div>
@@ -63,10 +63,10 @@ export default function SOAPResponse({ content, isLoading = false, errorMessage 
       {isLoading && (
         <div className="text-center py-12">
           <div className="flex justify-center mb-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1a2e45]"></div>
           </div>
-          <p className="text-blue-900 font-medium">Processando áudio com IA...</p>
-          <p className="text-blue-600 text-sm mt-2">Isso pode levar alguns segundos</p>
+          <p className="text-[#1a2e45] font-medium">Processando áudio...</p>
+          <p className="text-[#607080] text-sm mt-2">Isso pode levar alguns segundos</p>
         </div>
       )}
 
@@ -79,28 +79,26 @@ export default function SOAPResponse({ content, isLoading = false, errorMessage 
 
       {!isLoading && !errorMessage && content && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {soapFields.map(({ key, label, icon }) => (
+          {soapFields.map(({ key, label }) => (
             <div
               key={key}
-              className="border border-gray-200 bg-gradient-to-br from-pink-50 to-white rounded-xl p-4 hover:shadow-md hover:border-blue-300 transition"
+              className="border border-[#dde2e8] bg-white rounded-lg p-4 hover:border-[#4a7fa5] transition"
             >
               <div className="flex items-start justify-between mb-3">
-                <h3 className="font-bold text-blue-900 text-sm">
-                  <span className="text-lg mr-2">{icon}</span>{label}
-                </h3>
+                <h3 className="font-medium text-[#1a2e45] text-sm tracking-tight">{label}</h3>
                 <button
                   onClick={() =>
                     copyToClipboard(
                       soap[key as keyof typeof soap] || '(Não informado)'
                     )
                   }
-                  className="text-xs bg-blue-600 text-white px-2.5 py-1.5 rounded-md hover:bg-blue-700 transition font-medium whitespace-nowrap ml-2 flex-shrink-0"
+                  className="text-xs border border-[#dde2e8] text-[#607080] px-2.5 py-1.5 rounded-md hover:border-[#1a2e45] hover:text-[#1a2e45] transition font-medium whitespace-nowrap ml-2 flex-shrink-0"
                 >
                   Copiar
                 </button>
               </div>
-              <p className="text-blue-900 whitespace-pre-wrap text-sm min-h-24 leading-relaxed bg-white/70 p-3 rounded-lg">
-                {soap[key as keyof typeof soap] || '(Não informado na consulta)'}
+              <p className="text-[#1a2e45] whitespace-pre-wrap text-sm min-h-24 leading-relaxed bg-[#f4f6f9] p-3 rounded-md">
+                {soap[key as keyof typeof soap] || '—'}
               </p>
             </div>
           ))}
@@ -108,8 +106,8 @@ export default function SOAPResponse({ content, isLoading = false, errorMessage 
       )}
 
       {!isLoading && !errorMessage && !content && (
-        <div className="text-center py-12 bg-pink-50 rounded-xl border border-gray-200">
-          <p className="text-blue-700 font-medium">Grave uma consulta e envie para receber a análise em SOAP aqui.</p>
+        <div className="text-center py-12 bg-[#f4f6f9] rounded-xl border border-[#dde2e8]">
+          <p className="text-[#607080] text-sm">Grave uma consulta e envie para receber a análise em SOAP aqui.</p>
         </div>
       )}
     </div>

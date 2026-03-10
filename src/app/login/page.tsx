@@ -41,23 +41,23 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1f3f5f] to-[#4a9aca] flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-2xl p-8 w-full max-w-md">
-        {/* Header */}
+    <div className="min-h-screen bg-[#1a2e45] flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-[#1f3f5f] mb-2">
-            🏥 MedTranscritor
+          <div className="inline-flex items-center justify-center w-12 h-12 bg-[#1a2e45] rounded-lg mb-5">
+            <span className="text-white text-xs font-bold tracking-widest">MT</span>
+          </div>
+          <h1 className="text-2xl font-semibold text-[#1a2e45] tracking-tight">
+            MedTranscritor
           </h1>
-          <p className="text-gray-600 text-sm">
-            Transcrição de Consultas Médicas
+          <p className="text-slate-500 text-sm mt-1">
+            Transcrição de consultas médicas
           </p>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Username Input */}
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="username" className="block text-xs font-medium text-[#607080] uppercase tracking-wider mb-1.5">
               Usuário
             </label>
             <input
@@ -66,15 +66,14 @@ export default function LoginPage() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="Insira seu usuário"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4a9aca] transition"
+              className="w-full px-3.5 py-2.5 text-sm border border-[#dde2e8] rounded-md focus:outline-none focus:ring-2 focus:ring-[#4a7fa5] focus:border-[#4a7fa5] transition text-[#1a2e45]"
               required
               disabled={loading}
             />
           </div>
 
-          {/* Password Input */}
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="password" className="block text-xs font-medium text-[#607080] uppercase tracking-wider mb-1.5">
               Senha
             </label>
             <input
@@ -83,31 +82,28 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Insira sua senha"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4a9aca] transition"
+              className="w-full px-3.5 py-2.5 text-sm border border-[#dde2e8] rounded-md focus:outline-none focus:ring-2 focus:ring-[#4a7fa5] focus:border-[#4a7fa5] transition text-[#1a2e45]"
               required
               disabled={loading}
             />
           </div>
 
-          {/* Error Message */}
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+            <div className="border border-red-200 text-red-700 px-3.5 py-2.5 rounded-md text-sm">
               {error}
             </div>
           )}
 
-          {/* Submit Button */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#1f3f5f] hover:bg-[#1f3f5f]/90 text-white font-medium py-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-[#1a2e45] hover:bg-[#234060] text-white text-sm font-medium py-2.5 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed tracking-wide"
           >
-            {loading ? 'Conectando...' : 'Entrar'}
+            {loading ? 'Aguarde...' : 'Entrar'}
           </button>
         </form>
 
-        {/* Footer */}
-        <p className="text-center text-gray-500 text-xs mt-6">
+        <p className="text-center text-slate-400 text-xs mt-6">
           Acesso restrito para usuários autorizados
         </p>
       </div>
