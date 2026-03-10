@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     console.log('Base64 size:', base64Audio.length);
 
     // Use Gemini API to process the audio
-    const model = client.getGenerativeModel({ model: 'gemini-3.1-flash-lite' });
+    const model = client.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
     console.log('Sending to Gemini...');
 
