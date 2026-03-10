@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import AudioRecorder from '@/components/AudioRecorder';
 import SOAPResponse from '@/components/SOAPResponse';
 
 export default function Home() {
+  const router = useRouter();
   const [soapContent, setSOAPContent] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [lastRecordingTime, setLastRecordingTime] = useState<string>('');
@@ -37,20 +39,33 @@ export default function Home() {
     }
   };
 
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout');
+    router.push('/login');
+  };
+
   return (
     <main className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-8 sm:py-12">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-900 to-blue-800 rounded-lg flex items-center justify-center">
-              <span className="text-white text-xl">📋</span>
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-900 to-blue-800 rounded-lg flex items-center justify-center">
+                <span className="text-white text-xl">📋</span>
+              </div>
+              <h1 className="text-3xl sm:text-4xl font-bold text-blue-900">MedTranscritor</h1>
             </div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-blue-900">MedTranscritor</h1>
+            <p className="text-blue-600 text-sm sm:text-base ml-13">
+              Transcrição inteligente de consultas em formato SOAP
+            </p>
           </div>
-          <p className="text-blue-600 text-sm sm:text-base ml-13">
-            Transcrição inteligente de consultas em formato SOAP
-          </p>
+          <button
+            onClick={handleLogout}
+            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+          >
+            Sair
+          </button>
         </div>
       </div>
 
