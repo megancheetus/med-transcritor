@@ -3,9 +3,10 @@
 interface SOAPResponseProps {
   content: string;
   isLoading?: boolean;
+  errorMessage?: string;
 }
 
-export default function SOAPResponse({ content, isLoading = false }: SOAPResponseProps) {
+export default function SOAPResponse({ content, isLoading = false, errorMessage = '' }: SOAPResponseProps) {
   // Parse o conteúdo em secções SOAP
   const parseSOAP = (text: string) => {
     const sections = {
@@ -69,7 +70,14 @@ export default function SOAPResponse({ content, isLoading = false }: SOAPRespons
         </div>
       )}
 
-      {!isLoading && content && (
+      {!isLoading && errorMessage && (
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4">
+          <p className="text-sm font-semibold text-red-700">Falha ao processar o áudio</p>
+          <p className="mt-2 text-sm text-red-700 whitespace-pre-wrap">{errorMessage}</p>
+        </div>
+      )}
+
+      {!isLoading && !errorMessage && content && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {soapFields.map(({ key, label, icon }) => (
             <div
@@ -99,7 +107,7 @@ export default function SOAPResponse({ content, isLoading = false }: SOAPRespons
         </div>
       )}
 
-      {!isLoading && !content && (
+      {!isLoading && !errorMessage && !content && (
         <div className="text-center py-12 bg-pink-50 rounded-xl border border-gray-200">
           <p className="text-blue-700 font-medium">Grave uma consulta e envie para receber a análise em SOAP aqui.</p>
         </div>
