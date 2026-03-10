@@ -5,6 +5,7 @@ Um aplicativo web para transcrição automática de consultas médicas com forma
 ## ✨ Funcionalidades
 
 - **🎤 Gravação de Áudio**: Grave consultas médicas diretamente no navegador
+- **🖥️ Modo Teleconsulta**: Misture o seu microfone com o áudio da aba ou janela compartilhada
 - **🤖 Processamento com IA**: Análise automática usando Google Gemini API
 - **📝 Formatação SOAP**: Resposta estruturada em formato clínico padrão
 - **📱 Responsivo**: Funciona em desktops e dispositivos móveis
@@ -40,11 +41,18 @@ Abra [http://localhost:3000](http://localhost:3000) no navegador.
 
 ## 📖 Como Usar
 
-1. **Gravação**: Clique em "Iniciar Gravação" e permita acesso ao microfone
-2. **Consulta**: Realize a consulta normalmente
-3. **Parar**: Clique em "Parar Gravação" ao final
-4. **Processamento**: A IA analisará automaticamente e gerará o SOAP
-5. **Copiar**: Copie as seções para seu prontuário eletrônico
+1. **Modo**: Escolha entre consulta presencial e teleconsulta
+2. **Permissões**: Autorize o microfone; na teleconsulta, compartilhe a aba ou janela da chamada com áudio
+3. **Consulta**: Realize a consulta normalmente
+4. **Parar**: Clique em "Parar Gravação" ao final
+5. **Processamento**: A IA analisará automaticamente e gerará o SOAP
+6. **Copiar**: Copie as seções para seu prontuário eletrônico
+
+### Observações para Teleconsulta
+
+- Para melhor compatibilidade, abra o MedTranscritor e a teleconsulta no mesmo navegador, em abas do Chrome ou do Edge, e habilite o compartilhamento de áudio na aba da chamada.
+- A captura de áudio de uma janela isolada pode variar conforme o navegador e o sistema operacional.
+- O aplicativo grava apenas o áudio misturado; o vídeo compartilhado não é enviado para transcrição.
 
 ## 🏗️ Estrutura do Projeto
 
