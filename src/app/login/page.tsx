@@ -2,6 +2,7 @@
 
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -41,23 +42,25 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#1a2e45] flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-sm">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-[#1a2e45] rounded-lg mb-5">
-            <span className="text-white text-xs font-bold tracking-widest">MT</span>
+    <div className="min-h-screen bg-gradient-to-br from-[#003f87] to-[#002d5a] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+        {/* Logo */}
+        <div className="text-center mb-10">
+          <div className="inline-block">
+            <Image
+              src="/logo.png"
+              alt="MedTranscript Logo"
+              width={300}
+              height={100}
+              priority
+              className="w-80 h-auto"
+            />
           </div>
-          <h1 className="text-2xl font-semibold text-[#1a2e45] tracking-tight">
-            MedTranscritor
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">
-            Transcrição de consultas médicas
-          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label htmlFor="username" className="block text-xs font-medium text-[#607080] uppercase tracking-wider mb-1.5">
+            <label htmlFor="username" className="block text-xs font-semibold text-[#003f87] uppercase tracking-wider mb-2">
               Usuário
             </label>
             <input
@@ -66,14 +69,14 @@ export default function LoginPage() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="Insira seu usuário"
-              className="w-full px-3.5 py-2.5 text-sm border border-[#dde2e8] rounded-md focus:outline-none focus:ring-2 focus:ring-[#4a7fa5] focus:border-[#4a7fa5] transition text-[#1a2e45]"
+              className="w-full px-4 py-3 text-sm border-2 border-[#e0e8f0] rounded-lg focus:outline-none focus:border-[#5dd462] focus:ring-2 focus:ring-[#5dd462] focus:ring-opacity-20 transition text-[#003f87] placeholder-[#a0b0c0]"
               required
               disabled={loading}
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-xs font-medium text-[#607080] uppercase tracking-wider mb-1.5">
+            <label htmlFor="password" className="block text-xs font-semibold text-[#003f87] uppercase tracking-wider mb-2">
               Senha
             </label>
             <input
@@ -82,14 +85,14 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Insira sua senha"
-              className="w-full px-3.5 py-2.5 text-sm border border-[#dde2e8] rounded-md focus:outline-none focus:ring-2 focus:ring-[#4a7fa5] focus:border-[#4a7fa5] transition text-[#1a2e45]"
+              className="w-full px-4 py-3 text-sm border-2 border-[#e0e8f0] rounded-lg focus:outline-none focus:border-[#5dd462] focus:ring-2 focus:ring-[#5dd462] focus:ring-opacity-20 transition text-[#003f87] placeholder-[#a0b0c0]"
               required
               disabled={loading}
             />
           </div>
 
           {error && (
-            <div className="border border-red-200 text-red-700 px-3.5 py-2.5 rounded-md text-sm">
+            <div className="border border-red-200 bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm font-medium">
               {error}
             </div>
           )}
@@ -97,13 +100,13 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#1a2e45] hover:bg-[#234060] text-white text-sm font-medium py-2.5 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed tracking-wide"
+            className="w-full bg-[#003f87] hover:bg-[#002d5a] text-white text-sm font-bold py-3 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed tracking-wide shadow-md hover:shadow-lg"
           >
-            {loading ? 'Aguarde...' : 'Entrar'}
+            {loading ? 'Autenticando...' : 'Entrar'}
           </button>
         </form>
 
-        <p className="text-center text-slate-400 text-xs mt-6">
+        <p className="text-center text-[#a0b0c0] text-xs mt-6">
           Acesso restrito para usuários autorizados
         </p>
       </div>

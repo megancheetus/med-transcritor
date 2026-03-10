@@ -1,15 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+interface AuthUser {
+  username: string;
+  password: string;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { username, password } = await request.json();
 
-    // Get credentials from environment variables
-    const validUsername = process.env.AUTH_USERNAME;
-    const validPassword = process.env.AUTH_PASSWORD;
+    // Get credentials from environment variable (JSON format)
+    const authUsersJson = process.env.AUTH_USERS;
 
-    // Simple credential check
-    if (username === validUsername && password === validPassword) {
+    if (!authUsersJson) {
+      return NextResponse.json(
+        { error: 'Servidor não configurado corretamente' },
+        { status: 500 }
+      );
+    }
+
+    // Parse JSON with multiple users
+    let authUsers: AuthUser[];
+    try {
+      authUsers = JSON.parse(authUsersJson);
+    } catch {
+      return NextResponse.json(
+        { error: 'Configuração de usuários inválida' },
+        { status: 500 }
+      );
+    }
+
+    // Find matching user
+    const user = authUsers.find(
+      (u) => u.username === username && u.password === password
+    );
+
+    if (user) {
       // Create response with auth cookie
       const response = NextResponse.json(
         { message: 'Login bem-sucedido' },

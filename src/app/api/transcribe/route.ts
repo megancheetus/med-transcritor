@@ -1,31 +1,9 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
+import { getModelById, TranscriptionModelType, TRANSCRIPTION_MODELS } from '@/lib/transcriptionModels';
 
-const MODEL_NAME = 'gemini-3.1-flash-lite';
+const GEMINI_MODEL = 'gemini-2.5-flash';
 const MAX_INLINE_AUDIO_BYTES = 18 * 1024 * 1024;
-
-const SYSTEM_PROMPT = `Você é um assistente de transcrição clínica especializado em análise de áudio de consultas médicas.
-
-Sua tarefa é:
-1. Transcrever fielmente o conteúdo clínico do áudio
-2. Estruturar as informações no formato SOAP:
-   - S (Subjetivo): Queixas do paciente, histórico e sintomas relatados
-   - O (Objetivo): Sinais vitais e dados de exames físicos/laboratoriais
-   - A (Avaliação): Diagnósticos prováveis ou impressões clínicas
-   - P (Plano): Conduta, medicações, exames solicitados e retorno
-
-INSTRUÇÕES CRÍTICAS:
-- Ignore conversas não-clínicas
-- Use terminologia médica apropriada
-- Deixe seções em branco se não informadas
-- Não alucinhe dados
-- Seja preciso
-
-Formate EXATAMENTE assim:
-S (Subjetivo): [conteúdo aqui]
-O (Objetivo): [conteúdo aqui]
-A (Avaliação): [conteúdo aqui]
-P (Plano): [conteúdo aqui]`;
 
 const getGeminiClient = () => {
   const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
@@ -64,6 +42,15 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const audioBlob = formData.get('audio') as Blob;
     const mimeType = audioBlob?.type || 'audio/webm';
+    const model = (formData.get('model') as TranscriptionModelType) || 'soap';
+
+    // Validate model
+    if (!TRANSCRIPTION_MODELS[model]) {
+      return NextResponse.json(
+        { error: 'Modelo de transcrição inválido' },
+        { status: 400 }
+      );
+    }
 
     if (!audioBlob) {
       return NextResponse.json({ error: 'No audio file provided' }, { status: 400 });
@@ -90,12 +77,13 @@ export async function POST(request: NextRequest) {
 
     // Use Gemini API to process the audio
     const client = getGeminiClient();
-    const model = client.getGenerativeModel({ model: MODEL_NAME });
+    const geminiModel = client.getGenerativeModel({ model: GEMINI_MODEL });
+    const transcriptionModel = getModelById(model);
 
-    console.log('Sending to Gemini...');
+    console.log('Sending to Gemini with model:', model);
 
-    const response = await model.generateContent([
-      SYSTEM_PROMPT,
+    const response = await geminiModel.generateContent([
+      transcriptionModel.prompt,
       {
         inlineData: {
           mimeType,
@@ -108,7 +96,10 @@ export async function POST(request: NextRequest) {
 
     console.log('Gemini response:', result);
 
-    return NextResponse.json({ soap: result });
+    return NextResponse.json({ 
+      content: result,
+      model: model,
+    });
   } catch (error) {
     const details = getErrorDetails(error);
     const maybeStatus = typeof Reflect.get(error as object, 'status') === 'number'

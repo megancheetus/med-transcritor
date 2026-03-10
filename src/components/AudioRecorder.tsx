@@ -489,14 +489,24 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
                 type="button"
                 onClick={() => setCaptureMode(option.value)}
                 disabled={isRecording || isLoading}
-                className={`rounded-lg border p-4 text-left transition ${
+                className={`rounded-xl border-2 p-5 text-left transition transform hover:scale-105 ${
                   isSelected
-                    ? 'border-[#1a2e45] bg-[#f4f6f9]'
-                    : 'border-[#dde2e8] bg-white hover:border-[#4a7fa5]'
+                    ? 'border-[#5dd462] bg-gradient-to-br from-[#f0fdf4] to-[#e8f7f1] shadow-md'
+                    : 'border-[#e0e8f0] bg-white hover:border-[#003f87] hover:shadow-sm'
                 } disabled:cursor-not-allowed disabled:opacity-70`}
               >
-                <p className="text-sm font-medium text-[#1a2e45]">{option.title}</p>
-                <p className="mt-2 text-sm text-[#607080]">{option.description}</p>
+                <div className="flex items-center gap-3">
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition flex-shrink-0 ${
+                    isSelected
+                      ? 'border-[#5dd462] bg-[#5dd462]'
+                      : 'border-[#dde2e8]'
+                  }`}>
+                    {isSelected && (
+                      <span className="text-white text-xs font-bold">✓</span>
+                    )}
+                  </div>
+                  <p className="font-bold text-[#003f87] text-base">{option.title}</p>
+                </div>
               </button>
             );
           })}
@@ -525,7 +535,7 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {Object.values(sourceIndicators).map((indicator) => (
+            {(Object.values(sourceIndicators) as SourceIndicator[]).map((indicator) => (
               <div key={indicator.label} className="rounded-lg border border-[#dde2e8] bg-white p-4">
                 <div className="flex items-center justify-between gap-3 mb-2">
                   <p className="text-sm font-medium text-[#1a2e45]">{indicator.label}</p>
