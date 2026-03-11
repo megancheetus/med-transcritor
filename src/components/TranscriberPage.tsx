@@ -5,7 +5,15 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import AudioRecorder from '@/components/AudioRecorder';
 import TranscriptionResult from '@/components/TranscriptionResult';
-import { TranscriptionModelType, getAllModels } from '@/lib/transcriptionModels';
+import { TranscriptionModelType, getAllModels, getModelById } from '@/lib/transcriptionModels';
+
+interface HistoryEntry {
+  id: string;
+  timestamp: string;
+  model: TranscriptionModelType;
+  content: string;
+  duration: number; // em segundos
+}
 
 export default function TranscriberPage() {
   const router = useRouter();
@@ -14,11 +22,14 @@ export default function TranscriberPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [lastRecordingTime, setLastRecordingTime] = useState<string>('');
   const [processingError, setProcessingError] = useState('');
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [recordingDuration, setRecordingDuration] = useState(0);
 
-  const handleRecordingComplete = async (audioBlob: Blob) => {
+  const handleRecordingComplete = async (audioBlob: Blob, duration: number) => {
     setIsLoading(true);
     setTranscriptionContent('');
     setProcessingError('');
+    setRecordingDuration(duration);
 
     try {
       const formData = new FormData();
@@ -37,7 +48,18 @@ export default function TranscriberPage() {
       }
 
       setTranscriptionContent(data.content);
-      setLastRecordingTime(new Date().toLocaleString('pt-BR'));
+      const timestamp = new Date().toLocaleString('pt-BR');
+      setLastRecordingTime(timestamp);
+
+      // Add to history
+      const newEntry: HistoryEntry = {
+        id: Date.now().toString(),
+        timestamp,
+        model: selectedModel,
+        content: data.content,
+        duration,
+      };
+      setHistory((prev) => [newEntry, ...prev]);
     } catch (error) {
       console.error('Error:', error);
       setProcessingError((error as Error).message);
@@ -136,7 +158,7 @@ export default function TranscriberPage() {
 
       {/* Painéis principais */}
       <div className="max-w-5xl mx-auto px-6 pb-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="flex flex-col gap-5">
           <AudioRecorder onRecordingComplete={handleRecordingComplete} isLoading={isLoading} />
           <TranscriptionResult
             content={transcriptionContent}
@@ -147,6 +169,52 @@ export default function TranscriberPage() {
         </div>
       </div>
 
+      {/* Histórico de Consultas */}
+      {history.length > 0 && (
+        <div className="max-w-5xl mx-auto px-6 pb-8">
+          <div className="bg-white border border-[#dde2e8] rounded-xl p-6 sm:p-8">
+            <div className="flex items-center justify-between mb-6">
+              <p className="text-xs font-semibold text-[#607080] tracking-widest uppercase">
+                Histórico da Sessão
+              </p>
+              <span className="text-xs bg-[#f0fdf4] text-[#5dd462] px-3 py-1 rounded-full font-medium">
+                {history.length} consulta{history.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {history.map((entry) => (
+                <button
+                  key={entry.id}
+                  onClick={() => {
+                    setTranscriptionContent(entry.content);
+                    setSelectedModel(entry.model);
+                  }}
+                  className="w-full text-left p-4 rounded-lg border border-[#dde2e8] bg-[#f9fafb] hover:bg-[#f4f6f9] hover:border-[#003f87] transition"
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-[#1a2e45] mb-1">
+                        {getModelById(entry.model).name}
+                      </p>
+                      <div className="flex items-center gap-3 text-xs text-[#607080]">
+                        <span>📅 {entry.timestamp}</span>
+                        <span>⏱️ {Math.floor(entry.duration / 60)}m {entry.duration % 60}s</span>
+                      </div>
+                    </div>
+                    <div className="flex-shrink-0">
+                      <div className="text-sm font-medium text-[#003f87] bg-white rounded-md px-3 py-1.5 border border-[#dde2e8]">
+                        Ver
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Como usar — passos horizontais */}
       <div className="max-w-5xl mx-auto px-6 pb-14">
         <div className="bg-white border border-[#dde2e8] rounded-xl p-6 sm:p-8">
@@ -156,7 +224,7 @@ export default function TranscriberPage() {
               'Escolha entre consulta presencial e teleconsulta.',
               'Autorize o microfone — na teleconsulta, compartilhe também a aba com áudio.',
               'Inicie a gravação e conduza a consulta normalmente.',
-              'Pare ao final e aguarde o SOAP gerado.',
+              'Pare ao final e aguarde o resultado gerado.',
               'Copie o conteúdo para o prontuário eletrônico.',
             ].map((step, i) => (
               <li key={i} className="flex gap-3 flex-1">

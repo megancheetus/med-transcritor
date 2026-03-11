@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 interface AudioRecorderProps {
-  onRecordingComplete: (audioBlob: Blob) => void;
+  onRecordingComplete: (audioBlob: Blob, duration: number) => void;
   isLoading?: boolean;
 }
 
@@ -118,6 +118,8 @@ const createStartingIndicators = (mode: CaptureMode): SourceIndicators => ({
 export default function AudioRecorder({ onRecordingComplete, isLoading = false }: AudioRecorderProps) {
   const [captureMode, setCaptureMode] = useState<CaptureMode>('inPerson');
   const [isRecording, setIsRecording] = useState(false);
+  const [isPreparing, setIsPreparing] = useState(false);
+  const [isPrepared, setIsPrepared] = useState(false);
   const [duration, setDuration] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
   const [warningMessage, setWarningMessage] = useState('');
@@ -128,18 +130,20 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingResourcesRef = useRef<RecordingResources | null>(null);
+  const preparedInputStreamsRef = useRef<MediaStream[] | null>(null);
 
   useEffect(() => {
     return () => {
       void cleanupRecordingResources();
+      void cleanupPreparedStreams();
     };
   }, []);
 
   useEffect(() => {
-    if (!isRecording) {
+    if (!isRecording && !isPrepared) {
       setSourceIndicators(createSourceIndicators(captureMode));
     }
-  }, [captureMode, isRecording]);
+  }, [captureMode, isRecording, isPrepared]);
 
   const clearTimer = () => {
     if (timerIntervalRef.current) {
@@ -183,6 +187,20 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
     recordingResourcesRef.current = null;
   };
 
+  const cleanupPreparedStreams = async () => {
+    const preparedStreams = preparedInputStreamsRef.current;
+
+    if (!preparedStreams) {
+      return;
+    }
+
+    preparedStreams.forEach((stream) => {
+      stream.getTracks().forEach((track) => track.stop());
+    });
+
+    preparedInputStreamsRef.current = null;
+  };
+
   const getPreferredRecordingMimeType = () => {
     const preferredMimeTypes = [
       'audio/webm;codecs=opus',
@@ -222,14 +240,27 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
     return 'Não foi possível iniciar a gravação. Verifique as permissões do navegador e tente novamente.';
   };
 
-  const getMicrophoneStream = async () =>
-    navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
-    });
+  const getMicrophoneStream = async (isTeleconsult: boolean = false) => {
+    // For teleconsult mode, use less restrictive audio constraints
+    // to work better with shared tab audio
+    const audioConstraints = isTeleconsult
+      ? {
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+          },
+        }
+      : {
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        };
+
+    return navigator.mediaDevices.getUserMedia(audioConstraints);
+  };
 
   const getDisplayStream = async () => {
     try {
@@ -267,23 +298,23 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
 
   const getTeleconsultMicrophoneWarning = (error: unknown) => {
     if (error instanceof DOMException && error.name === 'NotAllowedError') {
-      return 'O microfone local não foi liberado. A teleconsulta será gravada apenas com o áudio compartilhado da chamada.';
+      return 'O microfone local não foi liberado. Verifique as permissões do navegador para o microfone e tente novamente. Dica: Certifique-se de que nenhum outro aplicativo está usando o microfone do Google Meet.';
     }
 
     if (error instanceof DOMException && error.name === 'NotFoundError') {
-      return 'Nenhum microfone local foi encontrado. A teleconsulta será gravada apenas com o áudio compartilhado da chamada.';
+      return 'Nenhum microfone local foi encontrado. Verifique se seu dispositivo de áudio está conectado e funcionando.';
     }
 
     if (error instanceof DOMException && error.name === 'NotReadableError') {
-      return 'O microfone local está em uso por outro aplicativo. A teleconsulta será gravada apenas com o áudio compartilhado da chamada.';
+      return 'O microfone local está em uso por outro aplicativo. Feche outras aplicações que usam áudio (como o próprio Google Meet aberto em outra aba) e tente novamente. A teleconsulta será gravada apenas com o áudio compartilhado.';
     }
 
-    return 'Não foi possível acessar o microfone local. A teleconsulta será gravada apenas com o áudio compartilhado da chamada.';
+    return 'Não foi possível acessar o microfone local. Tente novamente ou recarregue a página. A teleconsulta será gravada apenas com o áudio compartilhado da chamada.';
   };
 
   const getInputStreams = async () => {
     if (captureMode === 'inPerson') {
-      const microphoneStream = await getMicrophoneStream();
+      const microphoneStream = await getMicrophoneStream(false);
       return {
         streams: [microphoneStream],
         indicators: {
@@ -302,7 +333,10 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
     const streams: MediaStream[] = [displayStream];
 
     try {
-      const microphoneStream = await getMicrophoneStream();
+      // Add a small delay to allow the browser to release the microphone
+      // from the display share process before trying to access it again
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const microphoneStream = await getMicrophoneStream(true);
       streams.push(microphoneStream);
     } catch (error) {
       warning = getTeleconsultMicrophoneWarning(error);
@@ -339,12 +373,56 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
         error.name
       ));
 
-  const startRecording = async () => {
+  const prepareRecording = async () => {
     try {
       setErrorMessage('');
       setWarningMessage('');
+      setIsPreparing(true);
       setSourceIndicators(createStartingIndicators(captureMode));
       const { streams: inputStreams, warning, indicators } = await getInputStreams();
+
+      preparedInputStreamsRef.current = inputStreams;
+      setSourceIndicators(indicators);
+
+      if (warning) {
+        setWarningMessage(warning);
+      }
+
+      setIsPreparing(false);
+      setIsPrepared(true);
+    } catch (error) {
+      if (isExpectedRecordingError(error)) {
+        console.warn('Falha esperada ao preparar a gravação:', error);
+      } else {
+        console.error('Erro ao preparar a gravação:', error);
+      }
+
+      await cleanupPreparedStreams();
+      setIsPreparing(false);
+      setIsPrepared(false);
+      setWarningMessage('');
+      setSourceIndicators(createSourceIndicators(captureMode));
+      setErrorMessage(getErrorMessage(error));
+    }
+  };
+
+  const cancelPrepare = async () => {
+    await cleanupPreparedStreams();
+    setIsPrepared(false);
+    setWarningMessage('');
+    setErrorMessage('');
+    setSourceIndicators(createSourceIndicators(captureMode));
+  };
+
+  const startRecording = async () => {
+    try {
+      const inputStreams = preparedInputStreamsRef.current;
+
+      if (!inputStreams) {
+        throw new Error('As fontes de áudio não foram preparadas corretamente. Clique em "Preparar" novamente.');
+      }
+
+      setErrorMessage('');
       const audioContext = new AudioContext();
       const mixNode = audioContext.createGain();
       const destinationNode = audioContext.createMediaStreamDestination();
@@ -361,9 +439,6 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
         .map((stream) => audioContext.createMediaStreamSource(new MediaStream(stream.getAudioTracks())));
 
       if (sourceNodes.length === 0) {
-        inputStreams.forEach((stream) => {
-          stream.getTracks().forEach((track) => track.stop());
-        });
         await audioContext.close();
         throw new Error('Nenhuma fonte de áudio válida foi encontrada para a gravação.');
       }
@@ -386,12 +461,6 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
         mediaRecorder,
       };
 
-      setSourceIndicators(indicators);
-
-      if (warning) {
-        setWarningMessage(warning);
-      }
-
       mediaRecorder.start(1000);
       setIsRecording(true);
       setDuration(0);
@@ -399,15 +468,14 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
         setDuration((prev) => prev + 1);
       }, 1000);
     } catch (error) {
-      if (isExpectedRecordingError(error)) {
-        console.warn('Falha esperada ao iniciar a gravação:', error);
-      } else {
+      if (error instanceof Error) {
         console.error('Erro ao iniciar a gravação:', error);
       }
 
       await cleanupRecordingResources();
+      await cleanupPreparedStreams();
+      setIsPrepared(false);
       setIsRecording(false);
-      setWarningMessage('');
       setSourceIndicators(createSourceIndicators(captureMode));
       setErrorMessage(getErrorMessage(error));
     }
@@ -441,7 +509,9 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
     const audioMimeType =
       resources.mediaRecorder.mimeType || recordedChunks[0]?.type || getPreferredRecordingMimeType() || 'audio/webm';
     await cleanupRecordingResources();
+    await cleanupPreparedStreams();
     setSourceIndicators(createSourceIndicators(captureMode));
+    setIsPrepared(false);
 
     if (recordedChunks.length === 0) {
       setWarningMessage('');
@@ -458,7 +528,7 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
     }
 
     setLastCompletedMode(captureMode);
-    onRecordingComplete(audioBlob);
+    onRecordingComplete(audioBlob, duration);
   };
 
   const formatDuration = (seconds: number) => {
@@ -488,7 +558,7 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
                 key={option.value}
                 type="button"
                 onClick={() => setCaptureMode(option.value)}
-                disabled={isRecording || isLoading}
+                disabled={isRecording || isLoading || isPrepared || isPreparing}
                 className={`rounded-xl border-2 p-5 text-left transition transform hover:scale-105 ${
                   isSelected
                     ? 'border-[#5dd462] bg-gradient-to-br from-[#f0fdf4] to-[#e8f7f1] shadow-md'
@@ -527,10 +597,14 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
             <p className="text-sm font-medium text-[#1a2e45]">Fontes detectadas</p>
             <span
               className={`rounded-full px-3 py-1 text-xs font-medium ${
-                isRecording ? 'bg-red-100 text-red-700' : 'bg-white text-[#1a2e45] border border-[#dde2e8]'
+                isRecording
+                  ? 'bg-red-100 text-red-700'
+                  : isPrepared
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-white text-[#1a2e45] border border-[#dde2e8]'
               }`}
             >
-              {isRecording ? 'Capturando agora' : 'Pronto para iniciar'}
+              {isRecording ? 'Capturando agora' : isPrepared ? 'Pronto para iniciar consulta' : 'Pronto para testar o ambiente'}
             </span>
           </div>
 
@@ -563,6 +637,14 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
           </div>
         )}
 
+        {isPrepared && !isRecording && (
+          <div className="w-full bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+            <p className="text-sm text-blue-700 font-medium">
+              ✓ Todos os dispositivos de áudio foram verificados e estão funcionando. Você já pode iniciar a gravação!
+            </p>
+          </div>
+        )}
+
         {isRecording && (
           <div className="w-full text-center bg-red-50 rounded-xl border border-red-200 p-6">
             <div className="flex justify-center mb-3">
@@ -576,22 +658,38 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
         )}
 
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-          {!isRecording ? (
+          {!isRecording && !isPrepared ? (
             <button
-              onClick={startRecording}
-              disabled={isLoading}
+              onClick={prepareRecording}
+              disabled={isLoading || isPreparing}
               className="flex-1 sm:flex-none px-6 py-3 bg-[#1a2e45] hover:bg-[#234060] text-white font-medium tracking-wide rounded-md disabled:bg-gray-400 transition-all disabled:cursor-not-allowed"
             >
-              {captureMode === 'inPerson' ? 'Iniciar Consulta Presencial' : 'Iniciar Teleconsulta'}
+              {isPreparing ? 'Verificando dispositivos...' : 'Preparar'}
             </button>
-          ) : (
+          ) : isPrepared && !isRecording ? (
+            <>
+              <button
+                onClick={startRecording}
+                disabled={isLoading}
+                className="flex-1 sm:flex-none px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium tracking-wide rounded-md disabled:bg-gray-400 transition-all disabled:cursor-not-allowed"
+              >
+                {captureMode === 'inPerson' ? 'Iniciar Consulta Presencial' : 'Iniciar Teleconsulta'}
+              </button>
+              <button
+                onClick={cancelPrepare}
+                className="flex-1 sm:flex-none px-6 py-3 bg-gray-400 hover:bg-gray-500 text-white font-medium tracking-wide rounded-md transition-all"
+              >
+                Cancelar
+              </button>
+            </>
+          ) : isRecording ? (
             <button
               onClick={stopRecording}
               className="flex-1 sm:flex-none px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-medium tracking-wide rounded-md transition-all"
             >
               Parar Gravação
             </button>
-          )}
+          ) : null}
         </div>
 
         {!isRecording && duration > 0 && (

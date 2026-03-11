@@ -46,7 +46,7 @@ export default function SOAPResponse({ content, isLoading = false, errorMessage 
 
   return (
     <div className="w-full bg-white rounded-xl border border-[#dde2e8] p-6 sm:p-8">
-      <div className="flex items-center justify-between mb-5 flex-col sm:flex-row gap-3">
+      <div className="flex items-center justify-between mb-6 flex-col sm:flex-row gap-3">
         <p className="text-xs font-semibold text-[#607080] tracking-widest uppercase">
           Resultado SOAP
         </p>
@@ -78,28 +78,37 @@ export default function SOAPResponse({ content, isLoading = false, errorMessage 
       )}
 
       {!isLoading && !errorMessage && content && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-6 w-full">
           {soapFields.map(({ key, label }) => (
             <div
               key={key}
-              className="border border-[#dde2e8] bg-white rounded-lg p-4 hover:border-[#4a7fa5] transition"
+              className="border border-[#dde2e8] bg-[#f9fafb] rounded-lg overflow-visible hover:border-[#4a7fa5] transition w-full"
             >
-              <div className="flex items-start justify-between mb-3">
-                <h3 className="font-medium text-[#1a2e45] text-sm tracking-tight">{label}</h3>
+              {/* Header da seção */}
+              <div className="bg-[#f4f6f9] border-b border-[#dde2e8] px-5 py-3.5 flex items-center justify-between">
+                <h3 className="font-semibold text-[#003f87] text-base tracking-tight">{label}</h3>
                 <button
                   onClick={() =>
                     copyToClipboard(
                       soap[key as keyof typeof soap] || '(Não informado)'
                     )
                   }
-                  className="text-xs border border-[#dde2e8] text-[#607080] px-2.5 py-1.5 rounded-md hover:border-[#1a2e45] hover:text-[#1a2e45] transition font-medium whitespace-nowrap ml-2 flex-shrink-0"
+                  className="text-xs border border-[#dde2e8] text-[#607080] px-3 py-1.5 rounded-md hover:border-[#003f87] hover:text-[#003f87] hover:bg-white transition font-medium whitespace-nowrap flex-shrink-0"
                 >
                   Copiar
                 </button>
               </div>
-              <p className="text-[#1a2e45] whitespace-pre-wrap text-sm min-h-24 leading-relaxed bg-[#f4f6f9] p-3 rounded-md">
-                {soap[key as keyof typeof soap] || '—'}
-              </p>
+
+              {/* Conteúdo - sem limite de altura */}
+              <div className="p-5 w-full">
+                <div className="text-[#1a2e45] leading-relaxed text-base whitespace-pre-wrap break-words overflow-visible">
+                  {soap[key as keyof typeof soap] ? (
+                    <p className="text-justify m-0">{soap[key as keyof typeof soap]}</p>
+                  ) : (
+                    <p className="text-[#9ca3af] italic">— Não informado</p>
+                  )}
+                </div>
+              </div>
             </div>
           ))}
         </div>
