@@ -14,30 +14,31 @@ export const TRANSCRIPTION_MODELS: Record<TranscriptionModelType, TranscriptionM
     name: 'SOAP',
     description: 'Formato clássico SOAP (Subjetivo, Objetivo, Avaliação, Plano)',
     sections: ['S', 'O', 'A', 'P'],
-    prompt: `Você é um assistente de transcrição clínica especializado em análise de áudio de consultas médicas.
+    prompt: `Atue como um Médico de Família e Comunidade (MFC) experiente redigindo a evolução clínica de um paciente. Sua tarefa é transcrever e sintetizar o áudio da consulta em um formato SOAP estritamente narrativo, utilizando a abordagem do Método Clínico Centrado na Pessoa (MCCP).
 
-Sua tarefa é transcrever fielmente o conteúdo clínico do áudio e estruturar as informações em formato SOAP, usando PARÁGRAFOS COMPLETOS E TEXTOS FLUÍDOS, nunca tópicos ou bullet points.
+INSTRUÇÕES DE ESTILO E LIMITES (CRÍTICO):
+- O texto deve ser sintético, objetivo e clinicamente preciso.
+- LIMITE RIGOROSO: Nenhuma seção (S, O, A, P) deve ultrapassar 150 palavras (aprox. 1000 caracteres).
+- OBRIGATÓRIO: Use parágrafos completos e texto fluido.
+- PROIBIDO: Nunca use tópicos, bullet points ou listas numeradas.
 
-Estrutura esperada:
-- S (Subjetivo): Redija em parágrafos as queixas do paciente, histórico e sintomas relatados. Descreva de forma narrativa e contínua.
-- O (Objetivo): Descreva em parágrafos os sinais vitais e dados de exames físicos/laboratoriais com prosa fluída e bem estruturada.
-- A (Avaliação): Redija em parágrafos as impressões clínicas e diagnósticos prováveis de forma discursiva.
-- P (Plano): Descreva em parágrafos a conduta, medicações, exames e retorno de forma narrativa e clara.
+ESTRUTURA SOAP ESPERADA:
+S (Subjetivo): Sintetize o motivo da consulta, história clínica e vivência do paciente (sentimentos, ideias, impacto funcional e expectativas). Inclua aspectos familiares, sociais e econômicos apenas se tiverem impacto clínico direto.
+O (Objetivo): Descreva dados de exame físico, sinais vitais e exames complementares em texto corrido, com foco no que é clinicamente relevante.
+A (Avaliação): Redija impressão diagnóstica, problemas ativos e avaliação concisa do contexto biopsicossocial.
+P (Plano): Descreva conduta terapêutica, prescrições, orientações e seguimento/retorno de forma direta.
 
-INSTRUÇÕES CRÍTICAS:
-- NUNCA use bullet points, tópicos ou listas numeradas
-- Sempre escreva em parágrafos completos e bem estruturados
-- Ignore conversas não-clínicas
-- Use terminologia médica apropriada
-- Deixe seções em branco se não informadas
-- Não alucinhe dados
-- Seja preciso e clinicamente relevante
+REGRAS DE TRANSCRIÇÃO:
+- Ignore conversas paralelas ou amenidades sem valor clínico.
+- Alucinação zero: NÃO INVENTE ou presuma dados em hipótese alguma.
+- Trechos inaudíveis: não extrapole; registre apenas o audível e marque com "[Trecho inaudível]".
+- Se uma seção não tiver conteúdo audível suficiente, escreva apenas: "Não informado no áudio".
 
 Formate EXATAMENTE assim:
-S (Subjetivo): [parágrafos com conteúdo completo aqui]
-O (Objetivo): [parágrafos com conteúdo completo aqui]
-A (Avaliação): [parágrafos com conteúdo completo aqui]
-P (Plano): [parágrafos com conteúdo completo aqui]`,
+S (Subjetivo): [texto]
+O (Objetivo): [texto]
+A (Avaliação): [texto]
+P (Plano): [texto]`,
   },
   clinicaMedica: {
     id: 'clinicaMedica',
@@ -59,11 +60,16 @@ SEÇÕES COM REDAÇÃO EM PARÁGRAFOS:
 
 INSTRUÇÕES CRÍTICAS:
 - NUNCA use bullet points, tópicos ou listas numeradas
+- LIMITE RIGOROSO: Nenhuma seção deve ultrapassar 150 palavras (aprox. 1000 caracteres).
+- O texto deve ser sintético, objetivo e clinicamente preciso.
 - Sempre escreva em parágrafos completos e bem estruturados
 - Ignore conversas não-clínicas
 - Use terminologia médica apropriada
 - Deixe seções em branco se não informadas durante a consulta
-- Não alucinhe dados ou invente informações
+- NÃO INVENTE dados em hipótese alguma.
+- Se houver trecho inaudível, não extrapole: registre apenas o que foi audível e marque o trecho como "Trecho inaudível".
+- Se uma seção não tiver conteúdo audível suficiente, escreva apenas: "Não informado no áudio".
+- Limite de tamanho: cada seção deve ter no máximo 5 frases curtas (ou ~120 palavras).
 - Seja preciso e clinicamente relevante
 
 Formate EXATAMENTE assim:

@@ -4,8 +4,16 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import AudioRecorder from '@/components/AudioRecorder';
+import AudioFileUpload from '@/components/AudioFileUpload';
 import TranscriptionResult from '@/components/TranscriptionResult';
+import LocalAudioBackup from '@/components/LocalAudioBackup';
 import { TranscriptionModelType, getAllModels, getModelById } from '@/lib/transcriptionModels';
+import { compressAudio, formatBytes } from '@/lib/audioUtils';
+import { audioStorageManager } from '@/lib/audioStorageManager';
+
+// Legacy feature flags (false for production deploy).
+const ENABLE_LEGACY_TEST_UPLOAD = false;
+const ENABLE_LEGACY_LOCAL_BACKUP = false;
 
 interface HistoryEntry {
   id: string;
@@ -13,6 +21,7 @@ interface HistoryEntry {
   model: TranscriptionModelType;
   content: string;
   duration: number; // em segundos
+  audioId?: string; // ID do áudio armazenado localmente
 }
 
 export default function TranscriberPage() {
@@ -24,17 +33,83 @@ export default function TranscriberPage() {
   const [processingError, setProcessingError] = useState('');
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [recordingDuration, setRecordingDuration] = useState(0);
+  const [compressionStatus, setCompressionStatus] = useState('');
+  const [savedAudioInfo, setSavedAudioInfo] = useState<{ id: string; size: string } | null>(null);
+  const [backupRefreshTrigger, setBackupRefreshTrigger] = useState(0);
+  const [processingMeta, setProcessingMeta] = useState<{
+    originalBytes: number;
+    sentBytes: number;
+    compressed: boolean;
+    chunked: boolean;
+    chunksProcessed: number;
+  } | null>(null);
 
   const handleRecordingComplete = async (audioBlob: Blob, duration: number) => {
     setIsLoading(true);
     setTranscriptionContent('');
     setProcessingError('');
+    setCompressionStatus('');
+    setSavedAudioInfo(null);
+    setProcessingMeta(null);
     setRecordingDuration(duration);
 
+    let audioId: string | undefined;
+
     try {
+      // Etapa 1 (legacy): Salvar áudio no IndexedDB como backup local
+      if (ENABLE_LEGACY_LOCAL_BACKUP) {
+        try {
+          setCompressionStatus('💾 Salvando áudio como backup local...');
+          audioId = await audioStorageManager.saveAudio(audioBlob, duration, selectedModel);
+          console.log('Áudio salvo com ID:', audioId);
+        } catch (storageError) {
+          console.warn('Aviso: Não foi possível salvar backup local:', storageError);
+        }
+      }
+
+      // Etapa 2: Processar áudio (compressão adaptativa, igual ao fluxo legado de upload)
+      let audioToSend = audioBlob;
+
+      if (audioBlob.size > 10 * 1024 * 1024) {
+        setCompressionStatus('🗜️ Comprimindo áudio antes do envio...');
+        const targetRates = [8000, 4000, 2000];
+        const chunkThresholdBytes = 15 * 1024 * 1024;
+
+        for (const targetRate of targetRates) {
+          const compressed = await compressAudio(audioToSend, targetRate);
+
+          if (compressed.size < audioToSend.size) {
+            console.log(
+              `Gravação comprimida @${targetRate}Hz: ${formatBytes(audioToSend.size)} → ${formatBytes(compressed.size)}`
+            );
+            audioToSend = compressed;
+          }
+
+          if (audioToSend.size <= chunkThresholdBytes) {
+            break;
+          }
+        }
+
+        if (audioToSend.size < audioBlob.size) {
+          setCompressionStatus(
+            `✅ Compressão aplicada: ${formatBytes(audioBlob.size)} → ${formatBytes(audioToSend.size)}`
+          );
+        } else {
+          setCompressionStatus(
+            `⚠️ Não houve redução (${formatBytes(audioBlob.size)}). Enviando original; API fará chunking apenas se necessário.`
+          );
+        }
+      }
+
+      // Etapa 3: Enviar para API de transcrição
+      setCompressionStatus('🚀 Enviando para processamento...');
+
       const formData = new FormData();
-      formData.append('audio', audioBlob, 'recording.wav');
+      formData.append('audio', audioToSend, 'recording.wav');
       formData.append('model', selectedModel);
+      if (audioId) {
+        formData.append('audioId', audioId);
+      }
 
       const response = await fetch('/api/transcribe', {
         method: 'POST',
@@ -44,12 +119,47 @@ export default function TranscriberPage() {
       const data = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(data?.details || data?.error || `API error: ${response.statusText}`);
+        if (response.status === 401) {
+          throw new Error('Sessão expirada ou inválida. Faça login novamente.');
+        }
+
+        const errorMsg = data?.details || data?.error || `API error: ${response.statusText}`;
+
+        // Se for erro 413 (Payload Too Large), informar claramente
+        if (response.status === 413) {
+          throw new Error(
+            `Arquivo muito grande (${formatBytes(audioBlob.size)}). Máximo suportado: ~18 MB. Grave um trecho mais curto.`
+          );
+        }
+
+        throw new Error(errorMsg);
       }
 
+      // Etapa 4: Sucesso
+      if (audioId) {
+        try {
+          await audioStorageManager.updateAudioStatus(audioId, 'completed');
+        } catch (error) {
+          console.warn('Não foi possível atualizar status:', error);
+        }
+      }
+
+      setCompressionStatus('✅ Transcrição concluída com sucesso!');
+      setProcessingMeta({
+        originalBytes: audioBlob.size,
+        sentBytes: audioToSend.size,
+        compressed: audioToSend.size < audioBlob.size,
+        chunked: Boolean(data?.chunked),
+        chunksProcessed: Number(data?.chunksProcessed || 1),
+      });
       setTranscriptionContent(data.content);
       const timestamp = new Date().toLocaleString('pt-BR');
       setLastRecordingTime(timestamp);
+
+      if (audioId) {
+        setSavedAudioInfo({ id: audioId, size: formatBytes(audioBlob.size) });
+        setBackupRefreshTrigger((prev) => prev + 1);
+      }
 
       // Add to history
       const newEntry: HistoryEntry = {
@@ -58,11 +168,178 @@ export default function TranscriberPage() {
         model: selectedModel,
         content: data.content,
         duration,
+        audioId,
       };
       setHistory((prev) => [newEntry, ...prev]);
     } catch (error) {
       console.error('Error:', error);
-      setProcessingError((error as Error).message);
+      const errorMsg = (error as Error).message;
+      setProcessingError(errorMsg);
+      setCompressionStatus(`❌ Erro: ${errorMsg}`);
+
+      if (errorMsg.includes('Sessão expirada') || errorMsg.includes('Não autenticado')) {
+        setTimeout(() => {
+          router.push('/login');
+        }, 1200);
+      }
+
+      // Marcar áudio como falho
+      if (audioId) {
+        try {
+          await audioStorageManager.updateAudioStatus(audioId, 'failed', errorMsg);
+          if (ENABLE_LEGACY_LOCAL_BACKUP) {
+            setBackupRefreshTrigger((prev) => prev + 1);
+          }
+        } catch (updateError) {
+          console.warn('Não foi possível atualizar status de erro:', updateError);
+        }
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (file: File, duration: number) => {
+    setIsLoading(true);
+    setTranscriptionContent('');
+    setProcessingError('');
+    setCompressionStatus('');
+    setSavedAudioInfo(null);
+    setProcessingMeta(null);
+    setRecordingDuration(duration);
+
+    let audioId: string | undefined;
+
+    try {
+      // Etapa 1: Salvar áudio no backup
+      try {
+        setCompressionStatus('💾 Salvando arquivo como backup local...');
+        audioId = await audioStorageManager.saveAudio(file, duration, selectedModel);
+      } catch (storageError) {
+        console.warn('Aviso: Não foi possível salvar backup:', storageError);
+      }
+
+      // Etapa 2: Tentar comprimir antes de enviar
+      let audioToSend: Blob = file;
+      if (file.size > 10 * 1024 * 1024) {
+        setCompressionStatus('🗜️ Comprimindo arquivo antes do envio...');
+        const targetRates = [8000, 4000, 2000];
+        const chunkThresholdBytes = 15 * 1024 * 1024;
+
+        for (const targetRate of targetRates) {
+          const compressed = await compressAudio(audioToSend, targetRate);
+
+          if (compressed.size < audioToSend.size) {
+            console.log(
+              `Upload comprimido @${targetRate}Hz: ${formatBytes(audioToSend.size)} → ${formatBytes(compressed.size)}`
+            );
+            audioToSend = compressed;
+          }
+
+          if (audioToSend.size <= chunkThresholdBytes) {
+            break;
+          }
+        }
+
+        if (audioToSend.size < file.size) {
+          setCompressionStatus(
+            `✅ Compressão aplicada: ${formatBytes(file.size)} → ${formatBytes(audioToSend.size)}`
+          );
+        } else {
+          setCompressionStatus(
+            `⚠️ Não houve redução no cliente (${formatBytes(file.size)}). Enviando original; API fará chunking apenas se necessário.`
+          );
+          console.log('Compressão de upload não reduziu tamanho, mantendo original');
+        }
+      }
+
+      // Etapa 3: Enviar para processamento (chunking é último recurso no servidor)
+      setCompressionStatus('🚀 Enviando arquivo para processamento...');
+
+      const formData = new FormData();
+      formData.append('audio', audioToSend, file.name || 'uploaded-audio.wav');
+      formData.append('model', selectedModel);
+      if (audioId) {
+        formData.append('audioId', audioId);
+      }
+
+      const response = await fetch('/api/transcribe', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Sessão expirada ou inválida. Faça login novamente.');
+        }
+
+        const errorMsg = data?.details || data?.error || `API error: ${response.statusText}`;
+        throw new Error(errorMsg);
+      }
+
+      // Etapa 4: Sucesso
+      if (audioId) {
+        try {
+          await audioStorageManager.updateAudioStatus(audioId, 'completed');
+        } catch (error) {
+          console.warn('Não foi possível atualizar status:', error);
+        }
+      }
+
+      const processInfo = data.chunked
+        ? `✅ Processado em ${data.chunksProcessed} partes (${formatBytes(audioToSend.size)})`
+        : '✅ Transcrição concluída com sucesso!';
+
+      setCompressionStatus(processInfo);
+      setProcessingMeta({
+        originalBytes: file.size,
+        sentBytes: audioToSend.size,
+        compressed: audioToSend.size < file.size,
+        chunked: Boolean(data?.chunked),
+        chunksProcessed: Number(data?.chunksProcessed || 1),
+      });
+      setTranscriptionContent(data.content);
+      const timestamp = new Date().toLocaleString('pt-BR');
+      setLastRecordingTime(timestamp);
+
+      if (audioId) {
+        setSavedAudioInfo({ id: audioId, size: formatBytes(file.size) });
+        setBackupRefreshTrigger((prev) => prev + 1);
+      }
+
+      // Add to history
+      const newEntry: HistoryEntry = {
+        id: Date.now().toString(),
+        timestamp,
+        model: selectedModel,
+        content: data.content,
+        duration,
+        audioId,
+      };
+      setHistory((prev) => [newEntry, ...prev]);
+    } catch (error) {
+      console.error('Error:', error);
+      const errorMsg = (error as Error).message;
+      setProcessingError(errorMsg);
+      setCompressionStatus(`❌ Erro: ${errorMsg}`);
+
+      if (errorMsg.includes('Sessão expirada') || errorMsg.includes('Não autenticado')) {
+        setTimeout(() => {
+          router.push('/login');
+        }, 1200);
+      }
+
+      // Marcar áudio como falho
+      if (audioId) {
+        try {
+          await audioStorageManager.updateAudioStatus(audioId, 'failed', errorMsg);
+          setBackupRefreshTrigger((prev) => prev + 1);
+        } catch (updateError) {
+          console.warn('Não foi possível atualizar status de erro:', updateError);
+        }
+      }
     } finally {
       setIsLoading(false);
     }
@@ -160,6 +437,58 @@ export default function TranscriberPage() {
       <div className="max-w-5xl mx-auto px-6 pb-8">
         <div className="flex flex-col gap-5">
           <AudioRecorder onRecordingComplete={handleRecordingComplete} isLoading={isLoading} />
+
+          {ENABLE_LEGACY_TEST_UPLOAD && (
+            <AudioFileUpload onFileSelected={handleFileUpload} isLoading={isLoading} />
+          )}
+
+          {/* Status de Compressão e Armazenamento */}
+          {compressionStatus && (
+            <div className={`rounded-xl border p-4 ${
+              compressionStatus.startsWith('✅')
+                ? 'border-green-200 bg-green-50 text-green-700'
+                : compressionStatus.startsWith('❌')
+                  ? 'border-red-200 bg-red-50 text-red-700'
+                  : 'border-blue-200 bg-blue-50 text-blue-700'
+            }`}>
+              <p className="text-sm font-medium">{compressionStatus}</p>
+            </div>
+          )}
+
+          {/* Informações de Áudio Armazenado (legacy) */}
+          {ENABLE_LEGACY_LOCAL_BACKUP && savedAudioInfo && (
+            <div className="rounded-xl border border-green-200 bg-green-50 p-4">
+              <div className="flex items-start gap-3">
+                <div className="text-green-600 text-xl mt-0.5">💾</div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-green-900 mb-1">
+                    Áudio salvo como backup local
+                  </p>
+                  <p className="text-xs text-green-700 mb-2">
+                    Tamanho: <strong>{savedAudioInfo.size}</strong> | ID: <code className="bg-white px-2 py-1 rounded text-xs">{savedAudioInfo.id.substring(0, 20)}...</code>
+                  </p>
+                  <p className="text-xs text-green-700">
+                    Se o processamento falhar, você poderá recuperar este arquivo. Não feche a aba até confirmar o sucesso.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {processingMeta && (
+            <div className="rounded-xl border border-[#dde2e8] bg-[#f9fafb] p-4">
+              <p className="text-xs font-semibold text-[#607080] tracking-widest uppercase mb-3">
+                Diagnóstico do Processamento
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-[#1a2e45]">
+                <p>Tamanho original: <strong>{formatBytes(processingMeta.originalBytes)}</strong></p>
+                <p>Tamanho enviado: <strong>{formatBytes(processingMeta.sentBytes)}</strong></p>
+                <p>Compressão aplicada: <strong>{processingMeta.compressed ? 'Sim' : 'Não'}</strong></p>
+                <p>Chunking no servidor: <strong>{processingMeta.chunked ? `Sim (${processingMeta.chunksProcessed} partes)` : 'Não'}</strong></p>
+              </div>
+            </div>
+          )}
+
           <TranscriptionResult
             content={transcriptionContent}
             model={selectedModel}
@@ -212,6 +541,13 @@ export default function TranscriberPage() {
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Backup Local de Áudios (legacy) */}
+      {ENABLE_LEGACY_LOCAL_BACKUP && (
+        <div className="max-w-5xl mx-auto px-6 pb-8">
+          <LocalAudioBackup refreshTrigger={backupRefreshTrigger} />
         </div>
       )}
 
