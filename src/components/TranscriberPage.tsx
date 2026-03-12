@@ -14,6 +14,7 @@ import { audioStorageManager } from '@/lib/audioStorageManager';
 // Legacy feature flags (false for production deploy).
 const ENABLE_LEGACY_TEST_UPLOAD = false;
 const ENABLE_LEGACY_LOCAL_BACKUP = false;
+const NATIVE_QUALITY_MAX_BYTES = 15 * 1024 * 1024;
 
 interface HistoryEntry {
   id: string;
@@ -70,10 +71,10 @@ export default function TranscriberPage() {
       // Etapa 2: Processar áudio (compressão adaptativa, igual ao fluxo legado de upload)
       let audioToSend = audioBlob;
 
-      if (audioBlob.size > 10 * 1024 * 1024) {
+      if (audioBlob.size > NATIVE_QUALITY_MAX_BYTES) {
         setCompressionStatus('🗜️ Comprimindo áudio antes do envio...');
         const targetRates = [8000, 4000, 2000];
-        const chunkThresholdBytes = 15 * 1024 * 1024;
+        const chunkThresholdBytes = NATIVE_QUALITY_MAX_BYTES;
 
         for (const targetRate of targetRates) {
           const compressed = await compressAudio(audioToSend, targetRate);
@@ -125,10 +126,10 @@ export default function TranscriberPage() {
 
         const errorMsg = data?.details || data?.error || `API error: ${response.statusText}`;
 
-        // Se for erro 413 (Payload Too Large), o arquivo ainda excedeu o limite da plataforma após compressão
+        // Se for erro 413 (Payload Too Large), houve rejeição do provedor/plataforma de processamento.
         if (response.status === 413) {
           throw new Error(
-            `Arquivo muito grande para envio (${formatBytes(audioToSend.size)} após compressão). Tente gravar um trecho mais curto.`
+            `Arquivo muito grande para envio (${formatBytes(audioToSend.size)}). Tente novamente ou grave um trecho mais curto.`
           );
         }
 
@@ -219,12 +220,12 @@ export default function TranscriberPage() {
         console.warn('Aviso: Não foi possível salvar backup:', storageError);
       }
 
-      // Etapa 2: Comprimir até ficar dentro do limite de upload da plataforma (~4.5 MB no Vercel)
+      // Etapa 2: Só comprimir acima de 15MB; abaixo disso manter qualidade nativa
       let audioToSend: Blob = file;
-      if (file.size > 3.5 * 1024 * 1024) {
+      if (file.size > NATIVE_QUALITY_MAX_BYTES) {
         setCompressionStatus('🗜️ Comprimindo arquivo antes do envio...');
         const targetRates = [8000, 4000, 2000];
-        const uploadSafeBytes = 3.5 * 1024 * 1024; // Margem segura abaixo do limite de 4.5 MB do Vercel
+        const chunkThresholdBytes = NATIVE_QUALITY_MAX_BYTES;
 
         for (const targetRate of targetRates) {
           const compressed = await compressAudio(audioToSend, targetRate);
@@ -236,7 +237,7 @@ export default function TranscriberPage() {
             audioToSend = compressed;
           }
 
-          if (audioToSend.size <= uploadSafeBytes) {
+          if (audioToSend.size <= chunkThresholdBytes) {
             break;
           }
         }
@@ -488,6 +489,17 @@ export default function TranscriberPage() {
               </div>
             </div>
           )}
+
+          <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+            <p className="text-xs font-semibold text-amber-900 tracking-widest uppercase mb-2">
+              Aviso Importante
+            </p>
+            <p className="text-sm text-amber-900 leading-relaxed">
+              As informações transcritas podem conter erros, especialmente quando a qualidade do áudio gravado
+              ou enviado estiver reduzida. Todo conteúdo em texto deve ser obrigatoriamente revisado e validado
+              pelo profissional médico antes de qualquer uso clínico.
+            </p>
+          </div>
 
           <TranscriptionResult
             content={transcriptionContent}

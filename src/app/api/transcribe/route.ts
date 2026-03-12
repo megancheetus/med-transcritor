@@ -6,7 +6,8 @@ import { getModelById, TranscriptionModelType, TRANSCRIPTION_MODELS } from '@/li
 const GEMINI_MODEL = 'gemini-2.5-flash';
 // Audios maiores que este limite são enviados via Files API (upload separado ao Google),
 // em vez de inline base64, evitando o erro 413 do Gemini para payloads grandes.
-const FILES_API_THRESHOLD_BYTES = 10 * 1024 * 1024; // 10 MB
+// O inline base64 cresce ~33%; por isso usamos um limite conservador para evitar 413.
+const FILES_API_THRESHOLD_BYTES = 6 * 1024 * 1024; // 6 MB
 const CHUNK_SIZE_BYTES = 15 * 1024 * 1024;
 
 /**
