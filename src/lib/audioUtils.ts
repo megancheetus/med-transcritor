@@ -33,9 +33,9 @@ export async function compressAudio(audioBlob: Blob, targetSampleRate: number = 
   // Tentamos compressão para qualquer formato decodificável (inclusive WAV).
   // Só mantemos o original quando o resultado não reduz de fato o tamanho.
 
-  // Se é pequeno (< 10MB), não precisa comprimir
-  if (audioBlob.size < 10 * 1024 * 1024) {
-    console.log(`✓ Áudio pequeno (${formatBytes(audioBlob.size)}), mantendo original`);
+  // Se é muito pequeno (< 3.5 MB), já está dentro do limite de upload — não precisa comprimir
+  if (audioBlob.size < 3.5 * 1024 * 1024) {
+    console.log(`✓ Áudio dentro do limite de upload (${formatBytes(audioBlob.size)}), mantendo original`);
     return audioBlob;
   }
 
