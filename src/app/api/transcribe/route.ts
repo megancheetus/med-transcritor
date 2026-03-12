@@ -1,10 +1,13 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleAIFileManager } from '@google/generative-ai/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { getModelById, TranscriptionModelType, TRANSCRIPTION_MODELS } from '@/lib/transcriptionModels';
 
 const GEMINI_MODEL = 'gemini-2.5-flash';
-const MAX_INLINE_AUDIO_BYTES = 18 * 1024 * 1024;
-const CHUNK_SIZE_BYTES = 15 * 1024 * 1024; // Último recurso se ainda > 18MB
+// Audios maiores que este limite são enviados via Files API (upload separado ao Google),
+// em vez de inline base64, evitando o erro 413 do Gemini para payloads grandes.
+const FILES_API_THRESHOLD_BYTES = 10 * 1024 * 1024; // 10 MB
+const CHUNK_SIZE_BYTES = 15 * 1024 * 1024;
 
 /**
  * IMPORTANTE: O processamento chunked pode causar alucinações no Gemini
@@ -61,7 +64,7 @@ function divideAudioIntoChunks(buffer: Buffer, chunkSize: number = CHUNK_SIZE_BY
 }
 
 /**
- * Processa um chunk de áudio com Gemini
+ * Processa um chunk de áudio pequeno via inline base64 com Gemini.
  */
 async function processAudioChunk(
   client: GoogleGenerativeAI,
@@ -88,6 +91,48 @@ async function processAudioChunk(
   ]);
 
   return response.response.text();
+}
+
+/**
+ * Processa áudio usando a Gemini Files API.
+ * Faz upload do buffer diretamente para os servidores do Google e usa a URI no generateContent.
+ * Suporta arquivos de até 2 GB — sem restrição de tamanho inline.
+ */
+async function processAudioViaFilesAPI(
+  geminiModel: ReturnType<GoogleGenerativeAI['getGenerativeModel']>,
+  fileManager: GoogleAIFileManager,
+  transcriptionPrompt: string,
+  buffer: Buffer,
+  mimeType: string
+): Promise<string> {
+  console.log(`📤 Enviando via Files API (${buffer.length} bytes)...`);
+
+  const uploadResult = await fileManager.uploadFile(buffer, {
+    mimeType,
+    displayName: `consultation-${Date.now()}`,
+  });
+
+  const file = uploadResult.file;
+  console.log(`✅ Upload concluído: ${file.uri}`);
+
+  try {
+    const response = await geminiModel.generateContent([
+      transcriptionPrompt,
+      {
+        fileData: {
+          mimeType: file.mimeType,
+          fileUri: file.uri,
+        },
+      },
+    ]);
+
+    return response.response.text();
+  } finally {
+    // Remover o arquivo do Google após o processamento para não acumular no storage
+    await fileManager.deleteFile(file.name).catch((err: unknown) => {
+      console.warn('Aviso: não foi possível remover arquivo do Gemini Files API:', err);
+    });
+  }
 }
 
 /**
@@ -146,33 +191,49 @@ export async function POST(request: NextRequest) {
     console.log(`📦 Total de chunks: ${chunks.length}`);
 
     const client = getGeminiClient();
+    const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    if (!apiKey) throw new Error('A chave da API Gemini não está configurada.');
     const geminiModel = client.getGenerativeModel({ model: GEMINI_MODEL });
+    const fileManager = new GoogleAIFileManager(apiKey);
     const transcriptionModel = getModelById(model);
 
-    // Processar cada chunk
     const results: string[] = [];
 
-    for (let i = 0; i < chunks.length; i++) {
-      console.log(`\n🔄 Processando chunk ${i + 1}/${chunks.length} (${chunks[i].length} bytes)`);
+    // Arquivos grandes: usar Files API (sem limite inline) para evitar 413 do Gemini.
+    // Arquivos pequenos: usar inline base64 (mais rápido, sem round-trip de upload).
+    if (buffer.length > FILES_API_THRESHOLD_BYTES) {
+      console.log(`📦 Áudio grande (${buffer.length} bytes) → usando Files API`);
+      const result = await processAudioViaFilesAPI(
+        geminiModel,
+        fileManager,
+        transcriptionModel.prompt,
+        buffer,
+        mimeType
+      );
+      results.push(result);
+    } else {
+      for (let i = 0; i < chunks.length; i++) {
+        console.log(`\n🔄 Processando chunk ${i + 1}/${chunks.length} (${chunks[i].length} bytes)`);
 
-      const base64Chunk = chunks[i].toString('base64');
+        const base64Chunk = chunks[i].toString('base64');
 
-      try {
-        const chunkResult = await processAudioChunk(
-          client,
-          geminiModel,
-          transcriptionModel.prompt,
-          base64Chunk,
-          mimeType,
-          i,
-          chunks.length
-        );
+        try {
+          const chunkResult = await processAudioChunk(
+            client,
+            geminiModel,
+            transcriptionModel.prompt,
+            base64Chunk,
+            mimeType,
+            i,
+            chunks.length
+          );
 
-        results.push(chunkResult);
-        console.log(`✅ Chunk ${i + 1} processado com sucesso`);
-      } catch (chunkError) {
-        console.error(`❌ Erro ao processar chunk ${i + 1}:`, chunkError);
-        throw new Error(`Falha ao processar parte ${i + 1}/${chunks.length}: ${getErrorDetails(chunkError)}`);
+          results.push(chunkResult);
+          console.log(`✅ Chunk ${i + 1} processado com sucesso`);
+        } catch (chunkError) {
+          console.error(`❌ Erro ao processar chunk ${i + 1}:`, chunkError);
+          throw new Error(`Falha ao processar parte ${i + 1}/${chunks.length}: ${getErrorDetails(chunkError)}`);
+        }
       }
     }
 

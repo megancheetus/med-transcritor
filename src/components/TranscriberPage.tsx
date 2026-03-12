@@ -67,14 +67,13 @@ export default function TranscriberPage() {
         }
       }
 
-      // Etapa 2: Comprimir áudio até ficar dentro do limite de upload da plataforma (~4.5 MB no Vercel)
+      // Etapa 2: Processar áudio (compressão adaptativa, igual ao fluxo legado de upload)
       let audioToSend = audioBlob;
 
-      // Qualquer arquivo acima de 3.5 MB pode exceder o limite da plataforma — comprimir preventivamente
-      if (audioBlob.size > 3.5 * 1024 * 1024) {
+      if (audioBlob.size > 10 * 1024 * 1024) {
         setCompressionStatus('🗜️ Comprimindo áudio antes do envio...');
         const targetRates = [8000, 4000, 2000];
-        const uploadSafeBytes = 3.5 * 1024 * 1024; // Margem segura abaixo do limite de 4.5 MB do Vercel
+        const chunkThresholdBytes = 15 * 1024 * 1024;
 
         for (const targetRate of targetRates) {
           const compressed = await compressAudio(audioToSend, targetRate);
@@ -86,7 +85,7 @@ export default function TranscriberPage() {
             audioToSend = compressed;
           }
 
-          if (audioToSend.size <= uploadSafeBytes) {
+          if (audioToSend.size <= chunkThresholdBytes) {
             break;
           }
         }
