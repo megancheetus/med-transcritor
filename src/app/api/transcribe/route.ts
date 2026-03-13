@@ -48,6 +48,29 @@ const getErrorDetails = (error: unknown) => {
   return 'Erro desconhecido ao processar o áudio.';
 };
 
+const isPayloadTooLargeError = (error: unknown) => {
+  if (typeof error === 'object' && error !== null) {
+    const maybeStatus = Reflect.get(error, 'status');
+    if (typeof maybeStatus === 'number' && maybeStatus === 413) {
+      return true;
+    }
+
+    const maybeCode = Reflect.get(error, 'code');
+    if (maybeCode === 413 || maybeCode === '413') {
+      return true;
+    }
+  }
+
+  const details = getErrorDetails(error).toLowerCase();
+  return (
+    details.includes('413') ||
+    details.includes('payload too large') ||
+    details.includes('request payload size') ||
+    details.includes('request too large') ||
+    details.includes('exceeds the limit')
+  );
+};
+
 /**
  * Divide um buffer de áudio em chunks menores
  * Retorna array de buffers, cada um com tamanho <= CHUNK_SIZE_BYTES
@@ -200,6 +223,7 @@ export async function POST(request: NextRequest) {
     const transcriptionModel = getModelById(model);
 
     const results: string[] = [];
+    let usedFilesApiFallback = false;
 
     // Arquivos grandes: usar Files API (sem limite inline) para evitar 413 do Gemini.
     // Arquivos pequenos: usar inline base64 (mais rápido, sem round-trip de upload).
@@ -233,6 +257,27 @@ export async function POST(request: NextRequest) {
           results.push(chunkResult);
           console.log(`✅ Chunk ${i + 1} processado com sucesso`);
         } catch (chunkError) {
+          if (chunks.length === 1 && isPayloadTooLargeError(chunkError)) {
+            console.warn('⚠️ Inline rejeitado por tamanho. Reprocessando com Files API...');
+
+            try {
+              const fallbackResult = await processAudioViaFilesAPI(
+                geminiModel,
+                fileManager,
+                transcriptionModel.prompt,
+                buffer,
+                mimeType
+              );
+              results.push(fallbackResult);
+              usedFilesApiFallback = true;
+              console.log('✅ Fallback via Files API concluído com sucesso');
+              break;
+            } catch (fallbackError) {
+              console.error('❌ Falha no fallback via Files API:', fallbackError);
+              throw new Error(`Falha no fallback Files API: ${getErrorDetails(fallbackError)}`);
+            }
+          }
+
           console.error(`❌ Erro ao processar chunk ${i + 1}:`, chunkError);
           throw new Error(`Falha ao processar parte ${i + 1}/${chunks.length}: ${getErrorDetails(chunkError)}`);
         }
@@ -249,6 +294,7 @@ export async function POST(request: NextRequest) {
       model: model,
       chunked: chunks.length > 1,
       chunksProcessed: chunks.length,
+      usedFilesApiFallback,
     });
   } catch (error) {
     const details = getErrorDetails(error);

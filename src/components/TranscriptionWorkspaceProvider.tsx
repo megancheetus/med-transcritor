@@ -240,19 +240,24 @@ export function TranscriptionWorkspaceProvider({ storageNamespace, children }: T
       if (audioBlob.size > NATIVE_QUALITY_MAX_BYTES) {
         setCompressionStatus('Comprimindo áudio antes do envio...');
         const targetRates = [8000, 4000, 2000];
+        const chunkThresholdBytes = NATIVE_QUALITY_MAX_BYTES;
 
         for (const targetRate of targetRates) {
           const compressed = await compressAudio(audioToSend, targetRate);
           if (compressed.size < audioToSend.size) {
             audioToSend = compressed;
           }
-          if (audioToSend.size <= NATIVE_QUALITY_MAX_BYTES) {
+          if (audioToSend.size <= chunkThresholdBytes) {
             break;
           }
         }
 
         if (audioToSend.size < audioBlob.size) {
           setCompressionStatus(`Compressão aplicada: ${formatBytes(audioBlob.size)} -> ${formatBytes(audioToSend.size)}`);
+        } else {
+          setCompressionStatus(
+            `Não houve redução (${formatBytes(audioBlob.size)}). Enviando original; API usará fallback para arquivos grandes se necessário.`
+          );
         }
       }
 
@@ -280,7 +285,9 @@ export function TranscriptionWorkspaceProvider({ storageNamespace, children }: T
         const errorMsg = data?.details || data?.error || `API error: ${response.statusText}`;
 
         if (response.status === 413) {
-          throw new Error(`Arquivo muito grande para envio (${formatBytes(audioToSend.size)}). Tente um trecho mais curto.`);
+          throw new Error(
+            `Arquivo muito grande para envio (${formatBytes(audioToSend.size)}). Tente novamente ou grave um trecho mais curto.`
+          );
         }
 
         throw new Error(errorMsg);
@@ -352,15 +359,24 @@ export function TranscriptionWorkspaceProvider({ storageNamespace, children }: T
       if (file.size > NATIVE_QUALITY_MAX_BYTES) {
         setCompressionStatus('Comprimindo arquivo antes do envio...');
         const targetRates = [8000, 4000, 2000];
+        const chunkThresholdBytes = NATIVE_QUALITY_MAX_BYTES;
 
         for (const targetRate of targetRates) {
           const compressed = await compressAudio(audioToSend, targetRate);
           if (compressed.size < audioToSend.size) {
             audioToSend = compressed;
           }
-          if (audioToSend.size <= NATIVE_QUALITY_MAX_BYTES) {
+          if (audioToSend.size <= chunkThresholdBytes) {
             break;
           }
+        }
+
+        if (audioToSend.size < file.size) {
+          setCompressionStatus(`Compressão aplicada: ${formatBytes(file.size)} -> ${formatBytes(audioToSend.size)}`);
+        } else {
+          setCompressionStatus(
+            `Não houve redução (${formatBytes(file.size)}). Enviando original; API usará fallback para arquivos grandes se necessário.`
+          );
         }
       }
 
@@ -386,6 +402,13 @@ export function TranscriptionWorkspaceProvider({ storageNamespace, children }: T
         }
 
         const errorMsg = data?.details || data?.error || `API error: ${response.statusText}`;
+
+        if (response.status === 413) {
+          throw new Error(
+            `Arquivo muito grande para envio (${formatBytes(audioToSend.size)}). Tente novamente ou grave um trecho mais curto.`
+          );
+        }
+
         throw new Error(errorMsg);
       }
 
