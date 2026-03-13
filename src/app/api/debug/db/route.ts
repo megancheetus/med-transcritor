@@ -3,11 +3,17 @@ import { getPostgresPool } from '@/lib/postgres';
 
 // Rota temporária de diagnóstico — REMOVER após corrigir o problema de login
 export async function GET() {
+  const caCertRaw = process.env.POSTGRES_CA_CERT;
+  const caLooksLikePem = Boolean(caCertRaw && caCertRaw.includes('BEGIN CERTIFICATE'));
+  const caLooksLikeBase64 = Boolean(caCertRaw && !caLooksLikePem && /^[A-Za-z0-9+/=\r\n]+$/.test(caCertRaw));
+
   const result: Record<string, unknown> = {
     nodeEnv: process.env.NODE_ENV,
     hasDatabase: Boolean(process.env.DATABASE_URL),
     hasSsl: process.env.POSTGRES_SSL,
     sslRejectUnauthorized: process.env.POSTGRES_SSL_REJECT_UNAUTHORIZED,
+    hasPostgresCaCert: Boolean(caCertRaw),
+    postgresCaCertFormatHint: caLooksLikePem ? 'pem' : caLooksLikeBase64 ? 'base64' : 'unknown',
     hasAuthSecret: Boolean(process.env.AUTH_TOKEN_SECRET),
   };
 
