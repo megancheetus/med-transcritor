@@ -45,15 +45,15 @@ export default function SOAPResponse({ content, isLoading = false, errorMessage 
   };
 
   return (
-    <div className="w-full bg-white rounded-xl border border-[#dde2e8] p-6 sm:p-8">
+    <div className="w-full bg-white rounded-xl border border-[#cfe0e8] p-6 sm:p-8">
       <div className="flex items-center justify-between mb-6 flex-col sm:flex-row gap-3">
-        <p className="text-xs font-semibold text-[#607080] tracking-widest uppercase">
+        <p className="text-xs font-semibold text-[#4b6573] tracking-widest uppercase">
           Resultado SOAP
         </p>
         {!isLoading && content && (
           <button
             onClick={() => copyToClipboard(content)}
-            className="w-full sm:w-auto px-4 py-2 bg-[#1a2e45] hover:bg-[#234060] text-white rounded-md transition font-medium text-sm tracking-wide"
+            className="w-full sm:w-auto px-4 py-2 bg-[#1a6a8d] hover:bg-[#155b79] text-white rounded-md transition font-medium text-sm tracking-wide"
           >
             Copiar tudo
           </button>
@@ -63,10 +63,10 @@ export default function SOAPResponse({ content, isLoading = false, errorMessage 
       {isLoading && (
         <div className="text-center py-12">
           <div className="flex justify-center mb-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1a2e45]"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1a6a8d]"></div>
           </div>
-          <p className="text-[#1a2e45] font-medium">Processando áudio...</p>
-          <p className="text-[#607080] text-sm mt-2">Isso pode levar alguns segundos</p>
+          <p className="text-[#0c161c] font-medium">Processando áudio...</p>
+          <p className="text-[#4b6573] text-sm mt-2">Isso pode levar alguns segundos</p>
         </div>
       )}
 
@@ -82,18 +82,18 @@ export default function SOAPResponse({ content, isLoading = false, errorMessage 
           {soapFields.map(({ key, label }) => (
             <div
               key={key}
-              className="border border-[#dde2e8] bg-[#f9fafb] rounded-lg overflow-visible hover:border-[#4a7fa5] transition w-full"
+              className="border border-[#cfe0e8] bg-[#f7fbfc] rounded-lg overflow-visible hover:border-[#1a6a8d] transition w-full"
             >
               {/* Header da seção */}
-              <div className="bg-[#f4f6f9] border-b border-[#dde2e8] px-5 py-3.5 flex items-center justify-between">
-                <h3 className="font-semibold text-[#003f87] text-base tracking-tight">{label}</h3>
+              <div className="bg-[#edf4f6] border-b border-[#cfe0e8] px-5 py-3.5 flex items-center justify-between">
+                <h3 className="font-semibold text-[#155b79] text-base tracking-tight">{label}</h3>
                 <button
                   onClick={() =>
                     copyToClipboard(
                       soap[key as keyof typeof soap] || '(Não informado)'
                     )
                   }
-                  className="text-xs border border-[#dde2e8] text-[#607080] px-3 py-1.5 rounded-md hover:border-[#003f87] hover:text-[#003f87] hover:bg-white transition font-medium whitespace-nowrap flex-shrink-0"
+                  className="text-xs border border-[#cfe0e8] text-[#4b6573] px-3 py-1.5 rounded-md hover:border-[#155b79] hover:text-[#155b79] hover:bg-white transition font-medium whitespace-nowrap flex-shrink-0"
                 >
                   Copiar
                 </button>
@@ -101,7 +101,7 @@ export default function SOAPResponse({ content, isLoading = false, errorMessage 
 
               {/* Conteúdo - sem limite de altura */}
               <div className="p-5 w-full">
-                <div className="text-[#1a2e45] leading-relaxed text-base whitespace-pre-wrap break-words overflow-visible">
+                <div className="text-[#0c161c] leading-relaxed text-base whitespace-pre-wrap break-words overflow-visible">
                   {soap[key as keyof typeof soap] ? (
                     <p className="text-justify m-0">{soap[key as keyof typeof soap]}</p>
                   ) : (
@@ -115,8 +115,8 @@ export default function SOAPResponse({ content, isLoading = false, errorMessage 
       )}
 
       {!isLoading && !errorMessage && !content && (
-        <div className="text-center py-12 bg-[#f4f6f9] rounded-xl border border-[#dde2e8]">
-          <p className="text-[#607080] text-sm">Grave uma consulta e envie para receber a análise em SOAP aqui.</p>
+        <div className="text-center py-12 bg-[#edf4f6] rounded-xl border border-[#cfe0e8]">
+          <p className="text-[#4b6573] text-sm">Grave uma consulta e envie para receber a análise em SOAP aqui.</p>
         </div>
       )}
     </div>

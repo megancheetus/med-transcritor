@@ -351,247 +351,269 @@ export default function TranscriberPage() {
     router.push('/login');
   };
 
+  const activeModel = getModelById(selectedModel);
+  const latestEntry = history[0];
+  const totalSessionDuration = history.reduce((sum, entry) => sum + entry.duration, 0);
+  const storagePercent = Math.min(Math.round((history.length / 20) * 100), 100);
+
+  const formatDurationLabel = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
   return (
-    <main className="min-h-screen bg-gradient-to-br from-[#f8fafb] to-[#f3f6f9]">
-
-      {/* Header com logo */}
-      <header className="bg-white border-b border-[#e0e8f0] shadow-sm">
-        <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {/* Logo Image */}
-            <Image
-              src="/logo.png"
-              alt="MedTranscript Logo"
-              width={40}
-              height={40}
-              priority
-              className="w-8 h-8"
-            />
-            <div className="flex flex-col">
-              <span className="font-bold text-[#003f87] text-sm tracking-tight">MedTranscript</span>
-              <span className="text-[10px] text-[#5dd462] font-semibold">Seu assistente médico</span>
-            </div>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="text-sm font-medium text-[#607080] hover:text-[#003f87] transition"
-          >
-            Sair
-          </button>
-        </div>
-      </header>
-
-      {/* Hero Section - Logo apenas */}
-      <div className="max-w-6xl mx-auto px-6 pt-16 sm:pt-24 pb-16 flex justify-center">
-        <Image
-          src="/logo.png"
-          alt="MedTranscript Logo"
-          width={600}
-          height={200}
-          priority
-          className="w-full max-w-2xl h-auto"
-        />
-      </div>
-
-      {/* Seletor de Modelo */}
-      <div className="max-w-5xl mx-auto px-6 pb-6">
-        <div className="bg-white rounded-xl border border-[#e0e8f0] p-6 shadow-sm">
-          <label className="block text-xs font-bold text-[#003f87] tracking-widest uppercase mb-5">
-            Selecione o Modelo de Transcrição
-          </label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {getAllModels().map((model) => (
-              <button
-                key={model.id}
-                onClick={() => {
-                  setSelectedModel(model.id);
-                  setTranscriptionContent(''); // Limpar resultado anterior ao trocar modelo
-                }}
-                className={`text-left p-5 rounded-xl border-2 transition transform hover:scale-105 ${
-                  selectedModel === model.id
-                    ? 'border-[#5dd462] bg-gradient-to-br from-[#f0fdf4] to-[#e8f7f1] shadow-md'
-                    : 'border-[#e0e8f0] bg-white hover:border-[#003f87] hover:shadow-sm'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition ${
-                    selectedModel === model.id
-                      ? 'border-[#5dd462] bg-[#5dd462]'
-                      : 'border-[#dde2e8]'
-                  }`}>
-                    {selectedModel === model.id && (
-                      <span className="text-white text-xs font-bold">✓</span>
-                    )}
-                  </div>
-                  <div>
-                    <p className="font-bold text-[#003f87] text-base">{model.name}</p>
-                    <p className="text-xs text-[#607080] mt-1">{model.description}</p>
-                  </div>
-                </div>
-              </button>
-            ))}
+    <div className="min-h-screen bg-[#edf4f6] text-[#0c161c] lg:flex">
+      <aside className="hidden lg:flex lg:w-72 lg:flex-col border-r border-[#cfe0e8] bg-white">
+        <div className="p-6 flex items-center gap-3 border-b border-[#edf4f6]">
+          <Image src="/favicon.png" alt="OmniNote Favicon" width={40} height={40} className="w-10 h-10" priority />
+          <div>
+            <h1 className="font-bold text-[#155b79] text-lg leading-tight">OmniNote</h1>
+            <p className="text-xs text-[#1ea58c] font-semibold">Visão integral e multiprofissional</p>
           </div>
         </div>
-      </div>
 
-      {/* Painéis principais */}
-      <div className="max-w-5xl mx-auto px-6 pb-8">
-        <div className="flex flex-col gap-5">
-          <AudioRecorder onRecordingComplete={handleRecordingComplete} isLoading={isLoading} />
+        <nav className="p-4 space-y-1">
+          <button className="w-full text-left px-3 py-2.5 rounded-lg bg-[#e5f4f8] text-[#155b79] font-semibold">Dashboard</button>
+          <button className="w-full text-left px-3 py-2.5 rounded-lg text-[#4b6573] hover:bg-[#f2f8fa] transition">Pacientes</button>
+          <button className="w-full text-left px-3 py-2.5 rounded-lg text-[#4b6573] hover:bg-[#f2f8fa] transition">Histórico</button>
+          <button className="w-full text-left px-3 py-2.5 rounded-lg text-[#4b6573] hover:bg-[#f2f8fa] transition">Configurações</button>
+        </nav>
 
-          {ENABLE_LEGACY_TEST_UPLOAD && (
-            <AudioFileUpload onFileSelected={handleFileUpload} isLoading={isLoading} />
-          )}
-
-          {/* Status de Compressão e Armazenamento */}
-          {compressionStatus && (
-            <div className={`rounded-xl border p-4 ${
-              compressionStatus.startsWith('✅')
-                ? 'border-green-200 bg-green-50 text-green-700'
-                : compressionStatus.startsWith('❌')
-                  ? 'border-red-200 bg-red-50 text-red-700'
-                  : 'border-blue-200 bg-blue-50 text-blue-700'
-            }`}>
-              <p className="text-sm font-medium">{compressionStatus}</p>
+        <div className="p-4 mt-auto">
+          <div className="rounded-xl border border-[#cfe0e8] bg-[#f7fbfc] p-4">
+            <p className="text-xs font-semibold text-[#155b79] tracking-widest uppercase mb-2">Sessão atual</p>
+            <div className="w-full bg-[#dcebf1] rounded-full h-2 mb-2">
+              <div className="bg-[#1ea58c] h-2 rounded-full" style={{ width: `${storagePercent}%` }}></div>
             </div>
-          )}
+            <p className="text-xs text-[#4b6573]">{history.length} transcrição(ões) nesta sessão</p>
+          </div>
+        </div>
+      </aside>
 
-          {/* Informações de Áudio Armazenado (legacy) */}
-          {ENABLE_LEGACY_LOCAL_BACKUP && savedAudioInfo && (
-            <div className="rounded-xl border border-green-200 bg-green-50 p-4">
-              <div className="flex items-start gap-3">
-                <div className="text-green-600 text-xl mt-0.5">💾</div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-green-900 mb-1">
-                    Áudio salvo como backup local
-                  </p>
-                  <p className="text-xs text-green-700 mb-2">
-                    Tamanho: <strong>{savedAudioInfo.size}</strong> | ID: <code className="bg-white px-2 py-1 rounded text-xs">{savedAudioInfo.id.substring(0, 20)}...</code>
-                  </p>
-                  <p className="text-xs text-green-700">
-                    Se o processamento falhar, você poderá recuperar este arquivo. Não feche a aba até confirmar o sucesso.
-                  </p>
-                </div>
+      <main className="flex-1">
+        <header className="h-16 border-b border-[#cfe0e8] bg-white/90 backdrop-blur px-4 sm:px-6 lg:px-8 flex items-center justify-between sticky top-0 z-10">
+          <div>
+            <h2 className="text-lg sm:text-xl font-bold text-[#155b79]">Dashboard OmniNote</h2>
+            <p className="text-xs text-[#4b6573] hidden sm:block">Transcrição clínica com visão multiprofissional</p>
+          </div>
+
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg bg-[#f2f8fa] border border-[#cfe0e8]">
+              <Image src="/favicon.png" alt="OmniNote Favicon" width={20} height={20} className="w-5 h-5" />
+              <span className="text-sm text-[#4b6573]">{activeModel.name}</span>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="text-sm font-medium text-[#4b6573] hover:text-[#155b79] transition"
+            >
+              Sair
+            </button>
+          </div>
+        </header>
+
+        <div className="p-4 sm:p-6 lg:p-8 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white border border-[#cfe0e8] rounded-xl p-5 shadow-sm">
+              <p className="text-sm text-[#4b6573]">Transcrições na sessão</p>
+              <p className="text-2xl font-bold text-[#155b79] mt-1">{history.length}</p>
+              <p className="text-xs text-[#1ea58c] mt-2">Atualiza automaticamente após cada processamento</p>
+            </div>
+
+            <div className="bg-white border border-[#cfe0e8] rounded-xl p-5 shadow-sm">
+              <p className="text-sm text-[#4b6573]">Última gravação</p>
+              <p className="text-2xl font-bold text-[#155b79] mt-1">{recordingDuration > 0 ? formatDurationLabel(recordingDuration) : '--:--'}</p>
+              <p className="text-xs text-[#1ea58c] mt-2">Duração da gravação mais recente</p>
+            </div>
+
+            <div className="bg-white border border-[#cfe0e8] rounded-xl p-5 shadow-sm">
+              <p className="text-sm text-[#4b6573]">Tempo total na sessão</p>
+              <p className="text-2xl font-bold text-[#155b79] mt-1">{formatDurationLabel(totalSessionDuration)}</p>
+              <p className="text-xs text-[#1ea58c] mt-2">Soma das gravações processadas</p>
+            </div>
+          </div>
+
+          <div className="bg-white border border-[#cfe0e8] rounded-xl p-5 sm:p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-[#155b79]">Atividade de transcrição</h3>
+                <p className="text-xs sm:text-sm text-[#4b6573]">Visão semanal de volume</p>
               </div>
             </div>
-          )}
 
-          {processingMeta && (
-            <div className="rounded-xl border border-[#dde2e8] bg-[#f9fafb] p-4">
-              <p className="text-xs font-semibold text-[#607080] tracking-widest uppercase mb-3">
-                Diagnóstico do Processamento
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-[#1a2e45]">
-                <p>Tamanho original: <strong>{formatBytes(processingMeta.originalBytes)}</strong></p>
-                <p>Tamanho enviado: <strong>{formatBytes(processingMeta.sentBytes)}</strong></p>
-                <p>Compressão aplicada: <strong>{processingMeta.compressed ? 'Sim' : 'Não'}</strong></p>
-                <p>Chunking no servidor: <strong>{processingMeta.chunked ? `Sim (${processingMeta.chunksProcessed} partes)` : 'Não'}</strong></p>
+            <div className="h-40 w-full">
+              <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 800 200">
+                <defs>
+                  <linearGradient id="omniGradient" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stopColor="#1a6a8d" stopOpacity="0.18"></stop>
+                    <stop offset="100%" stopColor="#1a6a8d" stopOpacity="0"></stop>
+                  </linearGradient>
+                </defs>
+                <path d="M0 160 Q 100 130, 200 150 T 400 90 T 600 120 T 800 70 V 200 H 0 Z" fill="url(#omniGradient)"></path>
+                <path d="M0 160 Q 100 130, 200 150 T 400 90 T 600 120 T 800 70" fill="none" stroke="#1a6a8d" strokeWidth="3" strokeLinecap="round"></path>
+              </svg>
+              <div className="flex justify-between mt-3 px-1 text-[10px] sm:text-xs text-[#4b6573] font-medium">
+                <span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span><span>Dom</span>
               </div>
             </div>
-          )}
-
-          <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
-            <p className="text-xs font-semibold text-amber-900 tracking-widest uppercase mb-2">
-              Aviso Importante
-            </p>
-            <p className="text-sm text-amber-900 leading-relaxed">
-              As informações transcritas podem conter erros, especialmente quando a qualidade do áudio gravado
-              ou enviado estiver reduzida. Todo conteúdo em texto deve ser obrigatoriamente revisado e validado
-              pelo profissional médico antes de qualquer uso clínico.
-            </p>
           </div>
 
-          <TranscriptionResult
-            content={transcriptionContent}
-            model={selectedModel}
-            isLoading={isLoading}
-            errorMessage={processingError}
-          />
-        </div>
-      </div>
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <section className="xl:col-span-2 space-y-5">
+              <div className="bg-white rounded-xl border border-[#cfe0e8] p-5 sm:p-6 shadow-sm">
+                <label className="block text-xs font-bold text-[#155b79] tracking-widest uppercase mb-4">
+                  Selecione o modelo de transcrição
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {getAllModels().map((model) => (
+                    <button
+                      key={model.id}
+                      onClick={() => {
+                        setSelectedModel(model.id);
+                        setTranscriptionContent('');
+                      }}
+                      className={`text-left p-4 rounded-xl border-2 transition ${
+                        selectedModel === model.id
+                          ? 'border-[#1ea58c] bg-gradient-to-br from-[#effaf7] to-[#e5f4f8] shadow-sm'
+                          : 'border-[#cfe0e8] bg-white hover:border-[#155b79]'
+                      }`}
+                    >
+                      <p className="font-semibold text-[#155b79] text-sm">{model.name}</p>
+                      <p className="text-xs text-[#4b6573] mt-1">{model.description}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-      {/* Histórico de Consultas */}
-      {history.length > 0 && (
-        <div className="max-w-5xl mx-auto px-6 pb-8">
-          <div className="bg-white border border-[#dde2e8] rounded-xl p-6 sm:p-8">
-            <div className="flex items-center justify-between mb-6">
-              <p className="text-xs font-semibold text-[#607080] tracking-widest uppercase">
-                Histórico da Sessão
-              </p>
-              <span className="text-xs bg-[#f0fdf4] text-[#5dd462] px-3 py-1 rounded-full font-medium">
-                {history.length} consulta{history.length !== 1 ? 's' : ''}
-              </span>
-            </div>
+              <AudioRecorder onRecordingComplete={handleRecordingComplete} isLoading={isLoading} />
 
-            <div className="space-y-3">
-              {history.map((entry) => (
-                <button
-                  key={entry.id}
-                  onClick={() => {
-                    setTranscriptionContent(entry.content);
-                    setSelectedModel(entry.model);
-                  }}
-                  className="w-full text-left p-4 rounded-lg border border-[#dde2e8] bg-[#f9fafb] hover:bg-[#f4f6f9] hover:border-[#003f87] transition"
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-[#1a2e45] mb-1">
-                        {getModelById(entry.model).name}
+              {ENABLE_LEGACY_TEST_UPLOAD && (
+                <AudioFileUpload onFileSelected={handleFileUpload} isLoading={isLoading} />
+              )}
+
+              {compressionStatus && (
+                <div className={`rounded-xl border p-4 ${
+                  compressionStatus.startsWith('✅')
+                    ? 'border-green-200 bg-green-50 text-green-700'
+                    : compressionStatus.startsWith('❌')
+                      ? 'border-red-200 bg-red-50 text-red-700'
+                      : 'border-blue-200 bg-blue-50 text-blue-700'
+                }`}>
+                  <p className="text-sm font-medium">{compressionStatus}</p>
+                </div>
+              )}
+
+              {ENABLE_LEGACY_LOCAL_BACKUP && savedAudioInfo && (
+                <div className="rounded-xl border border-green-200 bg-green-50 p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="text-green-600 text-xl mt-0.5">💾</div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-green-900 mb-1">Áudio salvo como backup local</p>
+                      <p className="text-xs text-green-700 mb-2">
+                        Tamanho: <strong>{savedAudioInfo.size}</strong> | ID: <code className="bg-white px-2 py-1 rounded text-xs">{savedAudioInfo.id.substring(0, 20)}...</code>
                       </p>
-                      <div className="flex items-center gap-3 text-xs text-[#607080]">
-                        <span>📅 {entry.timestamp}</span>
-                        <span>⏱️ {Math.floor(entry.duration / 60)}m {entry.duration % 60}s</span>
-                      </div>
-                    </div>
-                    <div className="flex-shrink-0">
-                      <div className="text-sm font-medium text-[#003f87] bg-white rounded-md px-3 py-1.5 border border-[#dde2e8]">
-                        Ver
-                      </div>
+                      <p className="text-xs text-green-700">
+                        Se o processamento falhar, você poderá recuperar este arquivo. Não feche a aba até confirmar o sucesso.
+                      </p>
                     </div>
                   </div>
-                </button>
-              ))}
-            </div>
+                </div>
+              )}
+
+              {processingMeta && (
+                <div className="rounded-xl border border-[#cfe0e8] bg-[#f7fbfc] p-4">
+                  <p className="text-xs font-semibold text-[#4b6573] tracking-widest uppercase mb-3">Diagnóstico do processamento</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-[#0c161c]">
+                    <p>Tamanho original: <strong>{formatBytes(processingMeta.originalBytes)}</strong></p>
+                    <p>Tamanho enviado: <strong>{formatBytes(processingMeta.sentBytes)}</strong></p>
+                    <p>Compressão aplicada: <strong>{processingMeta.compressed ? 'Sim' : 'Não'}</strong></p>
+                    <p>Chunking no servidor: <strong>{processingMeta.chunked ? `Sim (${processingMeta.chunksProcessed} partes)` : 'Não'}</strong></p>
+                  </div>
+                </div>
+              )}
+
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+                <p className="text-xs font-semibold text-amber-900 tracking-widest uppercase mb-2">Aviso importante</p>
+                <p className="text-sm text-amber-900 leading-relaxed">
+                  As informações transcritas podem conter erros, especialmente quando a qualidade do áudio gravado
+                  ou enviado estiver reduzida. Todo conteúdo em texto deve ser obrigatoriamente revisado e validado
+                  pelo profissional médico antes de qualquer uso clínico.
+                </p>
+              </div>
+
+              <TranscriptionResult
+                content={transcriptionContent}
+                model={selectedModel}
+                isLoading={isLoading}
+                errorMessage={processingError}
+              />
+
+              {ENABLE_LEGACY_LOCAL_BACKUP && (
+                <LocalAudioBackup refreshTrigger={backupRefreshTrigger} />
+              )}
+            </section>
+
+            <aside className="space-y-5">
+              <div className="bg-white border border-[#cfe0e8] rounded-xl shadow-sm overflow-hidden">
+                <div className="px-5 py-4 border-b border-[#edf4f6] flex items-center justify-between">
+                  <h4 className="font-bold text-[#155b79] text-sm sm:text-base">Transcrições recentes</h4>
+                  <span className="text-xs text-[#4b6573]">Sessão</span>
+                </div>
+
+                <div className="max-h-[420px] overflow-y-auto divide-y divide-[#edf4f6]">
+                  {history.length === 0 && (
+                    <div className="p-5 text-sm text-[#4b6573]">
+                      Nenhuma transcrição ainda. Inicie uma gravação para popular o painel.
+                    </div>
+                  )}
+
+                  {history.slice(0, 6).map((entry) => (
+                    <button
+                      key={entry.id}
+                      onClick={() => {
+                        setTranscriptionContent(entry.content);
+                        setSelectedModel(entry.model);
+                      }}
+                      className="w-full text-left p-4 hover:bg-[#f7fbfc] transition"
+                    >
+                      <p className="text-sm font-semibold text-[#0c161c]">{getModelById(entry.model).name}</p>
+                      <p className="text-xs text-[#4b6573] mt-1">{entry.timestamp}</p>
+                      <p className="text-xs text-[#1ea58c] mt-1">Duração: {formatDurationLabel(entry.duration)}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-white border border-[#cfe0e8] rounded-xl p-5 shadow-sm">
+                <h4 className="font-bold text-[#155b79] text-sm sm:text-base mb-3">Resumo rápido</h4>
+                <ul className="space-y-2 text-sm text-[#4b6573]">
+                  <li>Modelo ativo: <strong>{activeModel.name}</strong></li>
+                  <li>Último processamento: <strong>{lastRecordingTime || 'Não processado'}</strong></li>
+                  <li>Status atual: <strong>{isLoading ? 'Processando...' : 'Pronto'}</strong></li>
+                  <li>Último item: <strong>{latestEntry ? formatDurationLabel(latestEntry.duration) : '--:--'}</strong></li>
+                </ul>
+              </div>
+
+              <div className="bg-white border border-[#cfe0e8] rounded-xl p-5 shadow-sm">
+                <h4 className="font-bold text-[#155b79] text-sm sm:text-base mb-3">Como usar</h4>
+                <ol className="space-y-2 text-sm text-[#4b6573]">
+                  {[
+                    'Escolha consulta presencial ou teleconsulta.',
+                    'Autorize o microfone e o áudio da aba na teleconsulta.',
+                    'Inicie e finalize a gravação da consulta.',
+                    'Revise o texto antes de qualquer uso clínico.',
+                  ].map((step, index) => (
+                    <li key={index} className="flex gap-2">
+                      <span className="w-5 h-5 rounded-full bg-[#1a6a8d] text-white text-[10px] font-semibold flex items-center justify-center mt-0.5">{index + 1}</span>
+                      <span>{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </aside>
           </div>
         </div>
-      )}
-
-      {/* Backup Local de Áudios (legacy) */}
-      {ENABLE_LEGACY_LOCAL_BACKUP && (
-        <div className="max-w-5xl mx-auto px-6 pb-8">
-          <LocalAudioBackup refreshTrigger={backupRefreshTrigger} />
-        </div>
-      )}
-
-      {/* Como usar — passos horizontais */}
-      <div className="max-w-5xl mx-auto px-6 pb-14">
-        <div className="bg-white border border-[#dde2e8] rounded-xl p-6 sm:p-8">
-          <p className="text-xs font-semibold text-[#607080] mb-6 tracking-widest uppercase">Como usar</p>
-          <ol className="flex flex-col sm:flex-row gap-5">
-            {[
-              'Escolha entre consulta presencial e teleconsulta.',
-              'Autorize o microfone — na teleconsulta, compartilhe também a aba com áudio.',
-              'Inicie a gravação e conduza a consulta normalmente.',
-              'Pare ao final e aguarde o resultado gerado.',
-              'Copie o conteúdo para o prontuário eletrônico.',
-            ].map((step, i) => (
-              <li key={i} className="flex gap-3 flex-1">
-                <span className="flex-shrink-0 w-5 h-5 mt-0.5 rounded-full bg-[#1a2e45] text-white text-[10px] font-semibold flex items-center justify-center">
-                  {i + 1}
-                </span>
-                <p className="text-sm text-[#607080] leading-relaxed">{step}</p>
-              </li>
-            ))}
-          </ol>
-        </div>
-
-        {lastRecordingTime && (
-          <p className="text-xs text-[#607080] text-right mt-4">
-            Último processamento: {lastRecordingTime}
-          </p>
-        )}
-      </div>
-
-    </main>
+      </main>
+    </div>
   );
 }

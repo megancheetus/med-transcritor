@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { GoogleAIFileManager } from '@google/generative-ai/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { isValidAuthToken } from '@/lib/auth';
 import { getModelById, TranscriptionModelType, TRANSCRIPTION_MODELS } from '@/lib/transcriptionModels';
 
 const GEMINI_MODEL = 'gemini-2.5-flash';
@@ -156,7 +157,7 @@ function combineChunkResults(results: string[], totalChunks: number): string {
 export async function POST(request: NextRequest) {
   const authToken = request.cookies.get('auth_token')?.value;
 
-  if (authToken !== 'authenticated') {
+  if (!(await isValidAuthToken(authToken))) {
     return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
   }
 

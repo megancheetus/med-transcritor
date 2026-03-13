@@ -65,7 +65,7 @@ export default function LocalAudioBackup({ refreshTrigger = 0 }: LocalAudioBacku
   const handleCleanup = async () => {
     if (window.confirm('Deseja deletar todos os áudios processados com sucesso?')) {
       try {
-        const cleaned = await audioStorageManager.cleanupCompleted();
+        await audioStorageManager.cleanupCompleted();
         await loadAudios();
       } catch (err) {
         console.error('Erro ao fazer limpeza:', err);
@@ -109,9 +109,9 @@ export default function LocalAudioBackup({ refreshTrigger = 0 }: LocalAudioBacku
   };
 
   return (
-    <div className="bg-white border border-[#dde2e8] rounded-xl p-6 sm:p-8">
+    <div className="bg-white border border-[#cfe0e8] rounded-xl p-6 sm:p-8">
       <div className="flex items-center justify-between mb-6">
-        <p className="text-xs font-semibold text-[#607080] tracking-widest uppercase">
+        <p className="text-xs font-semibold text-[#4b6573] tracking-widest uppercase">
           💾 Backup Local de Áudios
         </p>
         {savedAudios.length > 0 && (
@@ -147,12 +147,12 @@ export default function LocalAudioBackup({ refreshTrigger = 0 }: LocalAudioBacku
 
       {isLoading ? (
         <div className="text-center py-8">
-          <p className="text-sm text-[#607080]">Carregando áudios...</p>
+          <p className="text-sm text-[#4b6573]">Carregando áudios...</p>
         </div>
       ) : savedAudios.length === 0 ? (
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-6 text-center">
-          <p className="text-sm text-[#607080] mb-2">Nenhum áudio salvo ainda.</p>
-          <p className="text-xs text-[#607080]">
+          <p className="text-sm text-[#4b6573] mb-2">Nenhum áudio salvo ainda.</p>
+          <p className="text-xs text-[#4b6573]">
             Todos os áudios gravados serão salvos automaticamente como backup.
           </p>
         </div>
@@ -162,7 +162,7 @@ export default function LocalAudioBackup({ refreshTrigger = 0 }: LocalAudioBacku
             {savedAudios.map((audio) => (
               <div
                 key={audio.id}
-                className="border border-[#dde2e8] rounded-lg p-4 bg-[#f9fafb] hover:bg-[#f4f6f9] transition"
+                className="border border-[#cfe0e8] rounded-lg p-4 bg-[#f7fbfc] hover:bg-[#edf4f6] transition"
               >
                 <div className="flex items-start justify-between gap-4 mb-3">
                   <div className="flex-1">
@@ -174,10 +174,10 @@ export default function LocalAudioBackup({ refreshTrigger = 0 }: LocalAudioBacku
                         <span className="text-xs text-red-600 font-mono">{audio.error.substring(0, 50)}</span>
                       )}
                     </div>
-                    <p className="text-sm font-medium text-[#1a2e45] mb-1">
+                    <p className="text-sm font-medium text-[#0c161c] mb-1">
                       {new Date(audio.timestamp).toLocaleString('pt-BR')}
                     </p>
-                    <div className="flex items-center gap-4 text-xs text-[#607080]">
+                    <div className="flex items-center gap-4 text-xs text-[#4b6573]">
                       <span>📏 {audio.duration} segundos ({Math.floor(audio.duration / 60)}m)</span>
                       <span>💾 {formatFileSize(audio.blob.size)}</span>
                       <span>🏷️ {audio.model}</span>
@@ -216,7 +216,7 @@ export default function LocalAudioBackup({ refreshTrigger = 0 }: LocalAudioBacku
         </>
       )}
 
-      <p className="text-xs text-[#607080] mt-6 pt-4 border-t border-[#dde2e8]">
+      <p className="text-xs text-[#4b6573] mt-6 pt-4 border-t border-[#cfe0e8]">
         <strong>ℹ️ Como usar:</strong> Os áudios são salvos automaticamente no seu navegador como backup. 
         Se a transcrição falhar, você poderá recuperá-los aqui. Os arquivos são armazenados localmente e nunca 
         enviados para servidor externo.

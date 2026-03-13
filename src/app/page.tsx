@@ -1,14 +1,14 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import TranscriberPage from '@/components/TranscriberPage';
+import { isValidAuthToken } from '@/lib/auth';
 
 export default async function Home() {
   const cookieStore = await cookies();
   const authToken = cookieStore.get('auth_token')?.value;
 
-  if (authToken !== 'authenticated') {
+  if (!(await isValidAuthToken(authToken))) {
     redirect('/login');
   }
 
-  return <TranscriberPage />;
+  redirect('/dashboard');
 }

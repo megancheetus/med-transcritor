@@ -1,8 +1,8 @@
-# Transcritor de Consultas Médicas - Instruções do Copilot
+# OmniNote - Instruções do Copilot
 
 ## Visão Geral do Projeto
 
-Aplicativo Next.js para transcrição automática de consultas médicas com formatação SOAP usando Google Gemini API.
+Aplicativo Next.js para transcrição clínica multiprofissional com visão integral do paciente e formatação SOAP usando Google Gemini API.
 
 ### Funcionalidades Principais
 - Gravação de áudio em tempo real no navegador

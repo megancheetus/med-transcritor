@@ -8,6 +8,11 @@
 /**
  * Verifica se o blob de áudio está em formato comprimido
  */
+interface WindowWithWebkitAudioContext extends Window {
+  AudioContext?: typeof AudioContext;
+  webkitAudioContext?: typeof AudioContext;
+}
+
 export function isAudioCompressed(mimeType: string): boolean {
   const compressedFormats = [
     'audio/webm',
@@ -43,7 +48,15 @@ export async function compressAudio(audioBlob: Blob, targetSampleRate: number = 
     console.log(`🔴 Áudio grande detectado (${formatBytes(audioBlob.size)}), tentando comprimir...`);
 
     const arrayBuffer = await audioBlob.arrayBuffer();
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const audioWindow = window as WindowWithWebkitAudioContext;
+    const AudioContextClass = audioWindow.AudioContext || audioWindow.webkitAudioContext;
+
+    if (!AudioContextClass) {
+      console.warn('AudioContext não suportado, mantendo áudio original');
+      return audioBlob;
+    }
+
+    const audioContext = new AudioContextClass();
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
 
     const currentSampleRate = audioBuffer.sampleRate;

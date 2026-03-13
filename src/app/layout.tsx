@@ -9,8 +9,13 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "MedTranscritor",
-  description: "Transcrição de consultas médicas com formatação SOAP",
+  title: "OmniNote",
+  description: "Transcrição clínica multiprofissional com formatação SOAP",
+  icons: {
+    icon: [{ url: "/favicon.png", type: "image/png" }],
+    shortcut: "/favicon.png",
+    apple: "/favicon.png",
+  },
 };
 
 export default function RootLayout({

@@ -8,6 +8,11 @@ interface AudioFileUploadProps {
   isLoading?: boolean;
 }
 
+interface WindowWithWebkitAudioContext extends Window {
+  AudioContext?: typeof AudioContext;
+  webkitAudioContext?: typeof AudioContext;
+}
+
 export default function AudioFileUpload({ onFileSelected, isLoading = false }: AudioFileUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -47,7 +52,15 @@ export default function AudioFileUpload({ onFileSelected, isLoading = false }: A
 
   const estimateAudioDuration = async (file: File): Promise<number> => {
     return new Promise((resolve, reject) => {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioWindow = window as WindowWithWebkitAudioContext;
+      const AudioContextClass = audioWindow.AudioContext || audioWindow.webkitAudioContext;
+
+      if (!AudioContextClass) {
+        reject(new Error('AudioContext não suportado neste navegador'));
+        return;
+      }
+
+      const audioContext = new AudioContextClass();
       const reader = new FileReader();
 
       reader.onload = async (e) => {
@@ -91,15 +104,15 @@ export default function AudioFileUpload({ onFileSelected, isLoading = false }: A
   };
 
   return (
-    <div className="w-full bg-white rounded-xl border border-[#dde2e8] p-6 sm:p-8">
-      <p className="text-xs font-semibold text-[#607080] mb-5 tracking-widest uppercase">
+    <div className="w-full bg-white rounded-xl border border-[#cfe0e8] p-6 sm:p-8">
+      <p className="text-xs font-semibold text-[#4b6573] mb-5 tracking-widest uppercase">
         📤 Upload de Áudio para Teste
       </p>
 
       <div className="space-y-4">
         {/* Input de Arquivo */}
         <div>
-          <label className="block text-sm font-medium text-[#1a2e45] mb-3">
+          <label className="block text-sm font-medium text-[#0c161c] mb-3">
             Selecione um arquivo de áudio (.wav, .mp3, .webm, etc)
           </label>
           <input
@@ -108,15 +121,15 @@ export default function AudioFileUpload({ onFileSelected, isLoading = false }: A
             accept="audio/*"
             onChange={handleFileSelect}
             disabled={isLoading || !!selectedFile}
-            className="block w-full text-sm text-[#607080]
+            className="block w-full text-sm text-[#4b6573]
               file:mr-4 file:py-2 file:px-4
               file:rounded-md file:border-0
               file:text-sm file:font-medium
-              file:bg-[#1a2e45] file:text-white
-              hover:file:bg-[#234060]
+              file:bg-[#1a6a8d] file:text-white
+              hover:file:bg-[#155b79]
               disabled:opacity-50 disabled:cursor-not-allowed"
           />
-          <p className="text-xs text-[#607080] mt-2">
+          <p className="text-xs text-[#4b6573] mt-2">
             💡 Máximo: 200 MB | Recomendado: &lt; 50 MB (para teste rápido)
           </p>
         </div>
@@ -183,8 +196,8 @@ export default function AudioFileUpload({ onFileSelected, isLoading = false }: A
         )}
 
         {!selectedFile && !isLoading && (
-          <div className="rounded-lg border-2 border-dashed border-[#dde2e8] bg-[#f9fafb] p-6 text-center">
-            <p className="text-sm text-[#607080]">Clique no campo acima para selecionar um arquivo</p>
+          <div className="rounded-lg border-2 border-dashed border-[#cfe0e8] bg-[#f7fbfc] p-6 text-center">
+            <p className="text-sm text-[#4b6573]">Clique no campo acima para selecionar um arquivo</p>
           </div>
         )}
 
@@ -200,7 +213,7 @@ export default function AudioFileUpload({ onFileSelected, isLoading = false }: A
         )}
       </div>
 
-      <p className="text-xs text-[#607080] mt-6 pt-4 border-t border-[#dde2e8]">
+      <p className="text-xs text-[#4b6573] mt-6 pt-4 border-t border-[#cfe0e8]">
         <strong>ℹ️ Como funciona:</strong> Selecione um arquivo de áudio pré-gravado para testar a transcrição sem
         precisar gravar novamente. O app tenta comprimir primeiro e só usa divisão em partes como último recurso.
       </p>

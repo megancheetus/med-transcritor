@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface AudioRecorderProps {
   onRecordingComplete: (audioBlob: Blob, duration: number) => void;
@@ -132,27 +132,14 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
   const recordingResourcesRef = useRef<RecordingResources | null>(null);
   const preparedInputStreamsRef = useRef<MediaStream[] | null>(null);
 
-  useEffect(() => {
-    return () => {
-      void cleanupRecordingResources();
-      void cleanupPreparedStreams();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isRecording && !isPrepared) {
-      setSourceIndicators(createSourceIndicators(captureMode));
-    }
-  }, [captureMode, isRecording, isPrepared]);
-
-  const clearTimer = () => {
+  const clearTimer = useCallback(() => {
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;
     }
-  };
+  }, []);
 
-  const cleanupRecordingResources = async () => {
+  const cleanupRecordingResources = useCallback(async () => {
     clearTimer();
 
     const resources = recordingResourcesRef.current;
@@ -185,9 +172,9 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
     }
 
     recordingResourcesRef.current = null;
-  };
+  }, [clearTimer]);
 
-  const cleanupPreparedStreams = async () => {
+  const cleanupPreparedStreams = useCallback(async () => {
     const preparedStreams = preparedInputStreamsRef.current;
 
     if (!preparedStreams) {
@@ -199,7 +186,20 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
     });
 
     preparedInputStreamsRef.current = null;
-  };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      void cleanupRecordingResources();
+      void cleanupPreparedStreams();
+    };
+  }, [cleanupPreparedStreams, cleanupRecordingResources]);
+
+  useEffect(() => {
+    if (!isRecording && !isPrepared) {
+      setSourceIndicators(createSourceIndicators(captureMode));
+    }
+  }, [captureMode, isRecording, isPrepared]);
 
   const getPreferredRecordingMimeType = () => {
     const preferredMimeTypes = [
@@ -537,14 +537,13 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const modeTitle = captureMode === 'inPerson' ? 'consulta presencial' : 'teleconsulta';
   const completedModeTitle =
     lastCompletedMode === 'inPerson' ? 'consulta presencial' : 'teleconsulta';
   const recordingLabel = captureMode === 'inPerson' ? 'Gravando consulta presencial...' : 'Gravando teleconsulta...';
 
   return (
-    <div className="w-full bg-white rounded-xl border border-[#dde2e8] p-6 sm:p-8">
-      <p className="text-xs font-semibold text-[#607080] mb-5 tracking-widest uppercase">
+    <div className="w-full bg-white rounded-xl border border-[#cfe0e8] p-6 sm:p-8">
+      <p className="text-xs font-semibold text-[#4b6573] mb-5 tracking-widest uppercase">
         Gravação
       </p>
 
@@ -561,21 +560,21 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
                 disabled={isRecording || isLoading || isPrepared || isPreparing}
                 className={`rounded-xl border-2 p-5 text-left transition transform hover:scale-105 ${
                   isSelected
-                    ? 'border-[#5dd462] bg-gradient-to-br from-[#f0fdf4] to-[#e8f7f1] shadow-md'
-                    : 'border-[#e0e8f0] bg-white hover:border-[#003f87] hover:shadow-sm'
+                    ? 'border-[#1ea58c] bg-gradient-to-br from-[#effaf7] to-[#e5f4f8] shadow-md'
+                    : 'border-[#cfe0e8] bg-white hover:border-[#155b79] hover:shadow-sm'
                 } disabled:cursor-not-allowed disabled:opacity-70`}
               >
                 <div className="flex items-center gap-3">
                   <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition flex-shrink-0 ${
                     isSelected
-                      ? 'border-[#5dd462] bg-[#5dd462]'
-                      : 'border-[#dde2e8]'
+                      ? 'border-[#1ea58c] bg-[#1ea58c]'
+                      : 'border-[#cfe0e8]'
                   }`}>
                     {isSelected && (
                       <span className="text-white text-xs font-bold">✓</span>
                     )}
                   </div>
-                  <p className="font-bold text-[#003f87] text-base">{option.title}</p>
+                  <p className="font-bold text-[#155b79] text-base">{option.title}</p>
                 </div>
               </button>
             );
@@ -585,23 +584,23 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
         {captureMode === 'teleconsult' && (
           <div className="w-full rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             Para teleconsulta, o navegador abrirá a janela de compartilhamento. Para melhor resultado,
-            mantenha o Google Meet e o MedTranscritor no mesmo navegador e escolha a aba da chamada com a
+            mantenha o Google Meet e o OmniNote no mesmo navegador e escolha a aba da chamada com a
             opção de compartilhar áudio ativada. Compartilhar a tela inteira pode funcionar em alguns
             cenários. Já uma janela isolada, outro navegador ou aplicativo externo frequentemente não expõe
             o áudio ao navegador.
           </div>
         )}
 
-        <div className="w-full rounded-lg border border-[#dde2e8] bg-[#f4f6f9] p-4">
+        <div className="w-full rounded-lg border border-[#cfe0e8] bg-[#edf4f6] p-4">
           <div className="flex items-center justify-between gap-3 mb-3">
-            <p className="text-sm font-medium text-[#1a2e45]">Fontes detectadas</p>
+            <p className="text-sm font-medium text-[#0c161c]">Fontes detectadas</p>
             <span
               className={`rounded-full px-3 py-1 text-xs font-medium ${
                 isRecording
                   ? 'bg-red-100 text-red-700'
                   : isPrepared
                     ? 'bg-green-100 text-green-700'
-                    : 'bg-white text-[#1a2e45] border border-[#dde2e8]'
+                    : 'bg-white text-[#0c161c] border border-[#cfe0e8]'
               }`}
             >
               {isRecording ? 'Capturando agora' : isPrepared ? 'Pronto para iniciar consulta' : 'Pronto para testar o ambiente'}
@@ -610,16 +609,16 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {(Object.values(sourceIndicators) as SourceIndicator[]).map((indicator) => (
-              <div key={indicator.label} className="rounded-lg border border-[#dde2e8] bg-white p-4">
+              <div key={indicator.label} className="rounded-lg border border-[#cfe0e8] bg-white p-4">
                 <div className="flex items-center justify-between gap-3 mb-2">
-                  <p className="text-sm font-medium text-[#1a2e45]">{indicator.label}</p>
+                  <p className="text-sm font-medium text-[#0c161c]">{indicator.label}</p>
                   <span
                     className={`rounded-full border px-2.5 py-1 text-xs font-medium ${SOURCE_STATUS_CLASSES[indicator.status]}`}
                   >
                     {SOURCE_STATUS_LABELS[indicator.status]}
                   </span>
                 </div>
-                <p className="text-sm text-[#607080]">{indicator.detail}</p>
+                <p className="text-sm text-[#4b6573]">{indicator.detail}</p>
               </div>
             ))}
           </div>
@@ -652,8 +651,8 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
                 <div className="w-5 h-5 bg-red-500 rounded-full"></div>
               </div>
             </div>
-            <p className="text-lg font-semibold text-[#1a2e45] mb-2">{recordingLabel}</p>
-            <p className="text-4xl font-mono font-semibold text-[#1a2e45]">{formatDuration(duration)}</p>
+            <p className="text-lg font-semibold text-[#0c161c] mb-2">{recordingLabel}</p>
+            <p className="text-4xl font-mono font-semibold text-[#0c161c]">{formatDuration(duration)}</p>
           </div>
         )}
 
@@ -662,7 +661,7 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
             <button
               onClick={prepareRecording}
               disabled={isLoading || isPreparing}
-              className="flex-1 sm:flex-none px-6 py-3 bg-[#1a2e45] hover:bg-[#234060] text-white font-medium tracking-wide rounded-md disabled:bg-gray-400 transition-all disabled:cursor-not-allowed"
+              className="flex-1 sm:flex-none px-6 py-3 bg-[#1a6a8d] hover:bg-[#155b79] text-white font-medium tracking-wide rounded-md disabled:bg-gray-400 transition-all disabled:cursor-not-allowed"
             >
               {isPreparing ? 'Verificando dispositivos...' : 'Preparar'}
             </button>

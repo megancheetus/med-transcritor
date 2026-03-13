@@ -36,20 +36,21 @@ export default function LoginPage() {
       // Login bem-sucedido
       router.push('/');
     } catch (err) {
+      console.error('Erro no request de login:', err);
       setError('Erro ao fazer login. Tente novamente.');
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#003f87] to-[#002d5a] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-[#155b79] via-[#1a6a8d] to-[#0c161c] flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-10">
           <div className="inline-block">
             <Image
               src="/logo.png"
-              alt="MedTranscript Logo"
+              alt="OmniNote Logo"
               width={300}
               height={100}
               priority
@@ -60,7 +61,7 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label htmlFor="username" className="block text-xs font-semibold text-[#003f87] uppercase tracking-wider mb-2">
+            <label htmlFor="username" className="block text-xs font-semibold text-[#155b79] uppercase tracking-wider mb-2">
               Usuário
             </label>
             <input
@@ -69,14 +70,14 @@ export default function LoginPage() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="Insira seu usuário"
-              className="w-full px-4 py-3 text-sm border-2 border-[#e0e8f0] rounded-lg focus:outline-none focus:border-[#5dd462] focus:ring-2 focus:ring-[#5dd462] focus:ring-opacity-20 transition text-[#003f87] placeholder-[#a0b0c0]"
+              className="w-full px-4 py-3 text-sm border-2 border-[#cfe0e8] rounded-lg focus:outline-none focus:border-[#1ea58c] focus:ring-2 focus:ring-[#1ea58c] focus:ring-opacity-20 transition text-[#0c161c] placeholder-[#7b8d97]"
               required
               disabled={loading}
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-xs font-semibold text-[#003f87] uppercase tracking-wider mb-2">
+            <label htmlFor="password" className="block text-xs font-semibold text-[#155b79] uppercase tracking-wider mb-2">
               Senha
             </label>
             <input
@@ -85,7 +86,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Insira sua senha"
-              className="w-full px-4 py-3 text-sm border-2 border-[#e0e8f0] rounded-lg focus:outline-none focus:border-[#5dd462] focus:ring-2 focus:ring-[#5dd462] focus:ring-opacity-20 transition text-[#003f87] placeholder-[#a0b0c0]"
+              className="w-full px-4 py-3 text-sm border-2 border-[#cfe0e8] rounded-lg focus:outline-none focus:border-[#1ea58c] focus:ring-2 focus:ring-[#1ea58c] focus:ring-opacity-20 transition text-[#0c161c] placeholder-[#7b8d97]"
               required
               disabled={loading}
             />
@@ -100,13 +101,13 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#003f87] hover:bg-[#002d5a] text-white text-sm font-bold py-3 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed tracking-wide shadow-md hover:shadow-lg"
+            className="w-full bg-[#1a6a8d] hover:bg-[#155b79] text-white text-sm font-bold py-3 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed tracking-wide shadow-md hover:shadow-lg"
           >
             {loading ? 'Autenticando...' : 'Entrar'}
           </button>
         </form>
 
-        <p className="text-center text-[#a0b0c0] text-xs mt-6">
+        <p className="text-center text-[#7b8d97] text-xs mt-6">
           Acesso restrito para usuários autorizados
         </p>
       </div>

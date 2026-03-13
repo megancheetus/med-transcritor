@@ -14,7 +14,7 @@ interface StoredAudio {
   error?: string;
 }
 
-const DB_NAME = 'MedTranscritorDB';
+const DB_NAME = 'OmniNoteDB';
 const STORE_NAME = 'audioRecordings';
 const DB_VERSION = 1;
 
@@ -210,7 +210,7 @@ class AudioStorageManager {
    * Deleta todos os áudios com status "completed"
    */
   async cleanupCompleted(): Promise<number> {
-    const db = await this.getDB();
+    await this.getDB();
     const audios = await this.getAllAudios();
     const completedCount = audios.filter((a) => a.status === 'completed').length;
 
