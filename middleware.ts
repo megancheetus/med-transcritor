@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUsernameFromAuthToken } from '@/lib/auth';
 
+function setNoStoreHeaders(response: NextResponse): NextResponse {
+  response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  response.headers.set('Pragma', 'no-cache');
+  response.headers.set('Expires', '0');
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   const authToken = request.cookies.get('auth_token')?.value;
   const pathname = request.nextUrl.pathname;
@@ -10,17 +17,17 @@ export async function middleware(request: NextRequest) {
 
   if (pathname === '/login') {
     if (isAuthenticated) {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
+      return setNoStoreHeaders(NextResponse.redirect(new URL('/dashboard', request.url)));
     }
 
-    return NextResponse.next();
+    return setNoStoreHeaders(NextResponse.next());
   }
 
   if (!isAuthenticated && isProtectedPath) {
-    return NextResponse.redirect(new URL('/login', request.url));
+    return setNoStoreHeaders(NextResponse.redirect(new URL('/login', request.url)));
   }
 
-  return NextResponse.next();
+  return setNoStoreHeaders(NextResponse.next());
 }
 
 export const config = {

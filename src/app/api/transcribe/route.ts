@@ -23,7 +23,7 @@ const CHUNK_SIZE_BYTES = 15 * 1024 * 1024;
  */
 
 const getGeminiClient = () => {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
     throw new Error('A chave da API Gemini não está configurada.');
@@ -193,7 +193,7 @@ export async function POST(request: NextRequest) {
     console.log(`📦 Total de chunks: ${chunks.length}`);
 
     const client = getGeminiClient();
-    const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error('A chave da API Gemini não está configurada.');
     const geminiModel = client.getGenerativeModel({ model: GEMINI_MODEL });
     const fileManager = new GoogleAIFileManager(apiKey);
