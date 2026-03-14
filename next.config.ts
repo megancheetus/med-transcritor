@@ -196,10 +196,6 @@ const nextConfig: NextConfig = {
             key: 'Surrogate-Control',
             value: 'no-store',
           },
-          {
-            key: 'Access-Control-Allow-Credentials',
-            value: 'true',
-          },
         ],
       },
     ];
