@@ -2,8 +2,8 @@ import type { NextConfig } from "next";
 
 const contentSecurityPolicy = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-  "style-src 'self' 'unsafe-inline'",
+  "script-src 'self'",
+  "style-src 'self'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
   "connect-src 'self' https://generativelanguage.googleapis.com https://*.supabase.co",
@@ -32,6 +32,10 @@ const nextConfig: NextConfig = {
           {
             key: 'X-Content-Type-Options',
             value: 'nosniff',
+          },
+          {
+            key: 'X-Permitted-Cross-Domain-Policies',
+            value: 'none',
           },
           {
             key: 'Referrer-Policy',
@@ -65,6 +69,10 @@ const nextConfig: NextConfig = {
           {
             key: 'Surrogate-Control',
             value: 'no-store',
+          },
+          {
+            key: 'Access-Control-Allow-Credentials',
+            value: 'true',
           },
         ],
       },
