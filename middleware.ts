@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUsernameFromAuthToken } from '@/lib/auth';
 
 function setNoStoreHeaders(response: NextResponse): NextResponse {
-  response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, private');
   response.headers.set('Pragma', 'no-cache');
   response.headers.set('Expires', '0');
+  response.headers.set('Surrogate-Control', 'no-store');
   return response;
 }
 
