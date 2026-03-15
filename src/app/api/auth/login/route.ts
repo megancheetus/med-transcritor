@@ -1,10 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAuthToken } from '@/lib/auth';
 import { authenticateUser, ensureAuthBootstrap } from '@/lib/authUsers';
+import { rateLimitMiddleware, getClientIp } from '@/lib/rateLimit';
+import { logger } from '@/lib/logger';
 
+export const runtime = 'nodejs';
+
+/**
+ * POST /api/auth/login
+ * Autentica usuário e retorna JWT token via cookie
+ * 
+ * Rate Limit: 5 tentativas por 15 minutos por IP
+ */
 export async function POST(request: NextRequest) {
+  const ip = getClientIp(request);
+  
   try {
+    // Rate limiting: máximo 5 tentativas em 15 minutos
+    const rateLimitResponse = await rateLimitMiddleware(request, 'login', {
+      windowMs: 15 * 60 * 1000, // 15 minutos
+      maxRequests: 5,
+      message: 'Muitas tentativas de login. Tente novamente em 15 minutos.',
+    });
+
+    if (rateLimitResponse) {
+      logger.warn('Login rate limit exceeded', { ip }, request);
+      return rateLimitResponse;
+    }
+
     const { username, password } = await request.json();
+
+    if (!username || !password) {
+      logger.warn('Login attempt with missing credentials', { username, ip }, request);
+      return NextResponse.json(
+        { error: 'Usuário e senha são obrigatórios' },
+        { status: 400 }
+      );
+    }
+
+    logger.info('Login attempt', { username, ip }, request);
 
     await ensureAuthBootstrap();
     const authenticated = await authenticateUser(username, password);
@@ -27,16 +61,27 @@ export async function POST(request: NextRequest) {
         path: '/',
       });
 
+      logger.info('Login successful', { username, ip }, request);
       return response;
     }
 
     // Invalid credentials
+    logger.warn('Login failed - invalid credentials', { username, ip }, request);
     return NextResponse.json(
       { error: 'Usuário ou senha incorretos' },
       { status: 401 }
     );
   } catch (error) {
-    console.error('Erro no login:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Desconhecido';
+    logger.error('Login error', 
+      { 
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+        ip
+      }, 
+      request
+    );
+    
     return NextResponse.json(
       { error: 'Erro ao processar login' },
       { status: 500 }

@@ -82,29 +82,34 @@ async function ensureUsersTable(): Promise<void> {
   if (!usersTableReadyPromise) {
     usersTableReadyPromise = (async () => {
       const pool = getPostgresPool();
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS app_users (
-          username TEXT PRIMARY KEY,
-          password_hash TEXT NOT NULL,
-          full_name TEXT,
-          email TEXT,
-          is_admin BOOLEAN NOT NULL DEFAULT FALSE,
-          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          last_login_at TIMESTAMPTZ
-        )
-      `);
+      
+      try {
+        // Criar tabela com todas as colunas de uma vez
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS app_users (
+            username TEXT PRIMARY KEY,
+            password_hash TEXT NOT NULL,
+            full_name TEXT,
+            email TEXT,
+            is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            last_login_at TIMESTAMPTZ
+          )
+        `);
 
-      await pool.query('ALTER TABLE app_users ADD COLUMN IF NOT EXISTS full_name TEXT');
-      await pool.query('ALTER TABLE app_users ADD COLUMN IF NOT EXISTS email TEXT');
-      await pool.query('ALTER TABLE app_users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE');
-      await pool.query(
-        'CREATE UNIQUE INDEX IF NOT EXISTS app_users_email_lower_unique ON app_users (LOWER(email)) WHERE email IS NOT NULL'
-      );
-    })().catch((error) => {
-      usersTableReadyPromise = null;
-      throw error;
-    });
+        // Criar índice de forma segura
+        await pool.query(`
+          CREATE UNIQUE INDEX IF NOT EXISTS app_users_email_lower_unique 
+          ON app_users (LOWER(email)) 
+          WHERE email IS NOT NULL
+        `);
+      } catch (error) {
+        // Se falhar, reseta a promise para tentar novamente
+        usersTableReadyPromise = null;
+        throw error;
+      }
+    })();
   }
 
   return usersTableReadyPromise;
@@ -136,8 +141,7 @@ async function ensureAdminUserExists(preferredUsername: string): Promise<void> {
 async function seedUsersFromEnv(): Promise<void> {
   if (!envUsersSeededPromise) {
     envUsersSeededPromise = (async () => {
-      await ensureUsersTable();
-
+      // ensureUsersTable já foi chamada pelo caller
       const envUsers = parseEnvUsers();
       if (envUsers.length === 0) {
         return;
@@ -175,11 +179,19 @@ async function seedUsersFromEnv(): Promise<void> {
 }
 
 export async function authenticateUser(username: string, password: string): Promise<boolean> {
+  // Apenas uma chamada a ensureUsersTable para evitar race conditions
   await ensureUsersTable();
-  await seedUsersFromEnv();
+  
+  // Seed não precisa chamar ensureUsersTable novamente
+  const pool = getPostgresPool();
+  
+  // Verificar se há usuários. Se não há, fazer seed (apenas uma vez na vida)
+  const existingUsersResult = await pool.query('SELECT COUNT(*)::int as count FROM app_users');
+  if (existingUsersResult.rows[0]?.count === 0) {
+    await seedUsersFromEnv();
+  }
 
   const normalizedUsername = normalizeUsername(username);
-  const pool = getPostgresPool();
   const result = await pool.query('SELECT username, password_hash FROM app_users WHERE username = $1 LIMIT 1', [
     normalizedUsername,
   ]);
@@ -232,7 +244,6 @@ export async function getUserByUsername(username: string): Promise<AppUserRecord
 
 export async function listUsers(): Promise<AppUserRecord[]> {
   await ensureUsersTable();
-  await seedUsersFromEnv();
 
   const pool = getPostgresPool();
   const result = await pool.query(`

@@ -1,19 +1,35 @@
 import type { NextConfig } from "next";
 
-const contentSecurityPolicy = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self'",
-  "img-src 'self' data: blob:",
-  "font-src 'self' data:",
-  "connect-src 'self' https://generativelanguage.googleapis.com https://*.supabase.co",
-  "media-src 'self' blob: data:",
-  "object-src 'none'",
-  "frame-ancestors 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "upgrade-insecure-requests",
-].join('; ');
+const contentSecurityPolicy = process.env.NODE_ENV === 'production'
+  ? // PRODUÇÃO: Rigoroso, sem unsafe-*
+    [
+      "default-src 'self'",
+      "script-src 'self'",
+      "style-src 'self'",
+      "img-src 'self' data: blob:",
+      "font-src 'self' data:",
+      "connect-src 'self' https://generativelanguage.googleapis.com https://*.supabase.co",
+      "media-src 'self' blob: data:",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "upgrade-insecure-requests",
+    ].join('; ')
+  : // DESENVOLVIMENTO: Relaxado para permitir logs/debug
+    [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob:",
+      "font-src 'self' data:",
+      "connect-src 'self' https://generativelanguage.googleapis.com https://*.supabase.co localhost:*",
+      "media-src 'self' blob: data:",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join('; ');
 
 const nextConfig: NextConfig = {
   async headers() {

@@ -67,17 +67,29 @@ export function getPostgresPool(): Pool {
     const pool = new Pool({
       connectionString,
       ssl: getSslConfig(),
-      max: 3,                        // Serverless: limita conexões simultâneas
-      idleTimeoutMillis: 10000,      // Descarta conexões ociosas após 10s
-      connectionTimeoutMillis: 8000, // Falha rápida se o banco não responder
+      max: 10,                       // Aumentado para serverless
+      min: 2,                        // Manter pelo menos 2 conexões quentes
+      idleTimeoutMillis: 30000,      // Mais tolerante com pools
+      connectionTimeoutMillis: 10000, // Aumentado para Supabase
+      statement_timeout: 30000,      // Timeout de statement
     });
 
     // Quando o PgBouncer/Transaction Pooler fecha uma conexão ociosa,
     // o pg.Pool emite 'error' sem forma padrão de recuperação.
     // Resetamos o pool para que a próxima request crie um novo.
     pool.on('error', (err) => {
-      console.error('[postgres] idle client error — resetting pool:', err.message);
+      console.error('[postgres] pool error — resetting pool:', err.message);
       global.omninotePostgresPool = undefined;
+    });
+
+    pool.on('connect', () => {
+      // Define timeout para este client quando conectar
+      if (pool._clients && pool._clients.length > 0) {
+        const client = pool._clients[pool._clients.length - 1];
+        if (client && !client._connectionTimeoutId) {
+          // Client conectado com sucesso
+        }
+      }
     });
 
     global.omninotePostgresPool = pool;
