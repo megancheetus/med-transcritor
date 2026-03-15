@@ -14,7 +14,6 @@ interface LogEntry {
 
 class Logger {
   private isDevelopment = process.env.NODE_ENV === 'development';
-  private logFile = process.env.LOG_FILE || './logs/app.log';
 
   /**
    * Log estruturado
@@ -30,48 +29,16 @@ class Logger {
       ...(ip && { ip }),
     };
 
-    // Console em desenvolvimento
-    if (this.isDevelopment) {
-      const color = {
-        info: '\x1b[36m', // Cyan
-        warn: '\x1b[33m', // Yellow
-        error: '\x1b[31m', // Red
-        debug: '\x1b[35m', // Magenta
-      }[level];
-      const reset = '\x1b[0m';
+    // Console logging para ambos desenvolvimento e produção
+    const color = {
+      info: '\x1b[36m', // Cyan
+      warn: '\x1b[33m', // Yellow
+      error: '\x1b[31m', // Red
+      debug: '\x1b[35m', // Magenta
+    }[level];
+    const reset = '\x1b[0m';
 
-      console.log(`${color}[${level.toUpperCase()}]${reset} ${message}`, context || '');
-    }
-
-    // Arquivo de log em produção
-    if (!this.isDevelopment) {
-      await this.writeToFile(JSON.stringify(entry));
-    }
-  }
-
-  /**
-   * Escrever em arquivo (implementação simples)
-   * Nota: Em produção real, use Winston ou similar
-   */
-  private async writeToFile(data: string) {
-    try {
-      // Versão simplificada - em produção use fs.promises ou biblioteca
-      if (typeof window === 'undefined') {
-        // Server-side only
-        const fs = await import('fs').then((m) => m.promises);
-        const path = await import('path');
-        const logDir = path.dirname(this.logFile);
-
-        try {
-          await fs.mkdir(logDir, { recursive: true });
-          await fs.appendFile(this.logFile, data + '\n');
-        } catch (err) {
-          console.error('Erro ao escrever log:', err);
-        }
-      }
-    } catch (err) {
-      // Silenciosamente falhar em logs
-    }
+    console.log(`${color}[${level.toUpperCase()}]${reset} ${message}`, context || '');
   }
 
   info(message: string, context?: Record<string, any>, request?: NextRequest) {
