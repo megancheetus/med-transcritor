@@ -106,7 +106,7 @@ class Logger {
       return real;
     }
 
-    return request.ip || 'unknown';
+    return 'unknown';
   }
 }
 

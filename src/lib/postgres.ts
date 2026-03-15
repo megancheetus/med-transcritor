@@ -82,16 +82,6 @@ export function getPostgresPool(): Pool {
       global.omninotePostgresPool = undefined;
     });
 
-    pool.on('connect', () => {
-      // Define timeout para este client quando conectar
-      if (pool._clients && pool._clients.length > 0) {
-        const client = pool._clients[pool._clients.length - 1];
-        if (client && !client._connectionTimeoutId) {
-          // Client conectado com sucesso
-        }
-      }
-    });
-
     global.omninotePostgresPool = pool;
   }
 

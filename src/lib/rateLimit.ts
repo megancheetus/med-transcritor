@@ -87,7 +87,7 @@ export function getClientIp(request: NextRequest): string {
   }
 
   // Fallback para IP da conexão
-  return request.ip || 'unknown';
+  return 'unknown';
 }
 
 /**
