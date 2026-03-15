@@ -1,11 +1,11 @@
 import type { NextConfig } from "next";
 
 const contentSecurityPolicy = process.env.NODE_ENV === 'production'
-  ? // PRODUÇÃO: Rigoroso, sem unsafe-*
+  ? // PRODUÇÃO: Next.js/Tailwind precisam de unsafe-inline para hidrataçã e estilos
     [
       "default-src 'self'",
-      "script-src 'self'",
-      "style-src 'self'",
+      "script-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
       "connect-src 'self' https://generativelanguage.googleapis.com https://*.supabase.co",
