@@ -53,9 +53,28 @@ export function VideoCallComponent({
 
         // Setup de callbacks ANTES de inicializar
         webrtc.onRemoteStream((stream) => {
-          console.log('Stream remoto recebido');
+          console.log('📨 Stream remoto recebido');
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = stream;
+            console.log('✅ Remote video srcObject setado');
+            console.log('📹 Remote video element:', {
+              hasRef: !!remoteVideoRef.current,
+              hasSrcObject: !!remoteVideoRef.current.srcObject,
+              tracks: {
+                audio: stream.getAudioTracks().length,
+                video: stream.getVideoTracks().length,
+              },
+              videoTracks: stream.getVideoTracks().map(t => ({
+                kind: t.kind,
+                enabled: t.enabled,
+                readyState: t.readyState,
+              })),
+            });
+            
+            // Force play se possível
+            remoteVideoRef.current.play().catch(e => console.warn('⚠️ Não conseguiu dar play no vídeo remoto:', e));
+          } else {
+            console.error('❌ remoteVideoRef.current é nulo');
           }
         });
 
@@ -106,7 +125,25 @@ export function VideoCallComponent({
         // Exibir video local
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = localStream;
-          console.log('✅ Vídeo local exibido');
+          console.log('✅ Vídeo local srcObject setado');
+          console.log('📹 Local video element:', {
+            hasRef: !!localVideoRef.current,
+            hasSrcObject: !!localVideoRef.current.srcObject,
+            tracks: {
+              audio: localStream.getAudioTracks().length,
+              video: localStream.getVideoTracks().length,
+            },
+            videoTracks: localStream.getVideoTracks().map(t => ({
+              kind: t.kind,
+              enabled: t.enabled,
+              readyState: t.readyState,
+            })),
+          });
+          
+          // Force play se possível
+          localVideoRef.current.play().catch(e => console.warn('⚠️ Não conseguiu dar play no vídeo local:', e));
+        } else {
+          console.error('❌ localVideoRef.current é nulo');
         }
 
         webrtcRef.current = webrtc;
@@ -145,6 +182,35 @@ export function VideoCallComponent({
       }
     };
   }, [roomId, role]);
+
+  // Monitorar status dos vídeos
+  useEffect(() => {
+    if (isInitializing || error) return;
+
+    const interval = setInterval(() => {
+      const localStatus = {
+        ref: !!localVideoRef.current,
+        srcObject: !!localVideoRef.current?.srcObject,
+        readyState: localVideoRef.current?.readyState,
+        paused: localVideoRef.current?.paused,
+        width: localVideoRef.current?.videoWidth,
+        height: localVideoRef.current?.videoHeight,
+      };
+
+      const remoteStatus = {
+        ref: !!remoteVideoRef.current,
+        srcObject: !!remoteVideoRef.current?.srcObject,
+        readyState: remoteVideoRef.current?.readyState,
+        paused: remoteVideoRef.current?.paused,
+        width: remoteVideoRef.current?.videoWidth,
+        height: remoteVideoRef.current?.videoHeight,
+      };
+
+      console.log('🎬 VIDEO STATUS:', { local: localStatus, remote: remoteStatus, isConnected });
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [isInitializing, error, isConnected]);
 
 
   // Sinalizacao HTTP polling
