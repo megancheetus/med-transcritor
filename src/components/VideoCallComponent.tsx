@@ -226,6 +226,21 @@ export function VideoCallComponent({
         if (videoWidth === 0 && clientWidth > 0) {
           console.log(`🔥 MONITOR: Container tem dimensões (${clientWidth}x${clientHeight}) mas video não. Forçando play()...`);
           video.play().catch(e => console.warn('⚠️ Erro ao forçar play:', e));
+          
+          // Fallback: Try re-assigning srcObject if stuck at readyState 0
+          if (video.readyState === 0 && video.srcObject) {
+            const stream = video.srcObject as MediaStream;
+            const videoTracks = stream.getVideoTracks();
+            if (videoTracks.length > 0 && videoTracks[0].readyState === 'live') {
+              console.log(`🔄 FALLBACK: Re-atribuindo srcObject para resetar elemento...`);
+              const temp = video.srcObject;
+              video.srcObject = null;
+              setTimeout(() => {
+                video.srcObject = temp;
+                console.log(`✅ srcObject re-atribuído`);
+              }, 50);
+            }
+          }
         }
         
         // Log das dimensões
@@ -259,7 +274,14 @@ export function VideoCallComponent({
     });
 
     const handlers = {
-      loadstart: () => console.log(`📺 ${name}: loadstart`),
+      loadstart: () => {
+        console.log(`📺 ${name}: loadstart`);
+        // Force play on loadstart for remote videos
+        if (name === 'REMOTE' && video.paused) {
+          console.log(`🔥 LOADSTART HANDLER: Forçando play() no REMOTE...`);
+          video.play().catch(e => console.warn(`⚠️ Erro ao play no loadstart:`, e));
+        }
+      },
       loadedmetadata: () => {
         console.log(`📺 ${name}: loadedmetadata (${video.videoWidth}x${video.videoHeight})`);
         if (video.paused) {
@@ -621,7 +643,6 @@ export function VideoCallComponent({
             autoPlay
             playsInline
             muted
-            preload="metadata"
             crossOrigin="anonymous"
             style={{ 
               display: 'block',
@@ -631,7 +652,6 @@ export function VideoCallComponent({
               objectFit: 'cover'
             }}
             className="w-full h-full object-cover"
-            poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%23000' width='100' height='100'/%3E%3C/svg%3E"
           />
           {!isConnected && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50">
