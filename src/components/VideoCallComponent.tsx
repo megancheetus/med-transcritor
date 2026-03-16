@@ -160,6 +160,37 @@ export function VideoCallComponent({
     };
   }, [roomId, role]);
 
+  // DEBUG: Monitorar ref
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('🔍 VIDEO REF STATUS:', {
+        localRef: localVideoRef.current ? '✅ SET' : '❌ NULL',
+        remoteRef: remoteVideoRef.current ? '✅ SET' : '❌ NULL',
+        isInitializing,
+        hasError: !!error,
+      });
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [isInitializing, error]);
+
+  // Monitora WebRTC stream local
+  useEffect(() => {
+    if (webrtcRef.current && localVideoRef.current && !error) {
+      const localStream = webrtcRef.current.getLocalStream();
+      if (localStream && !localVideoRef.current.srcObject) {
+        console.log('🎬 Tentando settar srcObject no video local...');
+        localVideoRef.current.srcObject = localStream;
+        console.log('✅ srcObject setado!', {
+          audioTracks: localStream.getAudioTracks().length,
+          videoTracks: localStream.getVideoTracks().length,
+        });
+      }
+    }
+  }, [error]);
+
+  console.log('🎨 RENDER:', { isInitializing, hasError: !!error, isConnected });
+
   // Enviar signal de sinalizacao via HTTP
   const sendSignal = useCallback(
     async (type: string, signal: any) => {
@@ -347,6 +378,7 @@ export function VideoCallComponent({
   };
 
   if (isInitializing) {
+    console.log('🔄 RENDER STATE: Inicializando...');
     return (
       <div className="flex h-screen items-center justify-center bg-[#0c161c]">
         <div className="text-center">
@@ -362,6 +394,7 @@ export function VideoCallComponent({
   }
 
   if (error) {
+    console.log('⚠️ RENDER STATE: Erro detectado', error);
     // Erro de permissão - mostrar instruções
     if (error.includes('Permission denied') || error.includes('NotAllowedError') || error.includes('denied')) {
       return (
