@@ -578,11 +578,12 @@ export function VideoCallComponent({
       {/* Video container */}
       <div className="flex-1 flex gap-2 p-4 overflow-hidden">
         {/* Video remoto (maior) */}
-        <div className="flex-1 bg-black rounded-lg overflow-hidden relative">
+        <div className="flex-1 bg-black rounded-lg overflow-hidden relative min-w-0 min-h-0">
           <video
             ref={remoteVideoRef}
             autoPlay
             playsInline
+            style={{ minWidth: '100px', minHeight: '100px' }}
             className="w-full h-full object-cover"
           />
           {!isConnected && (
@@ -604,6 +605,7 @@ export function VideoCallComponent({
             autoPlay
             playsInline
             muted
+            style={{ minWidth: '100px', minHeight: '100px' }}
             className="w-full h-full object-cover"
           />
           <div className="absolute bottom-2 left-2 bg-[#155b79]/80 text-white px-2 py-1 rounded text-xs font-medium">
