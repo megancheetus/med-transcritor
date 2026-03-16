@@ -81,6 +81,14 @@ export function VideoCallComponent({
               })),
             });
             
+            // Force play imediatamente
+            setTimeout(() => {
+              if (remoteVideoRef.current && remoteVideoRef.current.paused) {
+                console.log('🔥 FORCE PLAY no REMOTE após 100ms...');
+                remoteVideoRef.current.play().catch(e => console.warn('⚠️ Erro ao forçar play:', e));
+              }
+            }, 100);
+            
             // Configurar event listeners AGORA que temos um ref válido
             console.log('📡 Chamando setupVideoEventListeners para REMOTE...');
             setupVideoEventListeners(remoteVideoRef, 'REMOTE');
@@ -576,7 +584,7 @@ export function VideoCallComponent({
   return (
     <div className="flex h-screen w-screen flex-col bg-[#0c161c]">
       {/* Video container */}
-      <div className="flex-1 flex gap-2 p-4 overflow-hidden min-h-[200px]">
+      <div className="flex-1 flex gap-2 p-4 overflow-hidden min-h-[300px]">
         {/* Video remoto (maior) */}
         <div className="flex-1 bg-black rounded-lg overflow-hidden relative min-w-[100px] min-h-[100px]">
           <video
@@ -585,8 +593,10 @@ export function VideoCallComponent({
             playsInline
             muted
             preload="metadata"
-            style={{ display: 'block' }}
+            crossOrigin="anonymous"
+            style={{ display: 'block', backgroundColor: '#000' }}
             className="w-full h-full object-cover"
+            poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%23000' width='100' height='100'/%3E%3C/svg%3E"
           />
           {!isConnected && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50">
