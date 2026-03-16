@@ -130,12 +130,19 @@ export class WebRTCManager {
         streams: event.streams.length,
       });
       if (event.streams && event.streams[0]) {
-        this.remoteStream = event.streams[0];
+        const incomingStream = event.streams[0];
         console.log('✅ Stream remoto ATIVO:', {
-          audioTracks: this.remoteStream.getAudioTracks().length,
-          videoTracks: this.remoteStream.getVideoTracks().length,
+          audioTracks: incomingStream.getAudioTracks().length,
+          videoTracks: incomingStream.getVideoTracks().length,
         });
-        this.onRemoteStreamCallback?.(this.remoteStream);
+        // Only call callback when stream changes — ontrack fires once per track
+        // (audio then video), but they share the same stream object. Re-assigning
+        // srcObject on the second ontrack interrupts the browser's decode pipeline
+        // and loadedmetadata never fires.
+        if (this.remoteStream !== incomingStream) {
+          this.remoteStream = incomingStream;
+          this.onRemoteStreamCallback?.(this.remoteStream);
+        }
       }
     };
 
