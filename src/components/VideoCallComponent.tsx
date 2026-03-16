@@ -107,13 +107,20 @@ export function VideoCallComponent({
         // Exibir video local
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = localStream;
-          console.log('✅ Vídeo local exibido');
+          console.log('✅ Vídeo local exibido com sucesso!');
           console.log('📹 Tracks locais:', {
             audio: localStream.getAudioTracks().length,
             video: localStream.getVideoTracks().length,
           });
+          // Verificar se está realmente exibindo
+          console.log('🎬 Video element:', {
+            isPlaying: !localVideoRef.current.paused,
+            readyState: localVideoRef.current.readyState,
+            videoWidth: localVideoRef.current.videoWidth,
+            videoHeight: localVideoRef.current.videoHeight,
+          });
         } else {
-          console.warn('⚠️ localVideoRef.current não definido');
+          console.error('❌ ERRO: localVideoRef.current é nulo! Elemento video não foi renderizado');
         }
 
         webrtcRef.current = webrtc;
@@ -210,21 +217,32 @@ export function VideoCallComponent({
             }
           );
 
-          if (!response.ok) return;
+          if (!response.ok) {
+            console.warn(`⚠️ Erro no polling: ${response.status}`);
+            return;
+          }
 
           const { signals } = await response.json();
+
+          if (signals && signals.length > 0) {
+            console.log(`📨 ${signals.length} signal(s) recebido(s)`);
+          }
 
           for (const sig of signals) {
             console.log(`📨 Signal recebido: ${sig.type}`);
 
             if (sig.type === 'offer') {
+              console.log('🤝 Oferta recebida - PACIENTE/PROFISSIONAL DETECTADO!');
+              setIsConnected(true); // Mostrar que outra pessoa entrou
               await webrtc.setRemoteDescription(sig.signal);
               const answer = await webrtc.createAnswer();
               await sendSignal('answer', answer);
               console.log('📤 Answer enviado');
             } else if (sig.type === 'answer') {
+              console.log('✅ Answer recebido - CONEXÃO EM ANDAMENTO');
+              setIsConnected(true);
               await webrtc.setRemoteDescription(sig.signal);
-              console.log('📥 Answer recebido');
+              console.log('📥 Answer recebido e processado');
             } else if (sig.type === 'ice-candidate') {
               if (sig.signal) {
                 try {
@@ -422,7 +440,7 @@ export function VideoCallComponent({
             </div>
           )}
           <div className="absolute top-4 left-4 bg-[#155b79]/80 text-white px-3 py-2 rounded-lg text-sm font-medium">
-            {role === 'professional' ? patientName : professionalName}
+            {role === 'professional' ? (patientName || 'Paciente') : (professionalName || 'Profissional')}
           </div>
         </div>
 

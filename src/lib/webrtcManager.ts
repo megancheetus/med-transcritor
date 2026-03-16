@@ -123,27 +123,37 @@ export class WebRTCManager {
 
     // Quando recebi remotas da outra pessoa
     this.peerConnection.ontrack = (event) => {
-      console.log('Track remoto recebido:', event.track.kind);
+      console.log('🎬 Track remoto recebido!', {
+        kind: event.track.kind,
+        enabled: event.track.enabled,
+        readyState: event.track.readyState,
+        streams: event.streams.length,
+      });
       if (event.streams && event.streams[0]) {
         this.remoteStream = event.streams[0];
+        console.log('✅ Stream remoto ATIVO:', {
+          audioTracks: this.remoteStream.getAudioTracks().length,
+          videoTracks: this.remoteStream.getVideoTracks().length,
+        });
         this.onRemoteStreamCallback?.(this.remoteStream);
       }
     };
 
     // Mudanças de estado de conexão
     this.peerConnection.onconnectionstatechange = () => {
-      console.log('Connection state:', this.peerConnection?.connectionState);
-      this.onConnectionStateCallback?.(
-        this.peerConnection?.connectionState as RTCPeerConnectionState
-      );
+      const state = this.peerConnection?.connectionState;
+      console.log('🔗 Connection state changed:', state, {
+        iceConnectionState: this.peerConnection?.iceConnectionState,
+        signalingState: this.peerConnection?.signalingState,
+      });
+      this.onConnectionStateCallback?.(state as RTCPeerConnectionState);
     };
 
     // Mudanças de estado ICE
     this.peerConnection.oniceconnectionstatechange = () => {
-      console.log('ICE connection state:', this.peerConnection?.iceConnectionState);
-      this.onIceConnectionStateCallback?.(
-        this.peerConnection?.iceConnectionState as RTCIceConnectionState
-      );
+      const state = this.peerConnection?.iceConnectionState;
+      console.log('❄️ ICE connection state changed:', state);
+      this.onIceConnectionStateCallback?.(state as RTCIceConnectionState);
     };
 
     // Enviar ICE candidates
