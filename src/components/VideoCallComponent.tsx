@@ -213,6 +213,31 @@ export function VideoCallComponent({
     };
   }, [roomId, role]);
 
+  // Monitorar e forçar renderização do video remoto
+  useEffect(() => {
+    const monitorInterval = setInterval(() => {
+      const video = remoteVideoRef.current;
+      if (video && video.srcObject) {
+        const clientWidth = video.clientWidth;
+        const clientHeight = video.clientHeight;
+        const videoWidth = video.videoWidth;
+        
+        // Se tem srcObject mas não tem dimensões, tenta forçar play
+        if (videoWidth === 0 && clientWidth > 0) {
+          console.log(`🔥 MONITOR: Container tem dimensões (${clientWidth}x${clientHeight}) mas video não. Forçando play()...`);
+          video.play().catch(e => console.warn('⚠️ Erro ao forçar play:', e));
+        }
+        
+        // Log das dimensões
+        if (videoWidth > 0 || clientWidth > 0) {
+          console.log(`📊 REMOTE DIMENSIONS: client=${clientWidth}x${clientHeight}, video=${videoWidth}x${video.videoHeight}, readyState=${video.readyState}`);
+        }
+      }
+    }, 1000);
+    
+    return () => clearInterval(monitorInterval);
+  }, []);
+
   // Adicionar event listeners aos elementos video quando srcObject é setado
   const setupVideoEventListeners = useCallback((videoRef: React.RefObject<HTMLVideoElement | null>, name: string, retries = 0) => {
     const video = videoRef.current;
@@ -313,6 +338,10 @@ export function VideoCallComponent({
         paused: remoteVideoRef.current?.paused,
         width: remoteVideoRef.current?.videoWidth,
         height: remoteVideoRef.current?.videoHeight,
+        clientWidth: remoteVideoRef.current?.clientWidth,
+        clientHeight: remoteVideoRef.current?.clientHeight,
+        offsetWidth: remoteVideoRef.current?.offsetWidth,
+        offsetHeight: remoteVideoRef.current?.offsetHeight,
         srcObjectStreams: (remoteVideoRef.current?.srcObject as MediaStream)?.getTracks?.().length || 0,
         videoElement: {
           hasVideo: (remoteVideoRef.current?.srcObject as MediaStream)?.getVideoTracks?.().length > 0,
@@ -594,7 +623,13 @@ export function VideoCallComponent({
             muted
             preload="metadata"
             crossOrigin="anonymous"
-            style={{ display: 'block', backgroundColor: '#000' }}
+            style={{ 
+              display: 'block',
+              width: '100%',
+              height: '100%',
+              backgroundColor: '#000',
+              objectFit: 'cover'
+            }}
             className="w-full h-full object-cover"
             poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%23000' width='100' height='100'/%3E%3C/svg%3E"
           />
