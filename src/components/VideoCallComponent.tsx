@@ -27,6 +27,7 @@ export function VideoCallComponent({
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const webrtcRef = useRef<WebRTCManager | null>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // States
   const [isInitializing, setIsInitializing] = useState(true);
@@ -107,12 +108,19 @@ export function VideoCallComponent({
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = localStream;
           console.log('✅ Vídeo local exibido');
+          console.log('📹 Tracks locais:', {
+            audio: localStream.getAudioTracks().length,
+            video: localStream.getVideoTracks().length,
+          });
+        } else {
+          console.warn('⚠️ localVideoRef.current não definido');
         }
 
         webrtcRef.current = webrtc;
         setIsInitializing(false);
 
-        // WebSocket sinalizacao desabilitado - usando P2P direto
+        // Iniciar polling para sinalizacao HTTP
+        startSignalingPolling(webrtc);
       } catch (err) {
         let errorMessage = 'Erro ao inicializar chamada';
         
@@ -139,8 +147,104 @@ export function VideoCallComponent({
       if (durationIntervalRef.current) {
         clearInterval(durationIntervalRef.current);
       }
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
     };
   }, [roomId, role]);
+
+  // Enviar signal de sinalizacao via HTTP
+  const sendSignal = useCallback(
+    async (type: string, signal: any) => {
+      try {
+        const response = await fetch(
+          `/api/videoconsultations/${roomId}/signal`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type,
+              signal,
+              fromRole: role,
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          console.error('❌ Erro ao enviar signal:', response.statusText);
+        } else {
+          console.log(`✅ Signal ${type} enviado`);
+        }
+      } catch (err) {
+        console.error('❌ Erro ao enviar signal:', err);
+      }
+    },
+    [roomId, role]
+  );
+
+  // Poll para sinalizacao HTTP
+  const startSignalingPolling = useCallback(
+    (webrtc: WebRTCManager) => {
+      console.log('🔄 Iniciando polling de sinalizacao...');
+
+      // Se profissional, enviar oferta imediatamente
+      if (role === 'professional') {
+        setTimeout(async () => {
+          try {
+            const offer = await webrtc.createOffer();
+            await sendSignal('offer', offer);
+            console.log('📤 Oferta enviada pelo profissional');
+          } catch (err) {
+            console.error('❌ Erro ao criar oferta:', err);
+          }
+        }, 1000);
+      }
+
+      // Polling a cada 2 segundos
+      const interval = setInterval(async () => {
+        try {
+          const response = await fetch(
+            `/api/videoconsultations/${roomId}/signal?fromRole=${role}`,
+            {
+              method: 'GET',
+            }
+          );
+
+          if (!response.ok) return;
+
+          const { signals } = await response.json();
+
+          for (const sig of signals) {
+            console.log(`📨 Signal recebido: ${sig.type}`);
+
+            if (sig.type === 'offer') {
+              await webrtc.setRemoteDescription(sig.signal);
+              const answer = await webrtc.createAnswer();
+              await sendSignal('answer', answer);
+              console.log('📤 Answer enviado');
+            } else if (sig.type === 'answer') {
+              await webrtc.setRemoteDescription(sig.signal);
+              console.log('📥 Answer recebido');
+            } else if (sig.type === 'ice-candidate') {
+              if (sig.signal) {
+                try {
+                  await webrtc.addIceCandidate(new RTCIceCandidate(sig.signal));
+                  console.log('❄️ ICE candidate adicionado');
+                } catch (err) {
+                  console.warn('⚠️ Erro ao adicionar ICE candidate:', err);
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('⚠️ Erro ao fazer poll de signals:', err);
+        }
+      }, 2000);
+
+      pollingIntervalRef.current = interval;
+    },
+    [roomId, role, sendSignal]
+  );
 
   // Toggle áudio
   const handleToggleAudio = useCallback(() => {
