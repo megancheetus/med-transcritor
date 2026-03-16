@@ -183,11 +183,62 @@ export function VideoCallComponent({
     };
   }, [roomId, role]);
 
-  // Monitorar status dos vídeos
+  // Adicionar event listeners aos elementos video para diagnostics
+  useEffect(() => {
+    const videoElements = [
+      { ref: localVideoRef, name: 'LOCAL' },
+      { ref: remoteVideoRef, name: 'REMOTE' },
+    ];
+
+    const cleanups: Array<() => void> = [];
+
+    videoElements.forEach(({ ref, name }) => {
+      const video = ref.current;
+      if (!video) return;
+
+      const handlers = {
+        loadstart: () => console.log(`📺 ${name}: loadstart`),
+        loadedmetadata: () => console.log(`📺 ${name}: loadedmetadata (${video.videoWidth}x${video.videoHeight})`),
+        loadeddata: () => console.log(`📺 ${name}: loadeddata`),
+        canplay: () => {
+          console.log(`📺 ${name}: canplay - iniciando play()`);
+          video.play().catch(e => console.warn(`⚠️ Erro ao play ${name}:`, e));
+        },
+        canplaythrough: () => console.log(`📺 ${name}: canplaythrough`),
+        playing: () => console.log(`✅ ${name}: PLAYING!`),
+        pause: () => console.log(`⏸️ ${name}: paused`),
+        ended: () => console.log(`⏹️ ${name}: ended`),
+        error: () => console.error(`❌ ${name}: ERROR -`, video.error),
+      };
+
+      Object.entries(handlers).forEach(([event, handler]) => {
+        video.addEventListener(event, handler as EventListener);
+      });
+
+      cleanups.push(() => {
+        Object.entries(handlers).forEach(([event, handler]) => {
+          video.removeEventListener(event, handler as EventListener);
+        });
+      });
+    });
+
+    return () => cleanups.forEach(cleanup => cleanup());
+  }, []);
+
+  // Monitorar status dos vídeos E forçar play() periodicamente
   useEffect(() => {
     if (isInitializing || error) return;
 
     const interval = setInterval(() => {
+      // Forçar play() se possível
+      if (localVideoRef.current && !localVideoRef.current.paused === false) {
+        localVideoRef.current.play().catch(e => console.log('⚠️ Não conseguiu triggerar play local:', e));
+      }
+
+      if (remoteVideoRef.current && !remoteVideoRef.current.paused === false) {
+        remoteVideoRef.current.play().catch(e => console.log('⚠️ Não conseguiu triggerar play remoto:', e));
+      }
+
       const localStatus = {
         ref: !!localVideoRef.current,
         srcObject: !!localVideoRef.current?.srcObject,
@@ -195,6 +246,7 @@ export function VideoCallComponent({
         paused: localVideoRef.current?.paused,
         width: localVideoRef.current?.videoWidth,
         height: localVideoRef.current?.videoHeight,
+        srcObjectStreams: (localVideoRef.current?.srcObject as MediaStream)?.getTracks?.().length || 0,
       };
 
       const remoteStatus = {
@@ -204,6 +256,7 @@ export function VideoCallComponent({
         paused: remoteVideoRef.current?.paused,
         width: remoteVideoRef.current?.videoWidth,
         height: remoteVideoRef.current?.videoHeight,
+        srcObjectStreams: (remoteVideoRef.current?.srcObject as MediaStream)?.getTracks?.().length || 0,
       };
 
       console.log('🎬 VIDEO STATUS:', { local: localStatus, remote: remoteStatus, isConnected });
