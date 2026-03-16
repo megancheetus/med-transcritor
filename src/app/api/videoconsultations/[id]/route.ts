@@ -9,9 +9,9 @@ import {
 } from '@/lib/videoConsultationManager';
 
 interface RouteContext {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 /**
