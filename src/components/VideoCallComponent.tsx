@@ -71,8 +71,8 @@ export function VideoCallComponent({
               })),
             });
             
-            // NÃO chamar play() aqui - esperar por loadedmetadata
-            console.log('⏳ Aguardando loadedmetadata antes de play()');
+            // Configurar event listeners AGORA que temos um ref válido
+            setupVideoEventListeners(remoteVideoRef, 'REMOTE');
           } else {
             console.error('❌ remoteVideoRef.current é nulo');
           }
@@ -145,8 +145,8 @@ export function VideoCallComponent({
             })),
           });
           
-          // NÃO tenta play() agora - aguarda loadedmetadata
-          console.log('⏳ Aguardando evento loadedmetadata antes de play()...');
+          // Configurar event listeners AGORA que temos um ref válido
+          setupVideoEventListeners(localVideoRef, 'LOCAL');
         } else {
           console.error('❌ localVideoRef.current é nulo - elemento video não foi attached!');
         }
@@ -188,59 +188,48 @@ export function VideoCallComponent({
     };
   }, [roomId, role]);
 
-  // Adicionar event listeners aos elementos video para diagnostics
-  useEffect(() => {
-    const videoElements = [
-      { ref: localVideoRef, name: 'LOCAL' },
-      { ref: remoteVideoRef, name: 'REMOTE' },
-    ];
+  // Adicionar event listeners aos elementos video quando srcObject é setado
+  const setupVideoEventListeners = useCallback((videoRef: React.RefObject<HTMLVideoElement | null>, name: string) => {
+    const video = videoRef.current;
+    if (!video) {
+      console.log(`⚠️ ${name} video ref não está available para event listeners`);
+      return;
+    }
 
-    const cleanups: Array<() => void> = [];
+    const handlers = {
+      loadstart: () => console.log(`📺 ${name}: loadstart`),
+      loadedmetadata: () => {
+        console.log(`📺 ${name}: loadedmetadata (${video.videoWidth}x${video.videoHeight})`);
+        if (video.paused) {
+          console.log(`⏯️ ${name}: Tentando play() após loadedmetadata...`);
+          video.play().catch(e => console.warn(`⚠️ Erro ao play ${name}:`, e));
+        }
+      },
+      loadeddata: () => console.log(`📺 ${name}: loadeddata`),
+      canplay: () => {
+        console.log(`📺 ${name}: canplay`);
+        if (video.paused) {
+          console.log(`⏯️ ${name}: Tentando play() em canplay...`);
+          video.play().catch(e => console.warn(`⚠️ Erro ao play ${name}:`, e));
+        }
+      },
+      canplaythrough: () => console.log(`📺 ${name}: canplaythrough`),
+      playing: () => console.log(`✅ ${name}: PLAYING!`),
+      pause: () => console.log(`⏸️ ${name}: paused`),
+      ended: () => console.log(`⏹️ ${name}: ended`),
+      error: () => console.error(`❌ ${name}: ERROR -`, video.error?.message),
+    };
 
-    videoElements.forEach(({ ref, name }) => {
-      const video = ref.current;
-      if (!video) {
-        console.log(`⚠️ ${name} video ref não está attached!`);
-        return;
-      }
-
-      const handlers = {
-        loadstart: () => console.log(`📺 ${name}: loadstart`),
-        loadedmetadata: () => {
-          console.log(`📺 ${name}: loadedmetadata (${video.videoWidth}x${video.videoHeight})`);
-          // Tenta play() DEPOIS que metadata foi carregado
-          if (video.paused) {
-            console.log(`⏯️ ${name}: Tentando play() após loadedmetadata...`);
-            video.play().catch(e => console.warn(`⚠️ Erro ao play ${name}:`, e));
-          }
-        },
-        loadeddata: () => console.log(`📺 ${name}: loadeddata`),
-        canplay: () => {
-          console.log(`📺 ${name}: canplay`);
-          if (video.paused) {
-            console.log(`⏯️ ${name}: Tentando play() em canplay...`);
-            video.play().catch(e => console.warn(`⚠️ Erro ao play ${name}:`, e));
-          }
-        },
-        canplaythrough: () => console.log(`📺 ${name}: canplaythrough`),
-        playing: () => console.log(`✅ ${name}: PLAYING!`),
-        pause: () => console.log(`⏸️ ${name}: paused`),
-        ended: () => console.log(`⏹️ ${name}: ended`),
-        error: () => console.error(`❌ ${name}: ERROR -`, video.error),
-      };
-
-      Object.entries(handlers).forEach(([event, handler]) => {
-        video.addEventListener(event, handler as EventListener);
-      });
-
-      cleanups.push(() => {
-        Object.entries(handlers).forEach(([event, handler]) => {
-          video.removeEventListener(event, handler as EventListener);
-        });
-      });
+    Object.entries(handlers).forEach(([event, handler]) => {
+      video.addEventListener(event, handler as EventListener);
     });
 
-    return () => cleanups.forEach(cleanup => cleanup());
+    // Retorna função para remover listeners
+    return () => {
+      Object.entries(handlers).forEach(([event, handler]) => {
+        video.removeEventListener(event, handler as EventListener);
+      });
+    };
   }, []);
 
   // Monitorar status dos vídeos E forçar play() periodicamente
