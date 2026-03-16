@@ -53,10 +53,20 @@ export function VideoCallComponent({
 
         // Setup de callbacks ANTES de inicializar
         webrtc.onRemoteStream((stream) => {
-          console.log('📨 Stream remoto recebido');
+          console.log('📨 Stream remoto recebido', {
+            audioTracks: stream.getAudioTracks().length,
+            videoTracks: stream.getVideoTracks().length,
+          });
           if (remoteVideoRef.current) {
+            console.log(`✏️ Setando srcObject no REMOTE video...`);
             remoteVideoRef.current.srcObject = stream;
-            console.log('✅ Remote video srcObject setado');
+            console.log('✅ Remote video srcObject setado', {
+              videoElement: remoteVideoRef.current.tagName,
+              hasVideoTracks: stream.getVideoTracks().length,
+              hasAudioTracks: stream.getAudioTracks().length,
+              videoTrackEnabled: stream.getVideoTracks()[0]?.enabled,
+              audioTrackEnabled: stream.getAudioTracks()[0]?.enabled,
+            });
             console.log('📹 Remote video element:', {
               hasRef: !!remoteVideoRef.current,
               hasSrcObject: !!remoteVideoRef.current.srcObject,
@@ -72,6 +82,7 @@ export function VideoCallComponent({
             });
             
             // Configurar event listeners AGORA que temos um ref válido
+            console.log('📡 Chamando setupVideoEventListeners para REMOTE...');
             setupVideoEventListeners(remoteVideoRef, 'REMOTE');
           } else {
             console.error('❌ remoteVideoRef.current é nulo');
@@ -207,6 +218,13 @@ export function VideoCallComponent({
       return;
     }
 
+    console.log(`✅ ${name} event listeners: Attached to video element`, {
+      videoTag: video.tagName,
+      srcObjectExists: !!video.srcObject,
+      readyState: video.readyState,
+      paused: video.paused,
+    });
+
     const handlers = {
       loadstart: () => console.log(`📺 ${name}: loadstart`),
       loadedmetadata: () => {
@@ -216,26 +234,35 @@ export function VideoCallComponent({
           video.play().catch(e => console.warn(`⚠️ Erro ao play ${name}:`, e));
         }
       },
-      loadeddata: () => console.log(`📺 ${name}: loadeddata`),
+      loadeddata: () => console.log(`📺 ${name}: loadeddata (readyState: ${video.readyState})`),
       canplay: () => {
-        console.log(`📺 ${name}: canplay`);
+        console.log(`📺 ${name}: canplay (readyState: ${video.readyState})`);
         if (video.paused) {
           console.log(`⏯️ ${name}: Tentando play() em canplay...`);
           video.play().catch(e => console.warn(`⚠️ Erro ao play ${name}:`, e));
         }
       },
       canplaythrough: () => console.log(`📺 ${name}: canplaythrough`),
-      playing: () => console.log(`✅ ${name}: PLAYING!`),
+      playing: () => console.log(`✅ ${name}: PLAYING! (${video.videoWidth}x${video.videoHeight})`),
       pause: () => console.log(`⏸️ ${name}: paused`),
       ended: () => console.log(`⏹️ ${name}: ended`),
-      error: () => console.error(`❌ ${name}: ERROR -`, video.error?.message),
+      error: () => console.error(`❌ ${name}: ERROR -`, video.error?.message, video.error?.code),
+      seeking: () => console.log(`🔍 ${name}: seeking`),
+      seeked: () => console.log(`✔️ ${name}: seeked`),
     };
 
     Object.entries(handlers).forEach(([event, handler]) => {
       video.addEventListener(event, handler as EventListener);
     });
 
-    // Retorna função para remover listeners
+    // Log inicial do estado
+    console.log(`🎞️ ${name}: Initial state:`, {
+      readyState: video.readyState,
+      paused: video.paused,
+      duration: video.duration,
+      currentTime: video.currentTime,
+    });
+
     return () => {
       Object.entries(handlers).forEach(([event, handler]) => {
         video.removeEventListener(event, handler as EventListener);
@@ -265,6 +292,10 @@ export function VideoCallComponent({
         width: localVideoRef.current?.videoWidth,
         height: localVideoRef.current?.videoHeight,
         srcObjectStreams: (localVideoRef.current?.srcObject as MediaStream)?.getTracks?.().length || 0,
+        videoElement: {
+          hasVideo: (localVideoRef.current?.srcObject as MediaStream)?.getVideoTracks?.().length > 0,
+          videoTrackEnabled: (localVideoRef.current?.srcObject as MediaStream)?.getVideoTracks?.()?.[0]?.enabled,
+        },
       };
 
       const remoteStatus = {
@@ -275,6 +306,10 @@ export function VideoCallComponent({
         width: remoteVideoRef.current?.videoWidth,
         height: remoteVideoRef.current?.videoHeight,
         srcObjectStreams: (remoteVideoRef.current?.srcObject as MediaStream)?.getTracks?.().length || 0,
+        videoElement: {
+          hasVideo: (remoteVideoRef.current?.srcObject as MediaStream)?.getVideoTracks?.().length > 0,
+          videoTrackEnabled: (remoteVideoRef.current?.srcObject as MediaStream)?.getVideoTracks?.()?.[0]?.enabled,
+        },
       };
 
       console.log('🎬 VIDEO STATUS:', { local: localStatus, remote: remoteStatus, isConnected });
