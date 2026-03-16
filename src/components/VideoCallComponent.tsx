@@ -122,34 +122,40 @@ export function VideoCallComponent({
           }
         };
 
-        // Exibir video local
-        console.log('🎬 Tentando atribuir srcObject ao vídeo local...', {
-          hasRef: !!localVideoRef.current,
-          refType: typeof localVideoRef.current,
-        });
-        
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = localStream;
-          console.log('✅ Vídeo local srcObject setado');
-          console.log('📹 Local video element:', {
+        // Exibir video local - com retry automático se ref ainda não estiver pronto
+        const attachLocalStream = () => {
+          console.log('🎬 Tentando atribuir srcObject ao vídeo local...', {
             hasRef: !!localVideoRef.current,
-            hasSrcObject: !!localVideoRef.current.srcObject,
-            tracks: {
-              audio: localStream.getAudioTracks().length,
-              video: localStream.getVideoTracks().length,
-            },
-            videoTracks: localStream.getVideoTracks().map(t => ({
-              kind: t.kind,
-              enabled: t.enabled,
-              readyState: t.readyState,
-            })),
+            refType: typeof localVideoRef.current,
           });
           
-          // Configurar event listeners AGORA que temos um ref válido
-          setupVideoEventListeners(localVideoRef, 'LOCAL');
-        } else {
-          console.error('❌ localVideoRef.current é nulo - elemento video não foi attached!');
-        }
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = localStream;
+            console.log('✅ Vídeo local srcObject setado');
+            console.log('📹 Local video element:', {
+              hasRef: !!localVideoRef.current,
+              hasSrcObject: !!localVideoRef.current.srcObject,
+              tracks: {
+                audio: localStream.getAudioTracks().length,
+                video: localStream.getVideoTracks().length,
+              },
+              videoTracks: localStream.getVideoTracks().map(t => ({
+                kind: t.kind,
+                enabled: t.enabled,
+                readyState: t.readyState,
+              })),
+            });
+            
+            // Configurar event listeners AGORA que temos um ref válido
+            setupVideoEventListeners(localVideoRef, 'LOCAL');
+          } else {
+            console.warn('⚠️ localVideoRef ainda nulo, tentando novamente em 100ms...');
+            // Retry com pequeno delay - deixa React render os elementos
+            setTimeout(attachLocalStream, 100);
+          }
+        };
+        
+        attachLocalStream();
 
         webrtcRef.current = webrtc;
         setIsInitializing(false);
@@ -189,10 +195,15 @@ export function VideoCallComponent({
   }, [roomId, role]);
 
   // Adicionar event listeners aos elementos video quando srcObject é setado
-  const setupVideoEventListeners = useCallback((videoRef: React.RefObject<HTMLVideoElement | null>, name: string) => {
+  const setupVideoEventListeners = useCallback((videoRef: React.RefObject<HTMLVideoElement | null>, name: string, retries = 0) => {
     const video = videoRef.current;
     if (!video) {
-      console.log(`⚠️ ${name} video ref não está available para event listeners`);
+      if (retries < 3) {
+        console.log(`⚠️ ${name} video ref não está available, retrying... (${retries + 1}/3)`);
+        setTimeout(() => setupVideoEventListeners(videoRef, name, retries + 1), 50);
+      } else {
+        console.log(`❌ ${name} video ref nunca ficou disponível`);
+      }
       return;
     }
 
