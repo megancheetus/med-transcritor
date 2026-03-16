@@ -14,6 +14,8 @@ interface AppShellProps {
 const BASE_MENU_ITEMS = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/transcricao', label: 'Transcrição' },
+  { href: '/prontuario', label: 'Prontuário' },
+  { href: '/teleconsulta', label: 'Teleconsulta' },
   { href: '/historico', label: 'Histórico' },
   { href: '/perfil', label: 'Perfil' },
 ];

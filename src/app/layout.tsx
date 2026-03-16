@@ -25,6 +25,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
+      <head>
+        <meta 
+          httpEquiv="Permissions-Policy" 
+          content="camera=*, microphone=*, speaker=*" 
+        />
+      </head>
       <body
         className={`${inter.variable} antialiased`}
       >

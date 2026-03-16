@@ -3,6 +3,7 @@
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { CookieConsentBanner } from '@/components/CookieConsentBanner';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -111,6 +112,8 @@ export default function LoginPage() {
           Acesso restrito para usuários autorizados
         </p>
       </div>
+
+      <CookieConsentBanner />
     </div>
   );
 }
