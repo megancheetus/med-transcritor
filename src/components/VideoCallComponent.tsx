@@ -81,14 +81,6 @@ export function VideoCallComponent({
               })),
             });
             
-            // Force play imediatamente
-            setTimeout(() => {
-              if (remoteVideoRef.current && remoteVideoRef.current.paused) {
-                console.log('🔥 FORCE PLAY no REMOTE após 100ms...');
-                remoteVideoRef.current.play().catch(e => console.warn('⚠️ Erro ao forçar play:', e));
-              }
-            }, 100);
-            
             // Configurar event listeners AGORA que temos um ref válido
             console.log('📡 Chamando setupVideoEventListeners para REMOTE...');
             setupVideoEventListeners(remoteVideoRef, 'REMOTE');
@@ -222,33 +214,12 @@ export function VideoCallComponent({
         const clientHeight = video.clientHeight;
         const videoWidth = video.videoWidth;
         
-        // Se tem srcObject mas não tem dimensões, tenta forçar play
-        if (videoWidth === 0 && clientWidth > 0) {
-          console.log(`🔥 MONITOR: Container tem dimensões (${clientWidth}x${clientHeight}) mas video não. Forçando play()...`);
-          video.play().catch(e => console.warn('⚠️ Erro ao forçar play:', e));
-          
-          // Fallback: Try re-assigning srcObject if stuck at readyState 0
-          if (video.readyState === 0 && video.srcObject) {
-            const stream = video.srcObject as MediaStream;
-            const videoTracks = stream.getVideoTracks();
-            if (videoTracks.length > 0 && videoTracks[0].readyState === 'live') {
-              console.log(`🔄 FALLBACK: Re-atribuindo srcObject para resetar elemento...`);
-              const temp = video.srcObject;
-              video.srcObject = null;
-              setTimeout(() => {
-                video.srcObject = temp;
-                console.log(`✅ srcObject re-atribuído`);
-              }, 50);
-            }
-          }
-        }
-        
         // Log das dimensões
         if (videoWidth > 0 || clientWidth > 0) {
-          console.log(`📊 REMOTE DIMENSIONS: client=${clientWidth}x${clientHeight}, video=${videoWidth}x${video.videoHeight}, readyState=${video.readyState}`);
+          console.log(`📊 REMOTE DIMENSIONS: client=${clientWidth}x${clientHeight}, video=${videoWidth}x${video.videoHeight}, readyState=${video.readyState}, paused=${video.paused}`);
         }
       }
-    }, 1000);
+    }, 3000);
     
     return () => clearInterval(monitorInterval);
   }, []);
@@ -274,14 +245,7 @@ export function VideoCallComponent({
     });
 
     const handlers = {
-      loadstart: () => {
-        console.log(`📺 ${name}: loadstart`);
-        // Force play on loadstart for remote videos
-        if (name === 'REMOTE' && video.paused) {
-          console.log(`🔥 LOADSTART HANDLER: Forçando play() no REMOTE...`);
-          video.play().catch(e => console.warn(`⚠️ Erro ao play no loadstart:`, e));
-        }
-      },
+      loadstart: () => console.log(`📺 ${name}: loadstart`),
       loadedmetadata: () => {
         console.log(`📺 ${name}: loadedmetadata (${video.videoWidth}x${video.videoHeight})`);
         if (video.paused) {
@@ -289,7 +253,13 @@ export function VideoCallComponent({
           video.play().catch(e => console.warn(`⚠️ Erro ao play ${name}:`, e));
         }
       },
-      loadeddata: () => console.log(`📺 ${name}: loadeddata (readyState: ${video.readyState})`),
+      loadeddata: () => {
+        console.log(`📺 ${name}: loadeddata (readyState: ${video.readyState})`);
+        if (video.paused && name === 'REMOTE') {
+          console.log(`⏯️ ${name}: Tentando play() em loadeddata...`);
+          video.play().catch(e => console.warn(`⚠️ Erro ao play ${name}:`, e));
+        }
+      },
       canplay: () => {
         console.log(`📺 ${name}: canplay (readyState: ${video.readyState})`);
         if (video.paused) {
@@ -297,7 +267,13 @@ export function VideoCallComponent({
           video.play().catch(e => console.warn(`⚠️ Erro ao play ${name}:`, e));
         }
       },
-      canplaythrough: () => console.log(`📺 ${name}: canplaythrough`),
+      canplaythrough: () => {
+        console.log(`📺 ${name}: canplaythrough`);
+        if (video.paused && name === 'REMOTE') {
+          console.log(`⏯️ ${name}: Tentando play() em canplaythrough...`);
+          video.play().catch(e => console.warn(`⚠️ Erro ao play ${name}:`, e));
+        }
+      },
       playing: () => console.log(`✅ ${name}: PLAYING! (${video.videoWidth}x${video.videoHeight})`),
       pause: () => console.log(`⏸️ ${name}: paused`),
       ended: () => console.log(`⏹️ ${name}: ended`),
