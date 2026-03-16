@@ -574,7 +574,7 @@ export function VideoCallComponent({
   }
 
   return (
-    <div className="flex h-screen flex-col bg-[#0c161c]">
+    <div className="flex h-screen w-screen flex-col bg-[#0c161c]">
       {/* Video container */}
       <div className="flex-1 flex gap-2 p-4 overflow-hidden min-h-[200px]">
         {/* Video remoto (maior) */}
@@ -583,6 +583,7 @@ export function VideoCallComponent({
             ref={remoteVideoRef}
             autoPlay
             playsInline
+            muted
             className="w-full h-full object-cover"
           />
           {!isConnected && (
