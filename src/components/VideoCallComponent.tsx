@@ -291,50 +291,58 @@ export function VideoCallComponent({
     (webrtc: WebRTCManager) => {
       console.log('🔄 Iniciando polling de sinalizacao HTTP...');
 
-      // Se profissional, enviar oferta imediatamente
-      if (role === 'professional') {
-        setTimeout(async () => {
-          try {
-            const offer = await webrtc.createOffer();
-            const response = await fetch(
-              `/api/videoconsultations/${roomId}/signal`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  type: 'offer',
-                  signal: offer,
-                  fromRole: role,
-                }),
-              }
-            );
-            if (response.ok) {
-              console.log('📤 Oferta enviada pelo profissional');
-            }
-          } catch (err) {
-            console.error('❌ Erro ao criar oferta:', err);
-          }
-        }, 1000);
-      }
+      let offerSent = false;
 
-      // Polling a cada 2 segundos
+      // Polling a cada 1000ms (mais frequente para melhor sincronização)
       const interval = setInterval(async () => {
         try {
+          // Se profissional e ainda não enviou oferta, enviar agora
+          if (role === 'professional' && !offerSent) {
+            try {
+              const offer = await webrtc.createOffer();
+              const response = await fetch(
+                `/api/videoconsultations/${roomId}/signal`,
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    type: 'offer',
+                    signal: offer,
+                    fromRole: role,
+                  }),
+                }
+              );
+              if (response.ok) {
+                console.log('📤 Oferta enviada pelo profissional');
+                offerSent = true;
+              }
+            } catch (err) {
+              console.error('❌ Erro ao criar/enviar oferta:', err);
+            }
+          }
+
+          // Fazer GET para buscar signals do outro usuário
           const response = await fetch(
             `/api/videoconsultations/${roomId}/signal?fromRole=${role}`,
             { method: 'GET' }
           );
 
-          if (!response.ok) return;
+          if (!response.ok) {
+            console.log('⚠️ GET retornou status:', response.status);
+            return;
+          }
 
           const { signals } = await response.json();
           if (!signals || signals.length === 0) return;
+
+          console.log(`📬 Recebidos ${signals.length} signal(s)`);
 
           for (const sig of signals) {
             console.log(`📨 Signal recebido: ${sig.type}`);
 
             if (sig.type === 'offer') {
               setIsConnected(true);
+              console.log('🎬 Processando OFFER...');
               await webrtc.setRemoteDescription(sig.signal);
               const answer = await webrtc.createAnswer();
               await fetch(`/api/videoconsultations/${roomId}/signal`, {
@@ -346,16 +354,18 @@ export function VideoCallComponent({
                   fromRole: role,
                 }),
               });
-              console.log('📤 Answer enviado');
+              console.log('📤 Answer enviado como resposta');
             } else if (sig.type === 'answer') {
               setIsConnected(true);
+              console.log('🎬 Processando ANSWER...');
               await webrtc.setRemoteDescription(sig.signal);
-              console.log('📥 Answer recebido');
+              console.log('📥 Answer processado');
             } else if (sig.type === 'ice-candidate') {
               if (sig.signal) {
                 try {
+                  console.log('❄️ Adicionando ICE candidate...');
                   await webrtc.addIceCandidate(new RTCIceCandidate(sig.signal));
-                  console.log('❄️ ICE candidate adicionado');
+                  console.log('✅ ICE candidate adicionado');
                 } catch (err) {
                   console.warn('⚠️ Erro ao adicionar ICE candidate:', err);
                 }
@@ -365,7 +375,7 @@ export function VideoCallComponent({
         } catch (err) {
           console.warn('⚠️ Erro no polling:', err);
         }
-      }, 2000);
+      }, 1000); // Reduzido de 2000 para 1000ms
 
       pollingIntervalRef.current = interval;
     },
