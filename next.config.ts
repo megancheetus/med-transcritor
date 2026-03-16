@@ -59,7 +59,7 @@ const nextConfig: NextConfig = {
           },
           {
             key: 'Permissions-Policy',
-            value: 'camera=*, microphone=*, speaker=*, geolocation=(), payment=(), usb=()',
+            value: 'camera=*, microphone=*, geolocation=(), payment=(), usb=()',
           },
           {
             key: 'Cross-Origin-Opener-Policy',

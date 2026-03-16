@@ -28,7 +28,7 @@ export default function RootLayout({
       <head>
         <meta 
           httpEquiv="Permissions-Policy" 
-          content="camera=*, microphone=*, speaker=*" 
+          content="camera=*, microphone=*" 
         />
       </head>
       <body

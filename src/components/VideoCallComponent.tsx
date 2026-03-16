@@ -584,6 +584,8 @@ export function VideoCallComponent({
             autoPlay
             playsInline
             muted
+            preload="metadata"
+            style={{ display: 'block' }}
             className="w-full h-full object-cover"
           />
           {!isConnected && (
@@ -605,6 +607,7 @@ export function VideoCallComponent({
             autoPlay
             playsInline
             muted
+            style={{ display: 'block' }}
             className="w-full h-full object-cover"
           />
           <div className="absolute bottom-2 left-2 bg-[#155b79]/80 text-white px-2 py-1 rounded text-xs font-medium">
