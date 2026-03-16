@@ -27,7 +27,7 @@ export function VideoCallComponent({
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const webrtcRef = useRef<WebRTCManager | null>(null);
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const signalingSocketRef = useRef<WebSocket | null>(null);
 
   // States
   const [isInitializing, setIsInitializing] = useState(true);
@@ -85,8 +85,17 @@ export function VideoCallComponent({
         
         // Inicializar mídia - ISTO VAI PEDIR PERMISSÃO AO NAVEGADOR
         const localStream = await webrtc.initialize(async (signal) => {
-          // Sinalizacao desabilitada por enquanto - WebRTC P2P via STUN servers
-          console.log('Signal (WebSocket desabilitado):', signal);
+          // Enviar sinal via WebSocket
+          if (signalingSocketRef.current?.readyState === WebSocket.OPEN) {
+            signalingSocketRef.current.send(
+              JSON.stringify({
+                type: 'signal',
+                signal,
+                roomId,
+                role,
+              })
+            );
+          }
         });
 
         console.log('✅ Acesso à mídia concedido');
@@ -107,27 +116,14 @@ export function VideoCallComponent({
         // Exibir video local
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = localStream;
-          console.log('✅ Vídeo local exibido com sucesso!');
-          console.log('📹 Tracks locais:', {
-            audio: localStream.getAudioTracks().length,
-            video: localStream.getVideoTracks().length,
-          });
-          // Verificar se está realmente exibindo
-          console.log('🎬 Video element:', {
-            isPlaying: !localVideoRef.current.paused,
-            readyState: localVideoRef.current.readyState,
-            videoWidth: localVideoRef.current.videoWidth,
-            videoHeight: localVideoRef.current.videoHeight,
-          });
-        } else {
-          console.error('❌ ERRO: localVideoRef.current é nulo! Elemento video não foi renderizado');
+          console.log('✅ Vídeo local exibido');
         }
 
         webrtcRef.current = webrtc;
         setIsInitializing(false);
 
-        // Iniciar polling para sinalizacao HTTP
-        startSignalingPolling(webrtc);
+        // Conectar WebSocket para sinalizacao (NÃO BLOQUEIA O FLUXO LOCAL)
+        connectWebSocket(webrtc);
       } catch (err) {
         let errorMessage = 'Erro ao inicializar chamada';
         
@@ -154,146 +150,97 @@ export function VideoCallComponent({
       if (durationIntervalRef.current) {
         clearInterval(durationIntervalRef.current);
       }
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-      }
     };
   }, [roomId, role]);
 
-  // DEBUG: Monitorar ref
-  useEffect(() => {
-    const interval = setInterval(() => {
-      console.log('🔍 VIDEO REF STATUS:', {
-        localRef: localVideoRef.current ? '✅ SET' : '❌ NULL',
-        remoteRef: remoteVideoRef.current ? '✅ SET' : '❌ NULL',
-        isInitializing,
-        hasError: !!error,
-      });
-    }, 5000);
+  // Conectar WebSocket para sinalizacao
+  const connectWebSocket = (webrtc: WebRTCManager) => {
+    try {
+      // Usa WS (não seguro) em localhost, WSS em produção HTTPS
+      const isSecure = window.location.protocol === 'https:' && !window.location.hostname.includes('localhost');
+      const protocol = isSecure ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/api/ws/videoconsultations/${roomId}`;
 
-    return () => clearInterval(interval);
-  }, [isInitializing, error]);
+      console.log('Tentando conectar WebSocket:', wsUrl);
+      const ws = new WebSocket(wsUrl);
 
-  // Monitora WebRTC stream local
-  useEffect(() => {
-    if (webrtcRef.current && localVideoRef.current && !error) {
-      const localStream = webrtcRef.current.getLocalStream();
-      if (localStream && !localVideoRef.current.srcObject) {
-        console.log('🎬 Tentando settar srcObject no video local...');
-        localVideoRef.current.srcObject = localStream;
-        console.log('✅ srcObject setado!', {
-          audioTracks: localStream.getAudioTracks().length,
-          videoTracks: localStream.getVideoTracks().length,
-        });
-      }
-    }
-  }, [error]);
+      ws.onopen = async () => {
+        console.log('✅ WebSocket conectado');
 
-  console.log('🎨 RENDER:', { isInitializing, hasError: !!error, isConnected });
-
-  // Enviar signal de sinalizacao via HTTP
-  const sendSignal = useCallback(
-    async (type: string, signal: any) => {
-      try {
-        const response = await fetch(
-          `/api/videoconsultations/${roomId}/signal`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type,
-              signal,
-              fromRole: role,
-            }),
-          }
+        // Enviar informação inicial
+        ws.send(
+          JSON.stringify({
+            type: 'join',
+            role,
+            token: roomToken,
+          })
         );
 
-        if (!response.ok) {
-          console.error('❌ Erro ao enviar signal:', response.statusText);
-        } else {
-          console.log(`✅ Signal ${type} enviado`);
-        }
-      } catch (err) {
-        console.error('❌ Erro ao enviar signal:', err);
-      }
-    },
-    [roomId, role]
-  );
-
-  // Poll para sinalizacao HTTP
-  const startSignalingPolling = useCallback(
-    (webrtc: WebRTCManager) => {
-      console.log('🔄 Iniciando polling de sinalizacao...');
-
-      // Se profissional, enviar oferta imediatamente
-      if (role === 'professional') {
-        setTimeout(async () => {
+        // Se profissional, criar oferta
+        if (role === 'professional') {
           try {
             const offer = await webrtc.createOffer();
-            await sendSignal('offer', offer);
-            console.log('📤 Oferta enviada pelo profissional');
+            ws.send(
+              JSON.stringify({
+                type: 'offer',
+                offer,
+                roomId,
+              })
+            );
           } catch (err) {
-            console.error('❌ Erro ao criar oferta:', err);
+            console.error('Erro ao criar oferta:', err);
           }
-        }, 1000);
-      }
+        }
+      };
 
-      // Polling a cada 2 segundos
-      const interval = setInterval(async () => {
+      ws.onmessage = async (event) => {
         try {
-          const response = await fetch(
-            `/api/videoconsultations/${roomId}/signal?fromRole=${role}`,
-            {
-              method: 'GET',
-            }
-          );
+          const message = JSON.parse(event.data);
 
-          if (!response.ok) {
-            console.warn(`⚠️ Erro no polling: ${response.status}`);
-            return;
-          }
-
-          const { signals } = await response.json();
-
-          if (signals && signals.length > 0) {
-            console.log(`📨 ${signals.length} signal(s) recebido(s)`);
-          }
-
-          for (const sig of signals) {
-            console.log(`📨 Signal recebido: ${sig.type}`);
-
-            if (sig.type === 'offer') {
-              console.log('🤝 Oferta recebida - PACIENTE/PROFISSIONAL DETECTADO!');
-              setIsConnected(true); // Mostrar que outra pessoa entrou
-              await webrtc.setRemoteDescription(sig.signal);
-              const answer = await webrtc.createAnswer();
-              await sendSignal('answer', answer);
-              console.log('📤 Answer enviado');
-            } else if (sig.type === 'answer') {
-              console.log('✅ Answer recebido - CONEXÃO EM ANDAMENTO');
-              setIsConnected(true);
-              await webrtc.setRemoteDescription(sig.signal);
-              console.log('📥 Answer recebido e processado');
-            } else if (sig.type === 'ice-candidate') {
-              if (sig.signal) {
-                try {
-                  await webrtc.addIceCandidate(new RTCIceCandidate(sig.signal));
-                  console.log('❄️ ICE candidate adicionado');
-                } catch (err) {
-                  console.warn('⚠️ Erro ao adicionar ICE candidate:', err);
-                }
+          if (message.type === 'offer') {
+            await webrtc.setRemoteDescription(message.offer);
+            const answer = await webrtc.createAnswer();
+            ws.send(
+              JSON.stringify({
+                type: 'answer',
+                answer,
+                roomId,
+              })
+            );
+          } else if (message.type === 'answer') {
+            await webrtc.setRemoteDescription(message.answer);
+          } else if (message.type === 'ice-candidate') {
+            if (message.candidate) {
+              try {
+                await webrtc.addIceCandidate(
+                  new RTCIceCandidate(message.candidate)
+                );
+              } catch (err) {
+                console.warn('Erro ao adicionar ICE candidate:', err);
               }
             }
           }
         } catch (err) {
-          console.warn('⚠️ Erro ao fazer poll de signals:', err);
+          console.error('Erro ao processar mensagem WebSocket:', err);
         }
-      }, 2000);
+      };
 
-      pollingIntervalRef.current = interval;
-    },
-    [roomId, role, sendSignal]
-  );
+      ws.onerror = (error) => {
+        console.error('❌ Erro WebSocket:', error);
+        // NÃO desabilita a interface - áudio/vídeo local ainda funciona
+        setError('Erro de conexão com servidor (sinalizacao)');
+      };
+
+      ws.onclose = () => {
+        console.log('WebSocket desconectado');
+      };
+
+      signalingSocketRef.current = ws;
+    } catch (err) {
+      console.error('Erro ao conectar WebSocket:', err);
+      // Não lança erro - a comunincação local ainda funciona
+    }
+  };
 
   // Toggle áudio
   const handleToggleAudio = useCallback(() => {
@@ -349,6 +296,11 @@ export function VideoCallComponent({
     // Fechar WebRTC
     webrtcRef.current?.close();
 
+    // Fechar WebSocket
+    if (signalingSocketRef.current) {
+      signalingSocketRef.current.close();
+    }
+
     // Callback
     if (onEndCall) {
       await onEndCall(callDuration);
@@ -378,7 +330,6 @@ export function VideoCallComponent({
   };
 
   if (isInitializing) {
-    console.log('🔄 RENDER STATE: Inicializando...');
     return (
       <div className="flex h-screen items-center justify-center bg-[#0c161c]">
         <div className="text-center">
@@ -394,7 +345,6 @@ export function VideoCallComponent({
   }
 
   if (error) {
-    console.log('⚠️ RENDER STATE: Erro detectado', error);
     // Erro de permissão - mostrar instruções
     if (error.includes('Permission denied') || error.includes('NotAllowedError') || error.includes('denied')) {
       return (
@@ -473,7 +423,7 @@ export function VideoCallComponent({
             </div>
           )}
           <div className="absolute top-4 left-4 bg-[#155b79]/80 text-white px-3 py-2 rounded-lg text-sm font-medium">
-            {role === 'professional' ? (patientName || 'Paciente') : (professionalName || 'Profissional')}
+            {role === 'professional' ? patientName : professionalName}
           </div>
         </div>
 
