@@ -71,8 +71,8 @@ export function VideoCallComponent({
               })),
             });
             
-            // Force play se possível
-            remoteVideoRef.current.play().catch(e => console.warn('⚠️ Não conseguiu dar play no vídeo remoto:', e));
+            // NÃO chamar play() aqui - esperar por loadedmetadata
+            console.log('⏳ Aguardando loadedmetadata antes de play()');
           } else {
             console.error('❌ remoteVideoRef.current é nulo');
           }
@@ -123,6 +123,11 @@ export function VideoCallComponent({
         };
 
         // Exibir video local
+        console.log('🎬 Tentando atribuir srcObject ao vídeo local...', {
+          hasRef: !!localVideoRef.current,
+          refType: typeof localVideoRef.current,
+        });
+        
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = localStream;
           console.log('✅ Vídeo local srcObject setado');
@@ -140,10 +145,10 @@ export function VideoCallComponent({
             })),
           });
           
-          // Force play se possível
-          localVideoRef.current.play().catch(e => console.warn('⚠️ Não conseguiu dar play no vídeo local:', e));
+          // NÃO tenta play() agora - aguarda loadedmetadata
+          console.log('⏳ Aguardando evento loadedmetadata antes de play()...');
         } else {
-          console.error('❌ localVideoRef.current é nulo');
+          console.error('❌ localVideoRef.current é nulo - elemento video não foi attached!');
         }
 
         webrtcRef.current = webrtc;
@@ -194,15 +199,28 @@ export function VideoCallComponent({
 
     videoElements.forEach(({ ref, name }) => {
       const video = ref.current;
-      if (!video) return;
+      if (!video) {
+        console.log(`⚠️ ${name} video ref não está attached!`);
+        return;
+      }
 
       const handlers = {
         loadstart: () => console.log(`📺 ${name}: loadstart`),
-        loadedmetadata: () => console.log(`📺 ${name}: loadedmetadata (${video.videoWidth}x${video.videoHeight})`),
+        loadedmetadata: () => {
+          console.log(`📺 ${name}: loadedmetadata (${video.videoWidth}x${video.videoHeight})`);
+          // Tenta play() DEPOIS que metadata foi carregado
+          if (video.paused) {
+            console.log(`⏯️ ${name}: Tentando play() após loadedmetadata...`);
+            video.play().catch(e => console.warn(`⚠️ Erro ao play ${name}:`, e));
+          }
+        },
         loadeddata: () => console.log(`📺 ${name}: loadeddata`),
         canplay: () => {
-          console.log(`📺 ${name}: canplay - iniciando play()`);
-          video.play().catch(e => console.warn(`⚠️ Erro ao play ${name}:`, e));
+          console.log(`📺 ${name}: canplay`);
+          if (video.paused) {
+            console.log(`⏯️ ${name}: Tentando play() em canplay...`);
+            video.play().catch(e => console.warn(`⚠️ Erro ao play ${name}:`, e));
+          }
         },
         canplaythrough: () => console.log(`📺 ${name}: canplaythrough`),
         playing: () => console.log(`✅ ${name}: PLAYING!`),
@@ -230,12 +248,12 @@ export function VideoCallComponent({
     if (isInitializing || error) return;
 
     const interval = setInterval(() => {
-      // Forçar play() se possível
-      if (localVideoRef.current && !localVideoRef.current.paused === false) {
+      // Só forçar play() se metadata foi carregado (readyState >= 1)
+      if (localVideoRef.current && localVideoRef.current.readyState >= 1 && localVideoRef.current.paused) {
         localVideoRef.current.play().catch(e => console.log('⚠️ Não conseguiu triggerar play local:', e));
       }
 
-      if (remoteVideoRef.current && !remoteVideoRef.current.paused === false) {
+      if (remoteVideoRef.current && remoteVideoRef.current.readyState >= 1 && remoteVideoRef.current.paused) {
         remoteVideoRef.current.play().catch(e => console.log('⚠️ Não conseguiu triggerar play remoto:', e));
       }
 
