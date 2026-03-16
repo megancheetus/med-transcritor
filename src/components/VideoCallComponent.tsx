@@ -27,7 +27,6 @@ export function VideoCallComponent({
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const webrtcRef = useRef<WebRTCManager | null>(null);
-  const signalingSocketRef = useRef<WebSocket | null>(null);
 
   // States
   const [isInitializing, setIsInitializing] = useState(true);
@@ -85,17 +84,8 @@ export function VideoCallComponent({
         
         // Inicializar mídia - ISTO VAI PEDIR PERMISSÃO AO NAVEGADOR
         const localStream = await webrtc.initialize(async (signal) => {
-          // Enviar sinal via WebSocket
-          if (signalingSocketRef.current?.readyState === WebSocket.OPEN) {
-            signalingSocketRef.current.send(
-              JSON.stringify({
-                type: 'signal',
-                signal,
-                roomId,
-                role,
-              })
-            );
-          }
+          // Sinalizacao desabilitada - usar HTTP polling em vez de WebSocket
+          console.log('📡 Signal gerado (WebSocket desabilitado):', signal);
         });
 
         console.log('✅ Acesso à mídia concedido');
@@ -122,8 +112,8 @@ export function VideoCallComponent({
         webrtcRef.current = webrtc;
         setIsInitializing(false);
 
-        // Conectar WebSocket para sinalizacao (NÃO BLOQUEIA O FLUXO LOCAL)
-        connectWebSocket(webrtc);
+        // Iniciar polling HTTP para sinalizacao
+        startSignalingPolling(webrtc);
       } catch (err) {
         let errorMessage = 'Erro ao inicializar chamada';
         
@@ -150,97 +140,100 @@ export function VideoCallComponent({
       if (durationIntervalRef.current) {
         clearInterval(durationIntervalRef.current);
       }
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
     };
   }, [roomId, role]);
 
-  // Conectar WebSocket para sinalizacao
-  const connectWebSocket = (webrtc: WebRTCManager) => {
-    try {
-      // Usa WS (não seguro) em localhost, WSS em produção HTTPS
-      const isSecure = window.location.protocol === 'https:' && !window.location.hostname.includes('localhost');
-      const protocol = isSecure ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/api/ws/videoconsultations/${roomId}`;
 
-      console.log('Tentando conectar WebSocket:', wsUrl);
-      const ws = new WebSocket(wsUrl);
+  // Sinalizacao HTTP polling
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-      ws.onopen = async () => {
-        console.log('✅ WebSocket conectado');
+  const startSignalingPolling = useCallback(
+    (webrtc: WebRTCManager) => {
+      console.log('🔄 Iniciando polling de sinalizacao HTTP...');
 
-        // Enviar informação inicial
-        ws.send(
-          JSON.stringify({
-            type: 'join',
-            role,
-            token: roomToken,
-          })
-        );
-
-        // Se profissional, criar oferta
-        if (role === 'professional') {
+      // Se profissional, enviar oferta imediatamente
+      if (role === 'professional') {
+        setTimeout(async () => {
           try {
             const offer = await webrtc.createOffer();
-            ws.send(
-              JSON.stringify({
-                type: 'offer',
-                offer,
-                roomId,
-              })
+            const response = await fetch(
+              `/api/videoconsultations/${roomId}/signal`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  type: 'offer',
+                  signal: offer,
+                  fromRole: role,
+                }),
+              }
             );
+            if (response.ok) {
+              console.log('📤 Oferta enviada pelo profissional');
+            }
           } catch (err) {
-            console.error('Erro ao criar oferta:', err);
+            console.error('❌ Erro ao criar oferta:', err);
           }
-        }
-      };
+        }, 1000);
+      }
 
-      ws.onmessage = async (event) => {
+      // Polling a cada 2 segundos
+      const interval = setInterval(async () => {
         try {
-          const message = JSON.parse(event.data);
+          const response = await fetch(
+            `/api/videoconsultations/${roomId}/signal?fromRole=${role}`,
+            { method: 'GET' }
+          );
 
-          if (message.type === 'offer') {
-            await webrtc.setRemoteDescription(message.offer);
-            const answer = await webrtc.createAnswer();
-            ws.send(
-              JSON.stringify({
-                type: 'answer',
-                answer,
-                roomId,
-              })
-            );
-          } else if (message.type === 'answer') {
-            await webrtc.setRemoteDescription(message.answer);
-          } else if (message.type === 'ice-candidate') {
-            if (message.candidate) {
-              try {
-                await webrtc.addIceCandidate(
-                  new RTCIceCandidate(message.candidate)
-                );
-              } catch (err) {
-                console.warn('Erro ao adicionar ICE candidate:', err);
+          if (!response.ok) return;
+
+          const { signals } = await response.json();
+          if (!signals || signals.length === 0) return;
+
+          for (const sig of signals) {
+            console.log(`📨 Signal recebido: ${sig.type}`);
+
+            if (sig.type === 'offer') {
+              setIsConnected(true);
+              await webrtc.setRemoteDescription(sig.signal);
+              const answer = await webrtc.createAnswer();
+              await fetch(`/api/videoconsultations/${roomId}/signal`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  type: 'answer',
+                  signal: answer,
+                  fromRole: role,
+                }),
+              });
+              console.log('📤 Answer enviado');
+            } else if (sig.type === 'answer') {
+              setIsConnected(true);
+              await webrtc.setRemoteDescription(sig.signal);
+              console.log('📥 Answer recebido');
+            } else if (sig.type === 'ice-candidate') {
+              if (sig.signal) {
+                try {
+                  await webrtc.addIceCandidate(new RTCIceCandidate(sig.signal));
+                  console.log('❄️ ICE candidate adicionado');
+                } catch (err) {
+                  console.warn('⚠️ Erro ao adicionar ICE candidate:', err);
+                }
               }
             }
           }
         } catch (err) {
-          console.error('Erro ao processar mensagem WebSocket:', err);
+          console.warn('⚠️ Erro no polling:', err);
         }
-      };
+      }, 2000);
 
-      ws.onerror = (error) => {
-        console.error('❌ Erro WebSocket:', error);
-        // NÃO desabilita a interface - áudio/vídeo local ainda funciona
-        setError('Erro de conexão com servidor (sinalizacao)');
-      };
-
-      ws.onclose = () => {
-        console.log('WebSocket desconectado');
-      };
-
-      signalingSocketRef.current = ws;
-    } catch (err) {
-      console.error('Erro ao conectar WebSocket:', err);
-      // Não lança erro - a comunincação local ainda funciona
-    }
-  };
+      pollingIntervalRef.current = interval;
+    },
+    [roomId, role]
+  );
 
   // Toggle áudio
   const handleToggleAudio = useCallback(() => {
@@ -295,11 +288,6 @@ export function VideoCallComponent({
 
     // Fechar WebRTC
     webrtcRef.current?.close();
-
-    // Fechar WebSocket
-    if (signalingSocketRef.current) {
-      signalingSocketRef.current.close();
-    }
 
     // Callback
     if (onEndCall) {
