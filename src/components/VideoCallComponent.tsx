@@ -576,14 +576,13 @@ export function VideoCallComponent({
   return (
     <div className="flex h-screen flex-col bg-[#0c161c]">
       {/* Video container */}
-      <div className="flex-1 flex gap-2 p-4 overflow-hidden">
+      <div className="flex-1 flex gap-2 p-4 overflow-hidden min-h-[200px]">
         {/* Video remoto (maior) */}
-        <div className="flex-1 bg-black rounded-lg overflow-hidden relative min-w-0 min-h-0">
+        <div className="flex-1 bg-black rounded-lg overflow-hidden relative min-w-[100px] min-h-[100px]">
           <video
             ref={remoteVideoRef}
             autoPlay
             playsInline
-            style={{ minWidth: '100px', minHeight: '100px' }}
             className="w-full h-full object-cover"
           />
           {!isConnected && (
@@ -599,13 +598,12 @@ export function VideoCallComponent({
         </div>
 
         {/* Video local (menor, canto) */}
-        <div className="w-40 h-40 bg-black rounded-lg overflow-hidden relative border-2 border-[#1ea58c]">
+        <div className="w-40 h-40 bg-black rounded-lg overflow-hidden relative border-2 border-[#1ea58c] min-w-[100px] min-h-[100px]">
           <video
             ref={localVideoRef}
             autoPlay
             playsInline
             muted
-            style={{ minWidth: '100px', minHeight: '100px' }}
             className="w-full h-full object-cover"
           />
           <div className="absolute bottom-2 left-2 bg-[#155b79]/80 text-white px-2 py-1 rounded text-xs font-medium">
