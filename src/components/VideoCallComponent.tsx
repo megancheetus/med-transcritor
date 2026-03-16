@@ -27,7 +27,6 @@ export function VideoCallComponent({
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const webrtcRef = useRef<WebRTCManager | null>(null);
-  const signalingSocketRef = useRef<WebSocket | null>(null);
 
   // States
   const [isInitializing, setIsInitializing] = useState(true);
@@ -85,17 +84,8 @@ export function VideoCallComponent({
         
         // Inicializar mídia - ISTO VAI PEDIR PERMISSÃO AO NAVEGADOR
         const localStream = await webrtc.initialize(async (signal) => {
-          // Enviar sinal via WebSocket
-          if (signalingSocketRef.current?.readyState === WebSocket.OPEN) {
-            signalingSocketRef.current.send(
-              JSON.stringify({
-                type: 'signal',
-                signal,
-                roomId,
-                role,
-              })
-            );
-          }
+          // Sinalizacao desabilitada por enquanto - WebRTC P2P via STUN servers
+          console.log('Signal (WebSocket desabilitado):', signal);
         });
 
         console.log('✅ Acesso à mídia concedido');
@@ -122,8 +112,7 @@ export function VideoCallComponent({
         webrtcRef.current = webrtc;
         setIsInitializing(false);
 
-        // Conectar WebSocket para sinalizacao (NÃO BLOQUEIA O FLUXO LOCAL)
-        connectWebSocket(webrtc);
+        // WebSocket sinalizacao desabilitado - usando P2P direto
       } catch (err) {
         let errorMessage = 'Erro ao inicializar chamada';
         
@@ -152,95 +141,6 @@ export function VideoCallComponent({
       }
     };
   }, [roomId, role]);
-
-  // Conectar WebSocket para sinalizacao
-  const connectWebSocket = (webrtc: WebRTCManager) => {
-    try {
-      // Usa WS (não seguro) em localhost, WSS em produção HTTPS
-      const isSecure = window.location.protocol === 'https:' && !window.location.hostname.includes('localhost');
-      const protocol = isSecure ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/api/ws/videoconsultations/${roomId}`;
-
-      console.log('Tentando conectar WebSocket:', wsUrl);
-      const ws = new WebSocket(wsUrl);
-
-      ws.onopen = async () => {
-        console.log('✅ WebSocket conectado');
-
-        // Enviar informação inicial
-        ws.send(
-          JSON.stringify({
-            type: 'join',
-            role,
-            token: roomToken,
-          })
-        );
-
-        // Se profissional, criar oferta
-        if (role === 'professional') {
-          try {
-            const offer = await webrtc.createOffer();
-            ws.send(
-              JSON.stringify({
-                type: 'offer',
-                offer,
-                roomId,
-              })
-            );
-          } catch (err) {
-            console.error('Erro ao criar oferta:', err);
-          }
-        }
-      };
-
-      ws.onmessage = async (event) => {
-        try {
-          const message = JSON.parse(event.data);
-
-          if (message.type === 'offer') {
-            await webrtc.setRemoteDescription(message.offer);
-            const answer = await webrtc.createAnswer();
-            ws.send(
-              JSON.stringify({
-                type: 'answer',
-                answer,
-                roomId,
-              })
-            );
-          } else if (message.type === 'answer') {
-            await webrtc.setRemoteDescription(message.answer);
-          } else if (message.type === 'ice-candidate') {
-            if (message.candidate) {
-              try {
-                await webrtc.addIceCandidate(
-                  new RTCIceCandidate(message.candidate)
-                );
-              } catch (err) {
-                console.warn('Erro ao adicionar ICE candidate:', err);
-              }
-            }
-          }
-        } catch (err) {
-          console.error('Erro ao processar mensagem WebSocket:', err);
-        }
-      };
-
-      ws.onerror = (error) => {
-        console.error('❌ Erro WebSocket:', error);
-        // NÃO desabilita a interface - áudio/vídeo local ainda funciona
-        setError('Erro de conexão com servidor (sinalizacao)');
-      };
-
-      ws.onclose = () => {
-        console.log('WebSocket desconectado');
-      };
-
-      signalingSocketRef.current = ws;
-    } catch (err) {
-      console.error('Erro ao conectar WebSocket:', err);
-      // Não lança erro - a comunincação local ainda funciona
-    }
-  };
 
   // Toggle áudio
   const handleToggleAudio = useCallback(() => {
@@ -295,11 +195,6 @@ export function VideoCallComponent({
 
     // Fechar WebRTC
     webrtcRef.current?.close();
-
-    // Fechar WebSocket
-    if (signalingSocketRef.current) {
-      signalingSocketRef.current.close();
-    }
 
     // Callback
     if (onEndCall) {
