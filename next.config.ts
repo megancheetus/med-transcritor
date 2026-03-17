@@ -8,7 +8,7 @@ const contentSecurityPolicy = process.env.NODE_ENV === 'production'
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
-      "connect-src 'self' https://generativelanguage.googleapis.com https://*.supabase.co",
+      "connect-src 'self' https://generativelanguage.googleapis.com https://*.supabase.co https://vercel.com https://*.vercel-storage.com",
       "media-src 'self' blob: data:",
       "object-src 'none'",
       "frame-ancestors 'none'",
@@ -23,7 +23,7 @@ const contentSecurityPolicy = process.env.NODE_ENV === 'production'
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
-      "connect-src 'self' https://generativelanguage.googleapis.com https://*.supabase.co localhost:*",
+      "connect-src 'self' https://generativelanguage.googleapis.com https://*.supabase.co https://vercel.com https://*.vercel-storage.com localhost:*",
       "media-src 'self' blob: data:",
       "object-src 'none'",
       "frame-ancestors 'none'",
@@ -59,7 +59,7 @@ const nextConfig: NextConfig = {
           },
           {
             key: 'Permissions-Policy',
-            value: 'camera=*, microphone=*, speaker=*, geolocation=(), payment=(), usb=()',
+            value: 'camera=*, microphone=*, geolocation=(), payment=(), usb=()',
           },
           {
             key: 'Cross-Origin-Opener-Policy',
