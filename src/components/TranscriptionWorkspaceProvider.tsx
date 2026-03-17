@@ -8,7 +8,9 @@ import { HistoryEntry } from '@/lib/history';
 import { TranscriptionModelType } from '@/lib/transcriptionModels';
 import { CookieConsentBanner } from '@/components/CookieConsentBanner';
 
-const NATIVE_QUALITY_MAX_BYTES = 15 * 1024 * 1024;
+// Em Vercel, uploads para API route podem ser rejeitados antes do handler (~4.5 MB).
+// Mantemos margem para evitar 413 no edge/proxy.
+const NATIVE_QUALITY_MAX_BYTES = 4 * 1024 * 1024;
 const HISTORY_STORAGE_KEY_BASE = 'omninote_session_history';
 
 interface ProcessingMeta {

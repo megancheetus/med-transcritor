@@ -14,7 +14,9 @@ import { audioStorageManager } from '@/lib/audioStorageManager';
 // Legacy feature flags (false for production deploy).
 const ENABLE_LEGACY_TEST_UPLOAD = false;
 const ENABLE_LEGACY_LOCAL_BACKUP = false;
-const NATIVE_QUALITY_MAX_BYTES = 15 * 1024 * 1024;
+// Em Vercel, uploads para API route podem ser rejeitados antes do handler (~4.5 MB).
+// Mantemos margem para evitar 413 no edge/proxy.
+const NATIVE_QUALITY_MAX_BYTES = 4 * 1024 * 1024;
 
 interface HistoryEntry {
   id: string;

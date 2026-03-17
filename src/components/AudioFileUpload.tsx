@@ -167,11 +167,11 @@ export default function AudioFileUpload({ onFileSelected, isLoading = false }: A
             </div>
 
             {/* Aviso se arquivo é grande */}
-            {selectedFile.size > 15 * 1024 * 1024 && (
+            {selectedFile.size > 4 * 1024 * 1024 && (
               <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
                 <p className="font-medium mb-1">⚠️ Arquivo Grande Detectado</p>
                 <p>
-                  O sistema tentará comprimir antes do envio. Se ainda passar do limite, aí sim será dividido em partes.
+                  O sistema tentará comprimir antes do envio para evitar erro 413 no provedor de deploy.
                 </p>
               </div>
             )}
