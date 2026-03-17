@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { GoogleAIFileManager } from '@google/generative-ai/server';
+import { del } from '@vercel/blob';
 import { NextRequest, NextResponse } from 'next/server';
 import { isValidAuthToken } from '@/lib/auth';
 import { getModelById, TranscriptionModelType, TRANSCRIPTION_MODELS } from '@/lib/transcriptionModels';
@@ -177,18 +178,89 @@ function combineChunkResults(results: string[], totalChunks: number): string {
   return combinedText;
 }
 
+interface JsonTranscriptionBody {
+  blobUrl?: string;
+  mimeType?: string;
+  model?: TranscriptionModelType;
+}
+
+interface NormalizedPayload {
+  buffer: Buffer;
+  mimeType: string;
+  model: TranscriptionModelType;
+  uploadedBlobUrl?: string;
+}
+
+const isAllowedBlobUrl = (value: string) => {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:' && parsed.hostname.includes('blob.vercel-storage.com');
+  } catch {
+    return false;
+  }
+};
+
+async function getNormalizedPayload(request: NextRequest): Promise<NormalizedPayload> {
+  const contentType = request.headers.get('content-type') || '';
+
+  if (contentType.includes('application/json')) {
+    const body = (await request.json()) as JsonTranscriptionBody;
+    const model = body.model || 'soap';
+
+    if (!body.blobUrl) {
+      throw new Error('URL do arquivo não enviada.');
+    }
+
+    if (!isAllowedBlobUrl(body.blobUrl)) {
+      throw new Error('URL de arquivo inválida para processamento.');
+    }
+
+    const blobResponse = await fetch(body.blobUrl, { cache: 'no-store' });
+    if (!blobResponse.ok) {
+      throw new Error(`Falha ao baixar arquivo de áudio do Blob (${blobResponse.status}).`);
+    }
+
+    const downloadedMimeType = blobResponse.headers.get('content-type') || undefined;
+    const buffer = Buffer.from(await blobResponse.arrayBuffer());
+
+    return {
+      buffer,
+      mimeType: body.mimeType || downloadedMimeType || 'audio/webm',
+      model,
+      uploadedBlobUrl: body.blobUrl,
+    };
+  }
+
+  const formData = await request.formData();
+  const audioBlob = formData.get('audio') as Blob;
+
+  if (!audioBlob) {
+    throw new Error('No audio file provided');
+  }
+
+  const mimeType = audioBlob.type || 'audio/webm';
+  const model = (formData.get('model') as TranscriptionModelType) || 'soap';
+  const buffer = Buffer.from(await audioBlob.arrayBuffer());
+
+  return {
+    buffer,
+    mimeType,
+    model,
+  };
+}
+
 export async function POST(request: NextRequest) {
   const authToken = request.cookies.get('auth_token')?.value;
+  let uploadedBlobUrl: string | undefined;
 
   if (!(await isValidAuthToken(authToken))) {
     return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
   }
 
   try {
-    const formData = await request.formData();
-    const audioBlob = formData.get('audio') as Blob;
-    const mimeType = audioBlob?.type || 'audio/webm';
-    const model = (formData.get('model') as TranscriptionModelType) || 'soap';
+    const normalized = await getNormalizedPayload(request);
+    const { buffer, mimeType, model } = normalized;
+    uploadedBlobUrl = normalized.uploadedBlobUrl;
 
     // Validate model
     if (!TRANSCRIPTION_MODELS[model]) {
@@ -198,15 +270,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!audioBlob) {
-      return NextResponse.json({ error: 'No audio file provided' }, { status: 400 });
-    }
-
-    console.log('🎵 Audio blob size:', audioBlob.size, 'bytes');
+    console.log('🎵 Audio blob size:', buffer.length, 'bytes');
     console.log('🎵 Audio blob type:', mimeType);
-
-    // Convert blob to buffer
-    const buffer = Buffer.from(await audioBlob.arrayBuffer());
 
     // Decidir se precisa dividir em chunks
     const needsChunking = buffer.length > CHUNK_SIZE_BYTES;
@@ -307,6 +372,12 @@ export async function POST(request: NextRequest) {
       { error: 'Failed to process audio', details },
       { status: maybeStatus >= 400 && maybeStatus < 600 ? maybeStatus : 500 }
     );
+  } finally {
+    if (uploadedBlobUrl) {
+      await del(uploadedBlobUrl).catch((error: unknown) => {
+        console.warn('Aviso: não foi possível remover arquivo do Vercel Blob:', error);
+      });
+    }
   }
 }
 

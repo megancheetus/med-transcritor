@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { upload } from '@vercel/blob/client';
 import { compressAudio, formatBytes } from '@/lib/audioUtils';
 import { audioStorageManager } from '@/lib/audioStorageManager';
 import { HistoryEntry } from '@/lib/history';
@@ -12,6 +13,7 @@ import { CookieConsentBanner } from '@/components/CookieConsentBanner';
 // Mantemos margem para evitar 413 no edge/proxy.
 const NATIVE_QUALITY_MAX_BYTES = 4 * 1024 * 1024;
 const HISTORY_STORAGE_KEY_BASE = 'omninote_session_history';
+const DIRECT_BLOB_UPLOAD_THRESHOLD_BYTES = NATIVE_QUALITY_MAX_BYTES;
 
 interface ProcessingMeta {
   originalBytes: number;
@@ -227,6 +229,64 @@ export function TranscriptionWorkspaceProvider({ storageNamespace, children }: T
     setHistory((prev) => [entry, ...prev.filter((currentEntry) => currentEntry.id !== entry.id)]);
   }, []);
 
+  const submitTranscriptionRequest = useCallback(
+    async (audioToSend: Blob, fileName: string) => {
+      const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '-');
+      const shouldUseDirectBlobUpload = audioToSend.size > DIRECT_BLOB_UPLOAD_THRESHOLD_BYTES;
+
+      if (shouldUseDirectBlobUpload) {
+        setCompressionStatus('Enviando áudio diretamente para armazenamento seguro...');
+
+        const blobUpload = await upload(
+          `transcriptions/${storageNamespace}/${Date.now()}-${safeName}`,
+          audioToSend,
+          {
+            access: 'public',
+            handleUploadUrl: '/api/blob/upload',
+          }
+        );
+
+        setCompressionStatus('Solicitando transcrição a partir do arquivo enviado...');
+
+        const response = await fetch('/api/transcribe', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: selectedModel,
+            blobUrl: blobUpload.url,
+            mimeType: audioToSend.type || 'audio/webm',
+          }),
+        });
+
+        return {
+          response,
+          data: await response.json().catch(() => null),
+          sentBytes: audioToSend.size,
+          usedDirectBlobUpload: true,
+        };
+      }
+
+      const formData = new FormData();
+      formData.append('audio', audioToSend, fileName);
+      formData.append('model', selectedModel);
+
+      const response = await fetch('/api/transcribe', {
+        method: 'POST',
+        body: formData,
+      });
+
+      return {
+        response,
+        data: await response.json().catch(() => null),
+        sentBytes: audioToSend.size,
+        usedDirectBlobUpload: false,
+      };
+    },
+    [selectedModel, storageNamespace]
+  );
+
   const handleRecordingComplete = useCallback(async (audioBlob: Blob, duration: number) => {
     setIsLoading(true);
     setTranscriptionContent('');
@@ -265,20 +325,10 @@ export function TranscriptionWorkspaceProvider({ storageNamespace, children }: T
       }
 
       setCompressionStatus('Enviando para processamento...');
-
-      const formData = new FormData();
-      formData.append('audio', audioToSend, 'recording.wav');
-      formData.append('model', selectedModel);
-      if (audioId) {
-        formData.append('audioId', audioId);
-      }
-
-      const response = await fetch('/api/transcribe', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await response.json().catch(() => null);
+      const { response, data, sentBytes, usedDirectBlobUpload } = await submitTranscriptionRequest(
+        audioToSend,
+        'recording.wav'
+      );
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -289,7 +339,7 @@ export function TranscriptionWorkspaceProvider({ storageNamespace, children }: T
 
         if (response.status === 413) {
           throw new Error(
-            `Arquivo muito grande para envio (${formatBytes(audioToSend.size)}). Tente novamente ou grave um trecho mais curto.`
+            `Arquivo muito grande para envio (${formatBytes(sentBytes)}). Tente novamente ou grave um trecho mais curto.`
           );
         }
 
@@ -304,10 +354,14 @@ export function TranscriptionWorkspaceProvider({ storageNamespace, children }: T
         }
       }
 
-      setCompressionStatus('Transcrição concluída com sucesso.');
+      setCompressionStatus(
+        usedDirectBlobUpload
+          ? 'Transcrição concluída com sucesso (upload direto aplicado).'
+          : 'Transcrição concluída com sucesso.'
+      );
       setProcessingMeta({
         originalBytes: audioBlob.size,
-        sentBytes: audioToSend.size,
+        sentBytes,
         compressed: audioToSend.size < audioBlob.size,
         chunked: Boolean(data?.chunked),
         chunksProcessed: Number(data?.chunksProcessed || 1),
@@ -345,7 +399,7 @@ export function TranscriptionWorkspaceProvider({ storageNamespace, children }: T
     } finally {
       setIsLoading(false);
     }
-  }, [persistHistoryEntry, router, selectedModel]);
+  }, [persistHistoryEntry, router, submitTranscriptionRequest]);
 
   const handleFileUpload = useCallback(async (file: File, duration: number) => {
     setIsLoading(true);
@@ -384,20 +438,10 @@ export function TranscriptionWorkspaceProvider({ storageNamespace, children }: T
       }
 
       setCompressionStatus('Enviando arquivo para processamento...');
-
-      const formData = new FormData();
-      formData.append('audio', audioToSend, file.name || 'uploaded-audio.wav');
-      formData.append('model', selectedModel);
-      if (audioId) {
-        formData.append('audioId', audioId);
-      }
-
-      const response = await fetch('/api/transcribe', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await response.json().catch(() => null);
+      const { response, data, sentBytes, usedDirectBlobUpload } = await submitTranscriptionRequest(
+        audioToSend,
+        file.name || 'uploaded-audio.wav'
+      );
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -408,7 +452,7 @@ export function TranscriptionWorkspaceProvider({ storageNamespace, children }: T
 
         if (response.status === 413) {
           throw new Error(
-            `Arquivo muito grande para envio (${formatBytes(audioToSend.size)}). Tente novamente ou grave um trecho mais curto.`
+            `Arquivo muito grande para envio (${formatBytes(sentBytes)}). Tente novamente ou grave um trecho mais curto.`
           );
         }
 
@@ -424,14 +468,16 @@ export function TranscriptionWorkspaceProvider({ storageNamespace, children }: T
       }
 
       setCompressionStatus(
-        data.chunked
-          ? `Processado em ${data.chunksProcessed} partes (${formatBytes(audioToSend.size)})`
-          : 'Transcrição concluída com sucesso.'
+        usedDirectBlobUpload
+          ? 'Transcrição concluída com sucesso (upload direto aplicado).'
+          : data.chunked
+            ? `Processado em ${data.chunksProcessed} partes (${formatBytes(sentBytes)})`
+            : 'Transcrição concluída com sucesso.'
       );
 
       setProcessingMeta({
         originalBytes: file.size,
-        sentBytes: audioToSend.size,
+        sentBytes,
         compressed: audioToSend.size < file.size,
         chunked: Boolean(data?.chunked),
         chunksProcessed: Number(data?.chunksProcessed || 1),
@@ -469,7 +515,7 @@ export function TranscriptionWorkspaceProvider({ storageNamespace, children }: T
     } finally {
       setIsLoading(false);
     }
-  }, [persistHistoryEntry, router, selectedModel]);
+  }, [persistHistoryEntry, router, submitTranscriptionRequest]);
 
   const value = useMemo(
     () => ({
