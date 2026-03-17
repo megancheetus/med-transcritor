@@ -58,7 +58,7 @@ POSTGRES_CA_CERT=
 
 AUTH_TOKEN_SECRET=um_segredo_forte_e_longo
 
-# Upload direto de áudio (evita limite de 4.5MB da função)
+# Upload direto de áudio privado (evita limite de 4.5MB da função)
 BLOB_READ_WRITE_TOKEN=seu_token_blob
 
 # Opcional em desenvolvimento local
@@ -72,7 +72,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 Notas importantes:
 
 - Use apenas `GEMINI_API_KEY` no servidor.
-- O fluxo de upload direto depende de `BLOB_READ_WRITE_TOKEN` no ambiente de execução.
+- O fluxo de upload direto privado depende de `BLOB_READ_WRITE_TOKEN` no ambiente de execução.
 - Em produção, prefira `POSTGRES_SSL=true`.
 - Evite `POSTGRES_SSL_REJECT_UNAUTHORIZED=false` fora de desenvolvimento local.
 - `AUTH_USERS` e `AUTH_ADMIN_USERNAME` devem ser usados somente para bootstrap local.

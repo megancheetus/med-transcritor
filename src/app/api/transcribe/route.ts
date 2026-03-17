@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { GoogleAIFileManager } from '@google/generative-ai/server';
-import { del } from '@vercel/blob';
+import { del, get } from '@vercel/blob';
 import { NextRequest, NextResponse } from 'next/server';
 import { isValidAuthToken } from '@/lib/auth';
 import { getModelById, TranscriptionModelType, TRANSCRIPTION_MODELS } from '@/lib/transcriptionModels';
@@ -215,13 +215,14 @@ async function getNormalizedPayload(request: NextRequest): Promise<NormalizedPay
       throw new Error('URL de arquivo inválida para processamento.');
     }
 
-    const blobResponse = await fetch(body.blobUrl, { cache: 'no-store' });
-    if (!blobResponse.ok) {
-      throw new Error(`Falha ao baixar arquivo de áudio do Blob (${blobResponse.status}).`);
+    const blobObject = await get(body.blobUrl, { access: 'private', useCache: false });
+
+    if (!blobObject) {
+      throw new Error('Arquivo de áudio não encontrado no Blob Storage.');
     }
 
-    const downloadedMimeType = blobResponse.headers.get('content-type') || undefined;
-    const buffer = Buffer.from(await blobResponse.arrayBuffer());
+    const downloadedMimeType = blobObject.blob.contentType;
+    const buffer = Buffer.from(await new Response(blobObject.stream).arrayBuffer());
 
     return {
       buffer,

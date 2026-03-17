@@ -241,7 +241,7 @@ export function TranscriptionWorkspaceProvider({ storageNamespace, children }: T
           `transcriptions/${storageNamespace}/${Date.now()}-${safeName}`,
           audioToSend,
           {
-            access: 'public',
+            access: 'private',
             handleUploadUrl: '/api/blob/upload',
           }
         );
