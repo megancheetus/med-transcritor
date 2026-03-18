@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 type JitsiLeaveReason = 'manual-hangup' | 'conference-left' | 'ready-to-close' | 'initialization-error';
 type RoomRole = 'professional' | 'patient';
+type ConnectionVisualState = 'connecting' | 'active' | 'reconnecting' | 'device-warning' | 'error';
 
 interface JitsiRoomProps {
   roomId: string;
@@ -43,6 +44,22 @@ declare global {
 
 const JITSI_SCRIPT_ID = 'jitsi-external-api-script';
 
+function getStatusClasses(state: ConnectionVisualState): string {
+  switch (state) {
+    case 'active':
+      return 'border-emerald-400/30 bg-emerald-500/15 text-emerald-100';
+    case 'reconnecting':
+      return 'border-amber-400/30 bg-amber-500/15 text-amber-100';
+    case 'device-warning':
+      return 'border-orange-400/30 bg-orange-500/15 text-orange-100';
+    case 'error':
+      return 'border-red-400/30 bg-red-500/15 text-red-100';
+    case 'connecting':
+    default:
+      return 'border-sky-400/30 bg-sky-500/15 text-sky-100';
+  }
+}
+
 interface JaasMeetingConfig {
   domain: string;
   appId: string;
@@ -71,7 +88,7 @@ const loadJitsiScript = (domain: string, appId: string) => {
 
     const script = document.createElement('script');
     script.id = JITSI_SCRIPT_ID;
-  script.src = `https://${domain}/${appId}/external_api.js`;
+    script.src = `https://${domain}/${appId}/external_api.js`;
     script.async = true;
     script.onload = () => resolve();
     script.onerror = () => reject(new Error('Falha ao carregar a API do Jitsi.'));
@@ -95,7 +112,10 @@ export default function JitsiRoom({
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [statusState, setStatusState] = useState<ConnectionVisualState>('connecting');
   const [statusMessage, setStatusMessage] = useState('Conectando na sala...');
+  const [statusDetail, setStatusDetail] = useState('Validando acesso e carregando conferência.');
+  const [participantCount, setParticipantCount] = useState(1);
   const [lastEvent, setLastEvent] = useState<string>('Aguardando inicialização do Jitsi');
 
   const logEvent = useCallback((message: string, payload?: unknown) => {
@@ -147,8 +167,11 @@ export default function JitsiRoom({
       try {
         setLoading(true);
         setError(null);
+        setStatusState('connecting');
         setStatusMessage('Conectando na sala...');
+        setStatusDetail('Validando acesso e carregando conferência.');
         setLastEvent('Carregando configuração do JaaS');
+        setParticipantCount(1);
         hasLeftRef.current = false;
         joinedAtRef.current = null;
         joinReportedRef.current = false;
@@ -191,28 +214,42 @@ export default function JitsiRoom({
           if (!active) return;
           joinedAtRef.current = Date.now();
           setLoading(false);
+          setStatusState('active');
           setStatusMessage('Teleconsulta ativa');
+          setStatusDetail('Conexão estabelecida. Você já pode iniciar o atendimento.');
           logEvent('Conferência iniciada', payload);
           void reportJoin();
         });
 
         api.addEventListener('videoConferenceLeft', (payload) => {
+          setStatusState('error');
+          setStatusMessage('Consulta encerrada');
+          setStatusDetail('A sala foi encerrada pelo Jitsi.');
           logEvent('Conferência encerrada pelo Jitsi', payload);
           void safeLeave('conference-left');
         });
 
         api.addEventListener('readyToClose', (payload) => {
+          setStatusState('error');
+          setStatusMessage('Finalizando teleconsulta');
+          setStatusDetail('A interface solicitou o fechamento da sala.');
           logEvent('Iframe sinalizou pronto para fechar', payload);
           void safeLeave('ready-to-close');
         });
 
         api.addEventListener('participantJoined', (payload) => {
+          setStatusState('active');
           setStatusMessage('Participante conectado');
+          setStatusDetail('Todos na sala estão online.');
+          setParticipantCount((prev) => prev + 1);
           logEvent('Participante entrou na sala', payload);
         });
 
         api.addEventListener('participantLeft', (payload) => {
-          setStatusMessage('Um participante saiu da sala');
+          setStatusState('reconnecting');
+          setStatusMessage('Participante desconectado');
+          setStatusDetail('Aguardando retorno do participante ou nova conexão.');
+          setParticipantCount((prev) => Math.max(1, prev - 1));
           logEvent('Participante saiu da sala', payload);
         });
 
@@ -225,17 +262,23 @@ export default function JitsiRoom({
         });
 
         api.addEventListener('cameraError', (payload) => {
+          setStatusState('device-warning');
           setStatusMessage('Erro de câmera detectado');
+          setStatusDetail('Confira permissões de câmera e dispositivo selecionado.');
           logEvent('Erro de câmera', payload);
         });
 
         api.addEventListener('micError', (payload) => {
+          setStatusState('device-warning');
           setStatusMessage('Erro de microfone detectado');
+          setStatusDetail('Confira permissões de microfone e dispositivo selecionado.');
           logEvent('Erro de microfone', payload);
         });
 
         api.addEventListener('suspendDetected', (payload) => {
+          setStatusState('reconnecting');
           setStatusMessage('Navegador suspendeu a aba ou conexão');
+          setStatusDetail('Tente manter esta aba ativa para evitar quedas na chamada.');
           logEvent('Suspensão detectada', payload);
         });
 
@@ -244,7 +287,9 @@ export default function JitsiRoom({
         });
 
         api.addEventListener('errorOccurred', (payload) => {
+          setStatusState('error');
           setStatusMessage('Erro reportado pela API do Jitsi');
+          setStatusDetail('Tentando manter a chamada. Verifique sua conexão de internet.');
           logEvent('Erro interno do Jitsi', payload);
         });
 
@@ -253,6 +298,7 @@ export default function JitsiRoom({
         if (!active) return;
         const message = err instanceof Error ? err.message : 'Erro ao iniciar teleconsulta.';
         logEvent('Falha na inicialização do Jitsi', err);
+        setStatusState('error');
         setError(message);
         setLoading(false);
       }
@@ -297,8 +343,16 @@ export default function JitsiRoom({
 
   return (
     <div className="relative h-screen w-full bg-[#0c161c]">
-      <div className="absolute left-4 top-4 z-20 rounded-md bg-black/60 px-3 py-2 text-sm text-white">
-        {statusMessage}
+      <div
+        className={`absolute left-4 top-4 z-20 max-w-lg rounded-lg border px-3 py-2 text-sm backdrop-blur ${getStatusClasses(
+          statusState
+        )}`}
+      >
+        <p className="font-semibold">{statusMessage}</p>
+        <p className="mt-0.5 text-xs opacity-90">{statusDetail}</p>
+        <p className="mt-1 text-[11px] opacity-80">
+          Participantes na sala: {participantCount} {loading ? '• conectando...' : ''}
+        </p>
       </div>
 
       <div className="absolute bottom-4 left-4 z-20 max-w-md rounded-md bg-black/60 px-3 py-2 text-xs text-white">
