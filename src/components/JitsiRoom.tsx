@@ -6,6 +6,7 @@ type JitsiLeaveReason = 'manual-hangup' | 'conference-left' | 'ready-to-close' |
 type RoomRole = 'professional' | 'patient';
 type ConnectionVisualState = 'connecting' | 'active' | 'reconnecting' | 'device-warning' | 'error';
 type PrecheckState = 'idle' | 'running' | 'passed' | 'failed';
+type ConnectionQuality = 'good' | 'fair' | 'poor' | 'unknown';
 
 const MAX_RECONNECT_ATTEMPTS = 3;
 const RECONNECT_DELAY_SECONDS = 5;
@@ -72,6 +73,15 @@ function formatDuration(seconds: number): string {
   const mm = String(m).padStart(2, '0');
   const ss = String(s).padStart(2, '0');
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+function getQualityLabel(q: ConnectionQuality) {
+  switch (q) {
+    case 'good': return { text: 'Boa', cls: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' };
+    case 'fair': return { text: 'Regular', cls: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' };
+    case 'poor': return { text: 'Fraca', cls: 'bg-red-500/20 text-red-300 border-red-500/30' };
+    default:     return { text: '...', cls: 'bg-slate-500/20 text-slate-400 border-slate-500/30' };
+  }
 }
 
 interface JaasMeetingConfig {
@@ -174,6 +184,10 @@ export default function JitsiRoom({
   const [sidebarLoading, setSidebarLoading] = useState(false);
   const [clinicalPatient, setClinicalPatient] = useState<ClinicalPatient | null>(null);
   const [clinicalRecords, setClinicalRecords] = useState<ClinicalRecord[]>([]);
+  const [connectionQuality, setConnectionQuality] = useState<ConnectionQuality>('unknown');
+  const [audioMuted, setAudioMuted] = useState(false);
+  const [videoMuted, setVideoMuted] = useState(false);
+  const [screenSharing, setScreenSharing] = useState(false);
   const [lastEvent, setLastEvent] = useState<string>('Aguardando inicialização do Jitsi');
 
   const clearReconnectTimers = useCallback(() => {
@@ -588,11 +602,47 @@ export default function JitsiRoom({
         });
 
         api.addEventListener('audioMuteStatusChanged', (payload) => {
+          const p = payload as { muted?: boolean } | undefined;
+          if (p && typeof p.muted === 'boolean') setAudioMuted(p.muted);
           logEvent('Status do microfone alterado', payload);
         });
 
         api.addEventListener('videoMuteStatusChanged', (payload) => {
+          const p = payload as { muted?: boolean } | undefined;
+          if (p && typeof p.muted === 'boolean') setVideoMuted(p.muted);
           logEvent('Status da câmera alterado', payload);
+        });
+
+        api.addEventListener('screenSharingStatusChanged', (payload) => {
+          const p = payload as { on?: boolean } | undefined;
+          if (p && typeof p.on === 'boolean') setScreenSharing(p.on);
+          logEvent('Status de compartilhamento de tela alterado', payload);
+        });
+
+        api.addEventListener('connectionQualityChanged', (payload) => {
+          const p = payload as { connectionQuality?: number } | undefined;
+          const score = p?.connectionQuality ?? -1;
+          let quality: ConnectionQuality;
+          if (score >= 70) {
+            quality = 'good';
+          } else if (score >= 40) {
+            quality = 'fair';
+            logEvent(`Qualidade de conexão regular (score: ${score})`);
+          } else if (score >= 0) {
+            quality = 'poor';
+            logEvent(`Qualidade de conexão fraca (score: ${score})`);
+            // Adaptação automática: reduz resolução quando a conexão é fraca
+            apiRef.current?.executeCommand('setVideoQuality', 180);
+          } else {
+            quality = 'unknown';
+          }
+          // Restaura resolução ao recuperar qualidade
+          if (quality === 'good') {
+            apiRef.current?.executeCommand('setVideoQuality', 720);
+          } else if (quality === 'fair') {
+            apiRef.current?.executeCommand('setVideoQuality', 360);
+          }
+          setConnectionQuality(quality);
         });
 
         api.addEventListener('cameraError', (payload) => {
@@ -758,7 +808,17 @@ export default function JitsiRoom({
           Participantes na sala: {participantCount} {loading ? '• conectando...' : ''}
         </p>
         {statusState === 'active' && (
-          <p className="mt-0.5 text-xs font-mono opacity-75">Duração: {formatDuration(callDuration)}</p>
+          <>
+            <p className="mt-0.5 text-xs font-mono opacity-75">Duração: {formatDuration(callDuration)}</p>
+            {connectionQuality !== 'unknown' && (() => {
+              const ql = getQualityLabel(connectionQuality);
+              return (
+                <span className={`mt-1 inline-block rounded border px-1.5 py-0.5 text-[10px] font-semibold ${ql.cls}`}>
+                  Conexão: {ql.text}
+                </span>
+              );
+            })()}
+          </>
         )}
       </div>
 
@@ -830,6 +890,63 @@ export default function JitsiRoom({
       <div className="absolute bottom-4 left-4 z-20 max-w-md rounded-md bg-black/60 px-3 py-2 text-xs text-white">
         Último evento: {lastEvent}
       </div>
+
+      {/* Barra de controles de dispositivo — visível apenas quando na chamada */}
+      {statusState === 'active' && (
+        <div className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2 flex items-center gap-2 rounded-2xl border border-white/10 bg-black/70 px-4 py-2 backdrop-blur">
+          {/* Microfone */}
+          <button
+            onClick={() => apiRef.current?.executeCommand('toggleAudio')}
+            title={audioMuted ? 'Ativar microfone' : 'Silenciar microfone'}
+            className={`flex h-10 w-10 items-center justify-center rounded-full border text-sm font-bold transition ${
+              audioMuted
+                ? 'border-red-500/60 bg-red-500/20 text-red-300 hover:bg-red-500/30'
+                : 'border-white/20 bg-white/10 text-white hover:bg-white/20'
+            }`}
+          >
+            {audioMuted ? '🔇' : '🎤'}
+          </button>
+
+          {/* Câmera */}
+          <button
+            onClick={() => apiRef.current?.executeCommand('toggleVideo')}
+            title={videoMuted ? 'Ativar câmera' : 'Desativar câmera'}
+            className={`flex h-10 w-10 items-center justify-center rounded-full border text-sm font-bold transition ${
+              videoMuted
+                ? 'border-red-500/60 bg-red-500/20 text-red-300 hover:bg-red-500/30'
+                : 'border-white/20 bg-white/10 text-white hover:bg-white/20'
+            }`}
+          >
+            {videoMuted ? '📵' : '📹'}
+          </button>
+
+          {/* Compartilhamento de tela */}
+          <button
+            onClick={() => apiRef.current?.executeCommand('toggleShareScreen')}
+            title={screenSharing ? 'Parar compartilhamento' : 'Compartilhar tela'}
+            className={`flex h-10 w-10 items-center justify-center rounded-full border text-sm font-bold transition ${
+              screenSharing
+                ? 'border-sky-500/60 bg-sky-500/20 text-sky-300 hover:bg-sky-500/30'
+                : 'border-white/20 bg-white/10 text-white hover:bg-white/20'
+            }`}
+          >
+            🖥️
+          </button>
+
+          {/* Separador */}
+          <div className="mx-1 h-6 w-px bg-white/20" />
+
+          {/* Indicador de qualidade compacto */}
+          {connectionQuality !== 'unknown' && (() => {
+            const ql = getQualityLabel(connectionQuality);
+            return (
+              <span className={`rounded border px-2 py-1 text-[10px] font-semibold ${ql.cls}`}>
+                {ql.text}
+              </span>
+            );
+          })()}
+        </div>
+      )}
 
       <button
         onClick={() => {
