@@ -14,6 +14,7 @@ interface JitsiRoomProps {
   roomId: string;
   role: RoomRole;
   displayName: string;
+  patientId?: string;
   publicAccessToken?: string | null;
   onJoin?: (details: { role: RoomRole }) => Promise<void> | void;
   onLeave?: (details: { durationSeconds: number; reason: JitsiLeaveReason }) => Promise<void> | void;
@@ -81,6 +82,27 @@ interface JaasMeetingConfig {
   expiresAt: string;
 }
 
+interface ClinicalPatient {
+  id: string;
+  nome: string;
+  nomeCompleto: string;
+  idade: number;
+  sexo: string;
+  dataNascimento: string;
+  telefone?: string;
+  email?: string;
+}
+
+interface ClinicalRecord {
+  id: string;
+  data: string;
+  tipoDocumento: string;
+  profissional: string;
+  especialidade: string;
+  resumo?: string;
+  conteudo: string;
+}
+
 const loadJitsiScript = (domain: string, appId: string) => {
   return new Promise<void>((resolve, reject) => {
     if (window.JitsiMeetExternalAPI) {
@@ -113,6 +135,7 @@ export default function JitsiRoom({
   roomId,
   role,
   displayName,
+  patientId,
   publicAccessToken,
   onJoin,
   onLeave,
@@ -147,6 +170,10 @@ export default function JitsiRoom({
   const [participantCount, setParticipantCount] = useState(1);
   const [callDuration, setCallDuration] = useState(0);
   const [tokenExpiringSoon, setTokenExpiringSoon] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarLoading, setSidebarLoading] = useState(false);
+  const [clinicalPatient, setClinicalPatient] = useState<ClinicalPatient | null>(null);
+  const [clinicalRecords, setClinicalRecords] = useState<ClinicalRecord[]>([]);
   const [lastEvent, setLastEvent] = useState<string>('Aguardando inicialização do Jitsi');
 
   const clearReconnectTimers = useCallback(() => {
@@ -237,6 +264,29 @@ export default function JitsiRoom({
     console.log(`[JitsiRoom:${roomId}] ${message}`, payload);
     setLastEvent(message);
   }, [roomId]);
+
+  const loadClinicalData = useCallback(async () => {
+    if (role !== 'professional' || !patientId) return;
+    setSidebarLoading(true);
+    try {
+      const [patientRes, recordsRes] = await Promise.all([
+        fetch(`/api/patients/${patientId}`),
+        fetch(`/api/medical-records?patientId=${patientId}`),
+      ]);
+      if (patientRes.ok) {
+        const p = await patientRes.json() as ClinicalPatient;
+        setClinicalPatient(p);
+      }
+      if (recordsRes.ok) {
+        const data = await recordsRes.json() as { records: ClinicalRecord[] };
+        setClinicalRecords((data.records ?? []).slice(0, 5));
+      }
+    } catch (err) {
+      console.warn('[JitsiRoom] Falha ao carregar dados clínicos:', err);
+    } finally {
+      setSidebarLoading(false);
+    }
+  }, [patientId, role]);
 
   const patchRoom = useCallback(async (action: 'start' | 'end', durationSeconds?: number) => {
     try {
@@ -489,6 +539,7 @@ export default function JitsiRoom({
           setStatusDetail('Conexão estabelecida. Você já pode iniciar o atendimento.');
           logEvent('Conferência iniciada', payload);
           if (role === 'professional') void patchRoom('start');
+          if (role === 'professional') void loadClinicalData();
           void reportJoin();
         });
 
@@ -600,6 +651,7 @@ export default function JitsiRoom({
   }, [
     clearReconnectTimers,
     displayName,
+    loadClinicalData,
     loadMeetingConfig,
     logEvent,
     patchRoom,
@@ -787,6 +839,104 @@ export default function JitsiRoom({
       >
         {role === 'patient' ? 'Sair da consulta' : 'Encerrar consulta'}
       </button>
+
+      {/* Botão de painel clínico — apenas profissional */}
+      {role === 'professional' && (
+        <button
+          onClick={() => setSidebarOpen((prev) => !prev)}
+          className="absolute right-4 top-16 z-20 rounded-md border border-[#37627a] bg-[#10202a]/90 px-3 py-2 text-xs font-medium text-white hover:bg-[#1f455c] backdrop-blur"
+          title="Dados clínicos do paciente"
+        >
+          {sidebarOpen ? 'Fechar painel' : 'Dados do paciente'}
+        </button>
+      )}
+
+      {/* Painel lateral clínico */}
+      {role === 'professional' && sidebarOpen && (
+        <div className="absolute right-4 top-32 z-20 flex h-[calc(100vh-9rem)] w-80 flex-col overflow-hidden rounded-xl border border-[#26414f] bg-[#10202a]/95 text-white shadow-2xl backdrop-blur">
+          {/* Cabeçalho do painel */}
+          <div className="flex items-center justify-between border-b border-[#26414f] px-4 py-3">
+            <span className="text-sm font-semibold text-[#1ea58c]">Dados clínicos</span>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="text-xs text-slate-400 hover:text-white"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {sidebarLoading && (
+              <p className="text-xs text-slate-400 animate-pulse">Carregando dados do paciente...</p>
+            )}
+
+            {!sidebarLoading && !clinicalPatient && (
+              <p className="text-xs text-slate-400">Dados do paciente não disponíveis.</p>
+            )}
+
+            {clinicalPatient && (
+              <section>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Identificação
+                </h3>
+                <div className="rounded-lg border border-[#26414f] bg-[#0c161c] p-3 space-y-1.5 text-sm">
+                  <p className="font-semibold text-white">{clinicalPatient.nomeCompleto || clinicalPatient.nome}</p>
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs text-slate-300">
+                    <span className="text-slate-500">Idade</span>
+                    <span>{clinicalPatient.idade} anos</span>
+                    <span className="text-slate-500">Sexo</span>
+                    <span>{clinicalPatient.sexo === 'M' ? 'Masculino' : clinicalPatient.sexo === 'F' ? 'Feminino' : 'Outro'}</span>
+                    <span className="text-slate-500">Nascimento</span>
+                    <span>{clinicalPatient.dataNascimento ? new Date(clinicalPatient.dataNascimento).toLocaleDateString('pt-BR') : '—'}</span>
+                    {clinicalPatient.telefone && (
+                      <>
+                        <span className="text-slate-500">Telefone</span>
+                        <span>{clinicalPatient.telefone}</span>
+                      </>
+                    )}
+                    {clinicalPatient.email && (
+                      <>
+                        <span className="text-slate-500">Email</span>
+                        <span className="truncate">{clinicalPatient.email}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {clinicalRecords.length > 0 && (
+              <section>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Últimos registros
+                </h3>
+                <div className="space-y-2">
+                  {clinicalRecords.map((rec) => (
+                    <div key={rec.id} className="rounded-lg border border-[#26414f] bg-[#0c161c] p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-semibold text-[#1ea58c]">{rec.tipoDocumento}</span>
+                        <span className="text-[10px] text-slate-500">
+                          {new Date(rec.data).toLocaleDateString('pt-BR')}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 font-medium">{rec.especialidade} — {rec.profissional}</p>
+                      {rec.resumo ? (
+                        <p className="mt-1 text-xs text-slate-400 line-clamp-3">{rec.resumo}</p>
+                      ) : (
+                        <p className="mt-1 text-xs text-slate-400 line-clamp-3">{rec.conteudo}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {!sidebarLoading && clinicalRecords.length === 0 && clinicalPatient && (
+              <p className="text-xs text-slate-400">Nenhum registro anterior encontrado.</p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div ref={containerRef} className="h-full w-full" />
     </div>

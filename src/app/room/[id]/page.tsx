@@ -194,6 +194,7 @@ export default function VideoRoomPage() {
     <JitsiRoom
       roomId={roomId}
       role={userRole}
+      patientId={roomData.patientId}
       displayName={
         userRole === 'professional'
           ? roomData.professionalUsername
