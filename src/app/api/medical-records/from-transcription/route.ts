@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUsernameFromAuthToken } from '@/lib/auth';
-import { createMedicalRecord, initializeMedicalRecordsTable } from '@/lib/medicalRecordManager';
+import {
+  createMedicalRecord,
+  initializeMedicalRecordsTable,
+  logMedicalRecordAudit,
+} from '@/lib/medicalRecordManager';
 import { getPatientById, initializePatientsTable } from '@/lib/patientManager';
 import { MedicalRecord } from '@/lib/types';
+import { getRequestAuditContext } from '@/lib/requestAudit';
 
 export const runtime = 'nodejs';
 
@@ -122,6 +127,21 @@ export async function POST(request: NextRequest) {
       aiGenerated: true,
       clinicianReviewed: payload.clinicianReviewed,
       reviewedAt,
+    });
+
+    const auditContext = getRequestAuditContext(request);
+    await logMedicalRecordAudit({
+      username,
+      action: 'create',
+      resourceType: 'medical_record',
+      resourceId: record.id,
+      metadataJson: {
+        patientId: payload.patientId,
+        sourceType: 'transcription',
+        sourceRefId: payload.sourceRefId || null,
+      },
+      ipHash: auditContext.ipHash,
+      userAgent: auditContext.userAgent,
     });
 
     return NextResponse.json(

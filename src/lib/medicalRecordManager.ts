@@ -1,5 +1,15 @@
 import { getPostgresPool } from './postgres';
-import { MedicalRecord } from './types';
+import { MedicalRecord, MedicalRecordVersion } from './types';
+
+interface MedicalRecordAuditInput {
+  username: string;
+  action: string;
+  resourceType: string;
+  resourceId: string;
+  metadataJson?: Record<string, unknown>;
+  ipHash?: string;
+  userAgent?: string;
+}
 
 interface ClinicalData {
   soapSubjetivo?: string;
@@ -72,6 +82,77 @@ function mapClinicalData(value: unknown): ClinicalData {
   };
 }
 
+function toIsoString(value: Date | string): string {
+  return new Date(value).toISOString();
+}
+
+function mapMedicalRecordVersionRow(row: {
+  id: string;
+  medical_record_id: string;
+  version_number: number;
+  snapshot_json: Record<string, unknown>;
+  changed_by: string;
+  change_reason: string | null;
+  created_at: Date | string;
+}): MedicalRecordVersion {
+  return {
+    id: row.id,
+    medicalRecordId: row.medical_record_id,
+    versionNumber: row.version_number,
+    snapshotJson: row.snapshot_json,
+    changedBy: row.changed_by,
+    changeReason: row.change_reason || undefined,
+    createdAt: toIsoString(row.created_at),
+  };
+}
+
+async function createMedicalRecordVersionSnapshot(
+  client: { query: (query: string, values?: unknown[]) => Promise<{ rows: any[] }> },
+  medicalRecordId: string,
+  username: string,
+  changeReason?: string
+): Promise<boolean> {
+  const currentRecordResult = await client.query(
+    `SELECT *
+     FROM medical_records
+     WHERE id = $1 AND username = $2
+     FOR UPDATE`,
+    [medicalRecordId, username]
+  );
+
+  if (currentRecordResult.rows.length === 0) {
+    return false;
+  }
+
+  const versionResult = await client.query(
+    `SELECT COALESCE(MAX(version_number), 0) + 1 AS next_version
+     FROM medical_record_versions
+     WHERE medical_record_id = $1`,
+    [medicalRecordId]
+  );
+
+  const nextVersion = Number(versionResult.rows[0]?.next_version || 1);
+
+  await client.query(
+    `INSERT INTO medical_record_versions (
+      medical_record_id,
+      version_number,
+      snapshot_json,
+      changed_by,
+      change_reason
+    ) VALUES ($1, $2, $3::jsonb, $4, $5)`,
+    [
+      medicalRecordId,
+      nextVersion,
+      JSON.stringify(currentRecordResult.rows[0]),
+      username,
+      changeReason || null,
+    ]
+  );
+
+  return true;
+}
+
 /**
  * Inicializa a tabela de registros médicos se não existir
  */
@@ -114,7 +195,104 @@ export async function initializeMedicalRecordsTable(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_medical_records_username ON medical_records(username);
       CREATE INDEX IF NOT EXISTS idx_medical_records_data ON medical_records(data DESC);
       CREATE INDEX IF NOT EXISTS idx_medical_records_clinical_data_gin ON medical_records USING GIN (clinical_data);
+
+      CREATE TABLE IF NOT EXISTS medical_record_versions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        medical_record_id UUID NOT NULL,
+        version_number INTEGER NOT NULL,
+        snapshot_json JSONB NOT NULL,
+        changed_by VARCHAR(255) NOT NULL,
+        change_reason TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(medical_record_id, version_number)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_medical_record_versions_record ON medical_record_versions(medical_record_id);
+      CREATE INDEX IF NOT EXISTS idx_medical_record_versions_created_at ON medical_record_versions(created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS medical_record_audit_log (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        username VARCHAR(255) NOT NULL,
+        action VARCHAR(64) NOT NULL,
+        resource_type VARCHAR(64) NOT NULL,
+        resource_id TEXT NOT NULL,
+        metadata_json JSONB,
+        ip_hash TEXT,
+        user_agent TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_medical_record_audit_log_username ON medical_record_audit_log(username);
+      CREATE INDEX IF NOT EXISTS idx_medical_record_audit_log_resource ON medical_record_audit_log(resource_type, resource_id);
+      CREATE INDEX IF NOT EXISTS idx_medical_record_audit_log_created_at ON medical_record_audit_log(created_at DESC);
     `);
+  } finally {
+    client.release();
+  }
+}
+
+export async function logMedicalRecordAudit(input: MedicalRecordAuditInput): Promise<void> {
+  const pool = getPostgresPool();
+
+  await pool.query(
+    `INSERT INTO medical_record_audit_log (
+      username,
+      action,
+      resource_type,
+      resource_id,
+      metadata_json,
+      ip_hash,
+      user_agent
+    ) VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7)`,
+    [
+      input.username,
+      input.action,
+      input.resourceType,
+      input.resourceId,
+      JSON.stringify(input.metadataJson || {}),
+      input.ipHash || null,
+      input.userAgent || null,
+    ]
+  );
+}
+
+export async function getMedicalRecordVersions(
+  medicalRecordId: string,
+  username: string
+): Promise<MedicalRecordVersion[]> {
+  const pool = getPostgresPool();
+  const client = await pool.connect();
+
+  try {
+    const result = await client.query(
+      `SELECT id, medical_record_id, version_number, snapshot_json, changed_by, change_reason, created_at
+       FROM medical_record_versions
+       WHERE medical_record_id = $1
+         AND (
+           EXISTS (
+             SELECT 1
+             FROM medical_records mr
+             WHERE mr.id = $1 AND mr.username = $2
+           )
+           OR snapshot_json ->> 'username' = $2
+         )
+       ORDER BY version_number DESC`,
+      [medicalRecordId, username]
+    );
+
+    return result.rows.map((row) =>
+      mapMedicalRecordVersionRow(
+        row as {
+          id: string;
+          medical_record_id: string;
+          version_number: number;
+          snapshot_json: Record<string, unknown>;
+          changed_by: string;
+          change_reason: string | null;
+          created_at: Date | string;
+        }
+      )
+    );
   } finally {
     client.release();
   }
@@ -304,10 +482,12 @@ export async function getMedicalRecordById(
 export async function updateMedicalRecord(
   id: string,
   username: string,
-  recordData: Partial<Omit<MedicalRecord, 'id' | 'patientId'>>
+  recordData: Partial<Omit<MedicalRecord, 'id' | 'patientId'>>,
+  changeReason?: string
 ): Promise<MedicalRecord | null> {
   const pool = getPostgresPool();
   const client = await pool.connect();
+  let hasTransaction = false;
 
   try {
     const updateFields = [];
@@ -397,6 +577,22 @@ export async function updateMedicalRecord(
       return getMedicalRecordById(id, username);
     }
 
+    await client.query('BEGIN');
+    hasTransaction = true;
+
+    const snapshotCreated = await createMedicalRecordVersionSnapshot(
+      client,
+      id,
+      username,
+      changeReason || 'Atualização de registro médico'
+    );
+
+    if (!snapshotCreated) {
+      await client.query('ROLLBACK');
+      hasTransaction = false;
+      return null;
+    }
+
     updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
 
     const query = `UPDATE medical_records
@@ -409,7 +605,14 @@ export async function updateMedicalRecord(
 
     const result = await client.query(query, values);
 
-    if (result.rows.length === 0) return null;
+    if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
+      hasTransaction = false;
+      return null;
+    }
+
+    await client.query('COMMIT');
+    hasTransaction = false;
 
     const row = result.rows[0];
     const mappedClinicalData = mapClinicalData(row.clinical_data);
@@ -437,6 +640,11 @@ export async function updateMedicalRecord(
       allergies: mappedClinicalData.allergies,
       followUpDate: mappedClinicalData.followUpDate,
     };
+  } catch (error) {
+    if (hasTransaction) {
+      await client.query('ROLLBACK');
+    }
+    throw error;
   } finally {
     client.release();
   }
@@ -445,17 +653,40 @@ export async function updateMedicalRecord(
 /**
  * Deleta um registro médico
  */
-export async function deleteMedicalRecord(id: string, username: string): Promise<boolean> {
+export async function deleteMedicalRecord(
+  id: string,
+  username: string,
+  changeReason?: string
+): Promise<boolean> {
   const pool = getPostgresPool();
   const client = await pool.connect();
 
   try {
+    await client.query('BEGIN');
+
+    const snapshotCreated = await createMedicalRecordVersionSnapshot(
+      client,
+      id,
+      username,
+      changeReason || 'Exclusão de registro médico'
+    );
+
+    if (!snapshotCreated) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+
     const result = await client.query(
       `DELETE FROM medical_records WHERE id = $1 AND username = $2`,
       [id, username]
     );
 
+    await client.query('COMMIT');
+
     return result.rowCount ? result.rowCount > 0 : false;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
   } finally {
     client.release();
   }

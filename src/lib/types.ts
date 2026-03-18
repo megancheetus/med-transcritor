@@ -38,6 +38,28 @@ export interface MedicalRecord {
   reviewedAt?: string;
 }
 
+export interface MedicalRecordVersion {
+  id: string;
+  medicalRecordId: string;
+  versionNumber: number;
+  snapshotJson: Record<string, unknown>;
+  changedBy: string;
+  changeReason?: string;
+  createdAt: string;
+}
+
+export interface MedicalRecordAuditLog {
+  id: string;
+  username: string;
+  action: string;
+  resourceType: string;
+  resourceId: string;
+  metadataJson?: Record<string, unknown>;
+  ipHash?: string;
+  userAgent?: string;
+  createdAt: string;
+}
+
 export type SortOrder = 'asc' | 'desc';
 
 // Tipos para Teleconsultas

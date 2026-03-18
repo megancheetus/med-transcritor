@@ -12,6 +12,8 @@ import {
   Edit2,
   Plus,
   Trash2,
+  History,
+  X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -21,6 +23,16 @@ interface PatientDashboardProps {
   onAddMedicalRecord?: () => void;
   onStartTeleconsulta?: () => void;
   onDeletePatient?: () => void;
+}
+
+interface MedicalRecordVersionItem {
+  id: string;
+  medicalRecordId: string;
+  versionNumber: number;
+  snapshotJson: Record<string, unknown>;
+  changedBy: string;
+  changeReason?: string;
+  createdAt: string;
 }
 
 function getDocumentIcon(tipoDocumento: string) {
@@ -65,6 +77,16 @@ function formatDate(dateString: string): string {
   });
 }
 
+function formatDateTime(dateString: string): string {
+  return new Date(dateString).toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 function getSourceBadge(sourceType?: MedicalRecord['sourceType']): {
   label: string;
   className: string;
@@ -99,6 +121,10 @@ export function PatientDashboard({
   const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [versions, setVersions] = useState<MedicalRecordVersionItem[]>([]);
+  const [isLoadingVersions, setIsLoadingVersions] = useState(false);
+  const [versionsError, setVersionsError] = useState<string | null>(null);
+  const [selectedRecordForVersions, setSelectedRecordForVersions] = useState<MedicalRecord | null>(null);
 
   // Carrega registros médicos do servidor
   useEffect(() => {
@@ -143,6 +169,38 @@ export function PatientDashboard({
       console.error('Erro ao deletar:', err);
       alert(err instanceof Error ? err.message : 'Erro ao deletar registro');
     }
+  };
+
+  const handleOpenVersions = async (record: MedicalRecord) => {
+    try {
+      setSelectedRecordForVersions(record);
+      setIsLoadingVersions(true);
+      setVersionsError(null);
+
+      const response = await fetch(`/api/medical-records/${record.id}/versions`);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(
+          errorData?.error || 'Não foi possível carregar o histórico de versões'
+        );
+      }
+
+      const data = await response.json();
+      setVersions(Array.isArray(data?.versions) ? data.versions : []);
+    } catch (err) {
+      console.error('Erro ao carregar versões:', err);
+      setVersionsError(err instanceof Error ? err.message : 'Erro desconhecido');
+      setVersions([]);
+    } finally {
+      setIsLoadingVersions(false);
+    }
+  };
+
+  const handleCloseVersionsModal = () => {
+    setSelectedRecordForVersions(null);
+    setVersions([]);
+    setVersionsError(null);
   };
 
   return (
@@ -306,6 +364,14 @@ export function PatientDashboard({
                           {formatDate(record.data)}
                         </span>
                         <button
+                          onClick={() => handleOpenVersions(record)}
+                          className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 transition hover:bg-blue-100"
+                          title="Ver histórico de versões"
+                        >
+                          <History className="h-3.5 w-3.5" />
+                          Versões
+                        </button>
+                        <button
                           onClick={() => handleDeleteRecord(record.id)}
                           className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 transition hover:bg-red-100"
                           title="Deletar registro"
@@ -334,6 +400,93 @@ export function PatientDashboard({
           </div>
         )}
       </div>
+
+      {selectedRecordForVersions && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white shadow-xl">
+            <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white p-5">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Histórico de versões</h3>
+                <p className="text-sm text-slate-600">
+                  Registro: {selectedRecordForVersions.tipoDocumento} - {selectedRecordForVersions.profissional}
+                </p>
+              </div>
+              <button
+                onClick={handleCloseVersionsModal}
+                className="rounded-md p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Fechar histórico de versões"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-5">
+              {versionsError && (
+                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  {versionsError}
+                </div>
+              )}
+
+              {isLoadingVersions ? (
+                <div className="flex h-32 items-center justify-center text-sm text-slate-600">
+                  Carregando versões...
+                </div>
+              ) : versions.length === 0 ? (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  Nenhuma versão anterior encontrada para este registro.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {versions.map((version) => {
+                    const snapshotConteudo =
+                      typeof version.snapshotJson?.conteudo === 'string'
+                        ? version.snapshotJson.conteudo
+                        : '';
+
+                    const snapshotResumo =
+                      typeof version.snapshotJson?.resumo === 'string'
+                        ? version.snapshotJson.resumo
+                        : '';
+
+                    return (
+                      <div
+                        key={version.id}
+                        className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                      >
+                        <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+                          <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 font-semibold text-blue-700">
+                            Versão {version.versionNumber}
+                          </span>
+                          <span className="text-slate-600">
+                            {formatDateTime(version.createdAt)}
+                          </span>
+                          <span className="text-slate-500">por {version.changedBy}</span>
+                        </div>
+
+                        {version.changeReason && (
+                          <p className="mb-2 text-xs text-slate-600">
+                            Motivo: <span className="font-medium text-slate-700">{version.changeReason}</span>
+                          </p>
+                        )}
+
+                        {snapshotResumo && (
+                          <p className="mb-2 text-sm font-medium text-slate-800">{snapshotResumo}</p>
+                        )}
+
+                        {snapshotConteudo && (
+                          <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-wrap">
+                            {snapshotConteudo}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,8 +4,10 @@ import {
   getMedicalRecordsByPatient,
   createMedicalRecord,
   initializeMedicalRecordsTable,
+  logMedicalRecordAudit,
 } from '@/lib/medicalRecordManager';
 import { MedicalRecord } from '@/lib/types';
+import { getRequestAuditContext } from '@/lib/requestAudit';
 
 export const runtime = 'nodejs';
 
@@ -79,6 +81,17 @@ export async function GET(request: NextRequest) {
 
     const records = await getMedicalRecordsByPatient(patientId, username);
 
+    const auditContext = getRequestAuditContext(request);
+    await logMedicalRecordAudit({
+      username,
+      action: 'view',
+      resourceType: 'medical_record_list',
+      resourceId: patientId,
+      metadataJson: { count: records.length, patientId },
+      ipHash: auditContext.ipHash,
+      userAgent: auditContext.userAgent,
+    });
+
     return NextResponse.json({
       records,
       count: records.length,
@@ -138,6 +151,20 @@ export async function POST(request: NextRequest) {
         followUpDate: payload.followUpDate,
       }
     );
+
+    const auditContext = getRequestAuditContext(request);
+    await logMedicalRecordAudit({
+      username,
+      action: 'create',
+      resourceType: 'medical_record',
+      resourceId: record.id,
+      metadataJson: {
+        patientId: payload.patientId,
+        sourceType: record.sourceType || 'manual',
+      },
+      ipHash: auditContext.ipHash,
+      userAgent: auditContext.userAgent,
+    });
 
     return NextResponse.json(record, { status: 201 });
   } catch (error) {

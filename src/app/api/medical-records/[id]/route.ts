@@ -4,7 +4,9 @@ import {
   getMedicalRecordById,
   updateMedicalRecord,
   deleteMedicalRecord,
+  logMedicalRecordAudit,
 } from '@/lib/medicalRecordManager';
+import { getRequestAuditContext } from '@/lib/requestAudit';
 
 export const runtime = 'nodejs';
 
@@ -36,6 +38,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    const auditContext = getRequestAuditContext(request);
+    await logMedicalRecordAudit({
+      username,
+      action: 'view',
+      resourceType: 'medical_record',
+      resourceId: id,
+      metadataJson: { patientId: record.patientId },
+      ipHash: auditContext.ipHash,
+      userAgent: auditContext.userAgent,
+    });
+
     return NextResponse.json(record);
   } catch (error) {
     console.error('[medical-records] GET/:id error:', error);
@@ -60,9 +73,18 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     const { id } = await params;
-    const payload = await request.json();
+    const payload = (await request.json()) as Record<string, unknown>;
 
-    const record = await updateMedicalRecord(id, username, payload);
+    const changeReason =
+      typeof payload.changeReason === 'string' && payload.changeReason.trim().length > 0
+        ? payload.changeReason.trim()
+        : undefined;
+
+    if ('changeReason' in payload) {
+      delete payload.changeReason;
+    }
+
+    const record = await updateMedicalRecord(id, username, payload, changeReason);
 
     if (!record) {
       return NextResponse.json(
@@ -70,6 +92,20 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         { status: 404 }
       );
     }
+
+    const auditContext = getRequestAuditContext(request);
+    await logMedicalRecordAudit({
+      username,
+      action: 'update',
+      resourceType: 'medical_record',
+      resourceId: id,
+      metadataJson: {
+        changeReason: changeReason || null,
+        patientId: record.patientId,
+      },
+      ipHash: auditContext.ipHash,
+      userAgent: auditContext.userAgent,
+    });
 
     return NextResponse.json(record);
   } catch (error) {
@@ -96,7 +132,28 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params;
 
-    const success = await deleteMedicalRecord(id, username);
+    let changeReason: string | undefined;
+    const bodyText = await request.text();
+
+    if (bodyText.trim()) {
+      try {
+        const body = JSON.parse(bodyText) as { changeReason?: unknown };
+        if (typeof body.changeReason === 'string' && body.changeReason.trim().length > 0) {
+          changeReason = body.changeReason.trim();
+        }
+      } catch {
+        return NextResponse.json(
+          { error: 'Payload inválido para exclusão de registro médico' },
+          { status: 400 }
+        );
+      }
+    }
+
+    const success = await deleteMedicalRecord(
+      id,
+      username,
+      changeReason || 'Exclusão de registro médico via API'
+    );
 
     if (!success) {
       return NextResponse.json(
@@ -104,6 +161,19 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
         { status: 404 }
       );
     }
+
+    const auditContext = getRequestAuditContext(request);
+    await logMedicalRecordAudit({
+      username,
+      action: 'delete',
+      resourceType: 'medical_record',
+      resourceId: id,
+      metadataJson: {
+        changeReason: changeReason || null,
+      },
+      ipHash: auditContext.ipHash,
+      userAgent: auditContext.userAgent,
+    });
 
     return NextResponse.json({ message: 'Registro médico deletado com sucesso' });
   } catch (error) {
