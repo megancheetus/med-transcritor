@@ -185,9 +185,7 @@ export default function JitsiRoom({
   const [clinicalPatient, setClinicalPatient] = useState<ClinicalPatient | null>(null);
   const [clinicalRecords, setClinicalRecords] = useState<ClinicalRecord[]>([]);
   const [connectionQuality, setConnectionQuality] = useState<ConnectionQuality>('unknown');
-  const [audioMuted, setAudioMuted] = useState(false);
   const [videoMuted, setVideoMuted] = useState(false);
-  const [screenSharing, setScreenSharing] = useState(false);
   const [audioFallbackOffered, setAudioFallbackOffered] = useState(false);
   const [audioFallbackActive, setAudioFallbackActive] = useState(false);
   const [lastEvent, setLastEvent] = useState<string>('Aguardando inicialização do Jitsi');
@@ -604,8 +602,6 @@ export default function JitsiRoom({
         });
 
         api.addEventListener('audioMuteStatusChanged', (payload) => {
-          const p = payload as { muted?: boolean } | undefined;
-          if (p && typeof p.muted === 'boolean') setAudioMuted(p.muted);
           logEvent('Status do microfone alterado', payload);
         });
 
@@ -616,8 +612,6 @@ export default function JitsiRoom({
         });
 
         api.addEventListener('screenSharingStatusChanged', (payload) => {
-          const p = payload as { on?: boolean } | undefined;
-          if (p && typeof p.on === 'boolean') setScreenSharing(p.on);
           logEvent('Status de compartilhamento de tela alterado', payload);
         });
 
@@ -932,61 +926,16 @@ export default function JitsiRoom({
       </div>
 
       {/* Barra de controles de dispositivo — visível apenas quando na chamada */}
-      {statusState === 'active' && (
-        <div className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2 flex items-center gap-2 rounded-2xl border border-white/10 bg-black/70 px-4 py-2 backdrop-blur">
-          {/* Microfone */}
-          <button
-            onClick={() => apiRef.current?.executeCommand('toggleAudio')}
-            title={audioMuted ? 'Ativar microfone' : 'Silenciar microfone'}
-            className={`flex h-10 w-10 items-center justify-center rounded-full border text-sm font-bold transition ${
-              audioMuted
-                ? 'border-red-500/60 bg-red-500/20 text-red-300 hover:bg-red-500/30'
-                : 'border-white/20 bg-white/10 text-white hover:bg-white/20'
-            }`}
-          >
-            {audioMuted ? '🔇' : '🎤'}
-          </button>
-
-          {/* Câmera */}
-          <button
-            onClick={() => apiRef.current?.executeCommand('toggleVideo')}
-            title={videoMuted ? 'Ativar câmera' : 'Desativar câmera'}
-            className={`flex h-10 w-10 items-center justify-center rounded-full border text-sm font-bold transition ${
-              videoMuted
-                ? 'border-red-500/60 bg-red-500/20 text-red-300 hover:bg-red-500/30'
-                : 'border-white/20 bg-white/10 text-white hover:bg-white/20'
-            }`}
-          >
-            {videoMuted ? '📵' : '📹'}
-          </button>
-
-          {/* Compartilhamento de tela */}
-          <button
-            onClick={() => apiRef.current?.executeCommand('toggleShareScreen')}
-            title={screenSharing ? 'Parar compartilhamento' : 'Compartilhar tela'}
-            className={`flex h-10 w-10 items-center justify-center rounded-full border text-sm font-bold transition ${
-              screenSharing
-                ? 'border-sky-500/60 bg-sky-500/20 text-sky-300 hover:bg-sky-500/30'
-                : 'border-white/20 bg-white/10 text-white hover:bg-white/20'
-            }`}
-          >
-            🖥️
-          </button>
-
-          {/* Separador */}
-          <div className="mx-1 h-6 w-px bg-white/20" />
-
-          {/* Indicador de qualidade compacto */}
-          {connectionQuality !== 'unknown' && (() => {
-            const ql = getQualityLabel(connectionQuality);
-            return (
-              <span className={`rounded border px-2 py-1 text-[10px] font-semibold ${ql.cls}`}>
-                {ql.text}
-              </span>
-            );
-          })()}
-        </div>
-      )}
+      {statusState === 'active' && connectionQuality !== 'unknown' && (() => {
+        const ql = getQualityLabel(connectionQuality);
+        return (
+          <div className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2 flex items-center gap-2 rounded-2xl border border-white/10 bg-black/70 px-4 py-2 backdrop-blur">
+            <span className={`rounded border px-2 py-1 text-[10px] font-semibold ${ql.cls}`}>
+              Conexão: {ql.text}
+            </span>
+          </div>
+        );
+      })()}
 
       <button
         onClick={() => {
