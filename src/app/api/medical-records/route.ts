@@ -6,53 +6,15 @@ import {
   initializeMedicalRecordsTable,
   logMedicalRecordAudit,
 } from '@/lib/medicalRecordManager';
-import { MedicalRecord } from '@/lib/types';
 import { getRequestAuditContext } from '@/lib/requestAudit';
+import { rateLimitMiddleware } from '@/lib/rateLimit';
+import {
+  medicalRecordCreateSchema,
+  patientIdQuerySchema,
+} from '@/lib/schemas/medicalRecords';
+import { parseWithSchema } from '@/lib/schemas/apiValidation';
 
 export const runtime = 'nodejs';
-
-function isOptionalString(value: unknown): boolean {
-  return value === undefined || value === null || typeof value === 'string';
-}
-
-function isOptionalStringArray(value: unknown): boolean {
-  return (
-    value === undefined ||
-    value === null ||
-    (Array.isArray(value) && value.every((item) => typeof item === 'string'))
-  );
-}
-
-function isValidMedicalRecord(data: unknown): data is Omit<MedicalRecord, 'id'> {
-  if (typeof data !== 'object' || data === null) return false;
-
-  const m = data as Record<string, unknown>;
-
-  return (
-    typeof m.patientId === 'string' &&
-    m.patientId.trim().length > 0 &&
-    typeof m.data === 'string' &&
-    m.data.trim().length > 0 &&
-    ['Consulta', 'Exame', 'Procedimento', 'Prescrição', 'Internação'].includes(
-      String(m.tipoDocumento)
-    ) &&
-    typeof m.profissional === 'string' &&
-    m.profissional.trim().length > 0 &&
-    typeof m.especialidade === 'string' &&
-    m.especialidade.trim().length > 0 &&
-    typeof m.conteudo === 'string' &&
-    m.conteudo.trim().length > 0 &&
-    isOptionalString(m.resumo) &&
-    isOptionalString(m.soapSubjetivo) &&
-    isOptionalString(m.soapObjetivo) &&
-    isOptionalString(m.soapAvaliacao) &&
-    isOptionalString(m.soapPlano) &&
-    isOptionalStringArray(m.cid10Codes) &&
-    isOptionalStringArray(m.medications) &&
-    isOptionalStringArray(m.allergies) &&
-    isOptionalString(m.followUpDate)
-  );
-}
 
 /**
  * GET /api/medical-records?patientId=...
@@ -60,6 +22,16 @@ function isValidMedicalRecord(data: unknown): data is Omit<MedicalRecord, 'id'> 
  */
 export async function GET(request: NextRequest) {
   try {
+    const rateLimitResponse = await rateLimitMiddleware(request, 'medical-records:get', {
+      windowMs: 60_000,
+      maxRequests: 120,
+      message: 'Muitas consultas de prontuário em pouco tempo. Tente novamente em instantes.',
+    });
+
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const authToken = request.cookies.get('auth_token')?.value;
     const username = await getUsernameFromAuthToken(authToken);
 
@@ -67,14 +39,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    const patientId = request.nextUrl.searchParams.get('patientId');
+    const queryValidation = parseWithSchema(patientIdQuerySchema, {
+      patientId: request.nextUrl.searchParams.get('patientId'),
+    });
 
-    if (!patientId) {
-      return NextResponse.json(
-        { error: 'patientId é obrigatório' },
-        { status: 400 }
-      );
+    if (!queryValidation.success) {
+      return queryValidation.response;
     }
+
+    const { patientId } = queryValidation.data;
 
     // Inicializar tabela se necessário
     await initializeMedicalRecordsTable();
@@ -111,6 +84,16 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const rateLimitResponse = await rateLimitMiddleware(request, 'medical-records:post', {
+      windowMs: 60_000,
+      maxRequests: 60,
+      message: 'Muitas criações de prontuário em pouco tempo. Tente novamente em instantes.',
+    });
+
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const authToken = request.cookies.get('auth_token')?.value;
     const username = await getUsernameFromAuthToken(authToken);
 
@@ -122,33 +105,33 @@ export async function POST(request: NextRequest) {
     await initializeMedicalRecordsTable();
 
     const payload = await request.json();
+    const payloadValidation = parseWithSchema(medicalRecordCreateSchema, payload);
 
-    if (!isValidMedicalRecord(payload)) {
-      return NextResponse.json(
-        { error: 'Dados de registro médico inválidos' },
-        { status: 400 }
-      );
+    if (!payloadValidation.success) {
+      return payloadValidation.response;
     }
 
+    const validatedPayload = payloadValidation.data;
+
     const record = await createMedicalRecord(
-      payload.patientId,
+      validatedPayload.patientId,
       username,
       {
-        patientId: payload.patientId,
-        data: payload.data,
-        tipoDocumento: payload.tipoDocumento,
-        profissional: payload.profissional,
-        especialidade: payload.especialidade,
-        conteudo: payload.conteudo,
-        resumo: payload.resumo,
-        soapSubjetivo: payload.soapSubjetivo,
-        soapObjetivo: payload.soapObjetivo,
-        soapAvaliacao: payload.soapAvaliacao,
-        soapPlano: payload.soapPlano,
-        cid10Codes: payload.cid10Codes,
-        medications: payload.medications,
-        allergies: payload.allergies,
-        followUpDate: payload.followUpDate,
+        patientId: validatedPayload.patientId,
+        data: validatedPayload.data,
+        tipoDocumento: validatedPayload.tipoDocumento,
+        profissional: validatedPayload.profissional,
+        especialidade: validatedPayload.especialidade,
+        conteudo: validatedPayload.conteudo,
+        resumo: validatedPayload.resumo,
+        soapSubjetivo: validatedPayload.soapSubjetivo,
+        soapObjetivo: validatedPayload.soapObjetivo,
+        soapAvaliacao: validatedPayload.soapAvaliacao,
+        soapPlano: validatedPayload.soapPlano,
+        cid10Codes: validatedPayload.cid10Codes,
+        medications: validatedPayload.medications,
+        allergies: validatedPayload.allergies,
+        followUpDate: validatedPayload.followUpDate,
       }
     );
 
@@ -159,7 +142,7 @@ export async function POST(request: NextRequest) {
       resourceType: 'medical_record',
       resourceId: record.id,
       metadataJson: {
-        patientId: payload.patientId,
+        patientId: validatedPayload.patientId,
         sourceType: record.sourceType || 'manual',
       },
       ipHash: auditContext.ipHash,

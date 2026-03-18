@@ -8,6 +8,9 @@ import {
 import { getPatientById, initializePatientsTable } from '@/lib/patientManager';
 import { MedicalRecord } from '@/lib/types';
 import { getRequestAuditContext } from '@/lib/requestAudit';
+import { rateLimitMiddleware } from '@/lib/rateLimit';
+import { parseWithSchema } from '@/lib/schemas/apiValidation';
+import { medicalRecordFromTranscriptionSchema } from '@/lib/schemas/medicalRecords';
 
 export const runtime = 'nodejs';
 
@@ -84,6 +87,16 @@ function parsePayload(payload: FromTranscriptionPayload) {
 
 export async function POST(request: NextRequest) {
   try {
+    const rateLimitResponse = await rateLimitMiddleware(request, 'medical-records:from-transcription', {
+      windowMs: 60_000,
+      maxRequests: 40,
+      message: 'Muitas criações de prontuário por transcrição. Tente novamente em instantes.',
+    });
+
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const authToken = request.cookies.get('auth_token')?.value;
     const username = await getUsernameFromAuthToken(authToken);
 
@@ -91,7 +104,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    const rawPayload = (await request.json()) as FromTranscriptionPayload;
+    const payloadValidation = parseWithSchema(
+      medicalRecordFromTranscriptionSchema,
+      await request.json()
+    );
+
+    if (!payloadValidation.success) {
+      return payloadValidation.response;
+    }
+
+    const rawPayload = payloadValidation.data as FromTranscriptionPayload;
     const parsed = parsePayload(rawPayload);
 
     if ('error' in parsed) {

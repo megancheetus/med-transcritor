@@ -234,55 +234,66 @@ export function TranscriptionWorkspaceProvider({ storageNamespace, children }: T
       const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '-');
       const shouldUseDirectBlobUpload = audioToSend.size > DIRECT_BLOB_UPLOAD_THRESHOLD_BYTES;
 
-      if (shouldUseDirectBlobUpload) {
-        setCompressionStatus('Enviando áudio diretamente para armazenamento seguro...');
-
-        const blobUpload = await upload(
-          `transcriptions/${storageNamespace}/${Date.now()}-${safeName}`,
-          audioToSend,
-          {
-            access: 'private',
-            handleUploadUrl: '/api/blob/upload',
-          }
-        );
-
-        setCompressionStatus('Solicitando transcrição a partir do arquivo enviado...');
+      const sendViaFormData = async () => {
+        const formData = new FormData();
+        formData.append('audio', audioToSend, fileName);
+        formData.append('model', selectedModel);
 
         const response = await fetch('/api/transcribe', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: selectedModel,
-            blobUrl: blobUpload.url,
-            mimeType: audioToSend.type || 'audio/webm',
-          }),
+          body: formData,
         });
 
         return {
           response,
           data: await response.json().catch(() => null),
           sentBytes: audioToSend.size,
-          usedDirectBlobUpload: true,
+          usedDirectBlobUpload: false,
         };
+      };
+
+      if (shouldUseDirectBlobUpload) {
+        try {
+          setCompressionStatus('Enviando áudio diretamente para armazenamento seguro...');
+
+          const blobUpload = await upload(
+            `transcriptions/${storageNamespace}/${Date.now()}-${safeName}`,
+            audioToSend,
+            {
+              access: 'private',
+              handleUploadUrl: '/api/blob/upload',
+            }
+          );
+
+          setCompressionStatus('Solicitando transcrição a partir do arquivo enviado...');
+
+          const response = await fetch('/api/transcribe', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: selectedModel,
+              blobUrl: blobUpload.url,
+              mimeType: audioToSend.type || 'audio/webm',
+            }),
+          });
+
+          return {
+            response,
+            data: await response.json().catch(() => null),
+            sentBytes: audioToSend.size,
+            usedDirectBlobUpload: true,
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Falha no upload direto';
+          console.warn('Fallback para envio tradicional após falha no upload direto:', error);
+          setCompressionStatus(`Upload direto indisponível (${message}). Tentando envio tradicional...`);
+          return sendViaFormData();
+        }
       }
 
-      const formData = new FormData();
-      formData.append('audio', audioToSend, fileName);
-      formData.append('model', selectedModel);
-
-      const response = await fetch('/api/transcribe', {
-        method: 'POST',
-        body: formData,
-      });
-
-      return {
-        response,
-        data: await response.json().catch(() => null),
-        sentBytes: audioToSend.size,
-        usedDirectBlobUpload: false,
-      };
+      return sendViaFormData();
     },
     [selectedModel, storageNamespace]
   );

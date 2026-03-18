@@ -7,6 +7,13 @@ import {
   logMedicalRecordAudit,
 } from '@/lib/medicalRecordManager';
 import { getRequestAuditContext } from '@/lib/requestAudit';
+import { rateLimitMiddleware } from '@/lib/rateLimit';
+import {
+  medicalRecordDeleteSchema,
+  medicalRecordPatchSchema,
+  routeIdSchema,
+} from '@/lib/schemas/medicalRecords';
+import { parseWithSchema } from '@/lib/schemas/apiValidation';
 
 export const runtime = 'nodejs';
 
@@ -20,6 +27,16 @@ interface RouteParams {
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
+    const rateLimitResponse = await rateLimitMiddleware(request, 'medical-records:id:get', {
+      windowMs: 60_000,
+      maxRequests: 120,
+      message: 'Muitas consultas de prontuário em pouco tempo. Tente novamente em instantes.',
+    });
+
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const authToken = request.cookies.get('auth_token')?.value;
     const username = await getUsernameFromAuthToken(authToken);
 
@@ -27,7 +44,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    const { id } = await params;
+    const idValidation = parseWithSchema(routeIdSchema, await params);
+    if (!idValidation.success) {
+      return idValidation.response;
+    }
+
+    const { id } = idValidation.data;
 
     const record = await getMedicalRecordById(id, username);
 
@@ -65,6 +87,16 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
+    const rateLimitResponse = await rateLimitMiddleware(request, 'medical-records:id:patch', {
+      windowMs: 60_000,
+      maxRequests: 60,
+      message: 'Muitas edições de prontuário em pouco tempo. Tente novamente em instantes.',
+    });
+
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const authToken = request.cookies.get('auth_token')?.value;
     const username = await getUsernameFromAuthToken(authToken);
 
@@ -72,19 +104,20 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    const { id } = await params;
-    const payload = (await request.json()) as Record<string, unknown>;
-
-    const changeReason =
-      typeof payload.changeReason === 'string' && payload.changeReason.trim().length > 0
-        ? payload.changeReason.trim()
-        : undefined;
-
-    if ('changeReason' in payload) {
-      delete payload.changeReason;
+    const idValidation = parseWithSchema(routeIdSchema, await params);
+    if (!idValidation.success) {
+      return idValidation.response;
     }
 
-    const record = await updateMedicalRecord(id, username, payload, changeReason);
+    const { id } = idValidation.data;
+    const payloadValidation = parseWithSchema(medicalRecordPatchSchema, await request.json());
+    if (!payloadValidation.success) {
+      return payloadValidation.response;
+    }
+
+    const { changeReason, ...patchData } = payloadValidation.data;
+
+    const record = await updateMedicalRecord(id, username, patchData, changeReason);
 
     if (!record) {
       return NextResponse.json(
@@ -123,6 +156,16 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
+    const rateLimitResponse = await rateLimitMiddleware(request, 'medical-records:id:delete', {
+      windowMs: 60_000,
+      maxRequests: 20,
+      message: 'Muitas exclusões de prontuário em pouco tempo. Tente novamente em instantes.',
+    });
+
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const authToken = request.cookies.get('auth_token')?.value;
     const username = await getUsernameFromAuthToken(authToken);
 
@@ -130,29 +173,28 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    const { id } = await params;
-
-    let changeReason: string | undefined;
-    const bodyText = await request.text();
-
-    if (bodyText.trim()) {
-      try {
-        const body = JSON.parse(bodyText) as { changeReason?: unknown };
-        if (typeof body.changeReason === 'string' && body.changeReason.trim().length > 0) {
-          changeReason = body.changeReason.trim();
-        }
-      } catch {
-        return NextResponse.json(
-          { error: 'Payload inválido para exclusão de registro médico' },
-          { status: 400 }
-        );
-      }
+    const idValidation = parseWithSchema(routeIdSchema, await params);
+    if (!idValidation.success) {
+      return idValidation.response;
     }
+
+    const { id } = idValidation.data;
+
+    const deletePayloadValidation = parseWithSchema(
+      medicalRecordDeleteSchema,
+      await request.json()
+    );
+
+    if (!deletePayloadValidation.success) {
+      return deletePayloadValidation.response;
+    }
+
+    const { changeReason } = deletePayloadValidation.data;
 
     const success = await deleteMedicalRecord(
       id,
       username,
-      changeReason || 'Exclusão de registro médico via API'
+      changeReason
     );
 
     if (!success) {
@@ -169,7 +211,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       resourceType: 'medical_record',
       resourceId: id,
       metadataJson: {
-        changeReason: changeReason || null,
+        changeReason,
       },
       ipHash: auditContext.ipHash,
       userAgent: auditContext.userAgent,

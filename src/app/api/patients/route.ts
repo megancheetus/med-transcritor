@@ -5,30 +5,11 @@ import {
   createPatient,
   initializePatientsTable,
 } from '@/lib/patientManager';
-import { Patient } from '@/lib/types';
+import { rateLimitMiddleware } from '@/lib/rateLimit';
+import { patientCreateSchema } from '@/lib/schemas/patients';
+import { parseWithSchema } from '@/lib/schemas/apiValidation';
 
 export const runtime = 'nodejs';
-
-function isValidPatientData(data: unknown): data is Omit<Patient, 'id'> {
-  if (typeof data !== 'object' || data === null) return false;
-
-  const p = data as Record<string, unknown>;
-
-  return (
-    typeof p.nome === 'string' &&
-    p.nome.trim().length > 0 &&
-    typeof p.nomeCompleto === 'string' &&
-    p.nomeCompleto.trim().length > 0 &&
-    typeof p.idade === 'number' &&
-    p.idade >= 0 &&
-    p.idade <= 150 &&
-    ['M', 'F', 'Outro'].includes(String(p.sexo)) &&
-    typeof p.cpf === 'string' &&
-    p.cpf.trim().length > 0 &&
-    typeof p.dataNascimento === 'string' &&
-    p.dataNascimento.trim().length > 0
-  );
-}
 
 /**
  * GET /api/patients
@@ -36,6 +17,16 @@ function isValidPatientData(data: unknown): data is Omit<Patient, 'id'> {
  */
 export async function GET(request: NextRequest) {
   try {
+    const rateLimitResponse = await rateLimitMiddleware(request, 'patients:get', {
+      windowMs: 60_000,
+      maxRequests: 120,
+      message: 'Muitas consultas de pacientes em pouco tempo. Tente novamente em instantes.',
+    });
+
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const authToken = request.cookies.get('auth_token')?.value;
     const username = await getUsernameFromAuthToken(authToken);
 
@@ -67,6 +58,16 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const rateLimitResponse = await rateLimitMiddleware(request, 'patients:post', {
+      windowMs: 60_000,
+      maxRequests: 60,
+      message: 'Muitas criações de pacientes em pouco tempo. Tente novamente em instantes.',
+    });
+
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const authToken = request.cookies.get('auth_token')?.value;
     const username = await getUsernameFromAuthToken(authToken);
 
@@ -77,14 +78,13 @@ export async function POST(request: NextRequest) {
     // Inicializar tabela se necessário
     await initializePatientsTable();
 
-    const payload = await request.json();
+    const payloadValidation = parseWithSchema(patientCreateSchema, await request.json());
 
-    if (!isValidPatientData(payload)) {
-      return NextResponse.json(
-        { error: 'Dados de paciente inválidos' },
-        { status: 400 }
-      );
+    if (!payloadValidation.success) {
+      return payloadValidation.response;
     }
+
+    const payload = payloadValidation.data;
 
     const patient = await createPatient(username, payload);
 

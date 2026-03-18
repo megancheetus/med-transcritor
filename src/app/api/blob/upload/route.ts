@@ -34,6 +34,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
   }
 
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    return NextResponse.json(
+      {
+        error: 'Upload direto indisponível',
+        details:
+          'BLOB_READ_WRITE_TOKEN não configurado. O cliente deve usar fallback para envio tradicional.',
+      },
+      { status: 503 }
+    );
+  }
+
   try {
     const body = (await request.json()) as HandleUploadBody;
 

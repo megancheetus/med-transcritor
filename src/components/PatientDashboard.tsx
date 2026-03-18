@@ -155,9 +155,20 @@ export function PatientDashboard({
   const handleDeleteRecord = async (recordId: string) => {
     if (!confirm('Tem certeza que deseja deletar este registro?')) return;
 
+    const changeReason = prompt('Informe o motivo da exclusão deste registro:')?.trim();
+
+    if (!changeReason) {
+      alert('Motivo da exclusão é obrigatório.');
+      return;
+    }
+
     try {
       const response = await fetch(`/api/medical-records/${recordId}`, {
         method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ changeReason }),
       });
 
       if (!response.ok) {

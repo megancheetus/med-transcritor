@@ -5,7 +5,9 @@ import {
   updatePatient,
   deletePatient,
 } from '@/lib/patientManager';
-import { Patient } from '@/lib/types';
+import { rateLimitMiddleware } from '@/lib/rateLimit';
+import { patientPatchSchema, routeIdSchema } from '@/lib/schemas/patients';
+import { parseWithSchema } from '@/lib/schemas/apiValidation';
 
 export const runtime = 'nodejs';
 
@@ -19,6 +21,16 @@ interface RouteParams {
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
+    const rateLimitResponse = await rateLimitMiddleware(request, 'patients:id:get', {
+      windowMs: 60_000,
+      maxRequests: 120,
+      message: 'Muitas consultas de pacientes em pouco tempo. Tente novamente em instantes.',
+    });
+
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const authToken = request.cookies.get('auth_token')?.value;
     const username = await getUsernameFromAuthToken(authToken);
 
@@ -26,7 +38,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    const { id } = await params;
+    const idValidation = parseWithSchema(routeIdSchema, await params);
+    if (!idValidation.success) {
+      return idValidation.response;
+    }
+
+    const { id } = idValidation.data;
 
     const patient = await getPatientById(id, username);
 
@@ -53,6 +70,16 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
+    const rateLimitResponse = await rateLimitMiddleware(request, 'patients:id:patch', {
+      windowMs: 60_000,
+      maxRequests: 60,
+      message: 'Muitas atualizações de pacientes em pouco tempo. Tente novamente em instantes.',
+    });
+
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const authToken = request.cookies.get('auth_token')?.value;
     const username = await getUsernameFromAuthToken(authToken);
 
@@ -60,8 +87,19 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    const { id } = await params;
-    const payload = await request.json();
+    const idValidation = parseWithSchema(routeIdSchema, await params);
+    if (!idValidation.success) {
+      return idValidation.response;
+    }
+
+    const { id } = idValidation.data;
+
+    const payloadValidation = parseWithSchema(patientPatchSchema, await request.json());
+    if (!payloadValidation.success) {
+      return payloadValidation.response;
+    }
+
+    const payload = payloadValidation.data;
 
     const patient = await updatePatient(id, username, payload);
 
@@ -99,6 +137,16 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
+    const rateLimitResponse = await rateLimitMiddleware(request, 'patients:id:delete', {
+      windowMs: 60_000,
+      maxRequests: 20,
+      message: 'Muitas exclusões de pacientes em pouco tempo. Tente novamente em instantes.',
+    });
+
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const authToken = request.cookies.get('auth_token')?.value;
     const username = await getUsernameFromAuthToken(authToken);
 
@@ -106,7 +154,12 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    const { id } = await params;
+    const idValidation = parseWithSchema(routeIdSchema, await params);
+    if (!idValidation.success) {
+      return idValidation.response;
+    }
+
+    const { id } = idValidation.data;
 
     const success = await deletePatient(id, username);
 
