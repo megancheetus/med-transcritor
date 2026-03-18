@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 type JitsiLeaveReason = 'manual-hangup' | 'conference-left' | 'ready-to-close' | 'initialization-error';
 type RoomRole = 'professional' | 'patient';
 type ConnectionVisualState = 'connecting' | 'active' | 'reconnecting' | 'device-warning' | 'error';
+type PrecheckState = 'idle' | 'running' | 'passed' | 'failed';
 
 interface JitsiRoomProps {
   roomId: string;
@@ -112,11 +113,72 @@ export default function JitsiRoom({
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [precheckState, setPrecheckState] = useState<PrecheckState>('idle');
+  const [precheckMessage, setPrecheckMessage] = useState('');
+  const [precheckDetails, setPrecheckDetails] = useState('');
+  const [precheckApproved, setPrecheckApproved] = useState(false);
   const [statusState, setStatusState] = useState<ConnectionVisualState>('connecting');
   const [statusMessage, setStatusMessage] = useState('Conectando na sala...');
   const [statusDetail, setStatusDetail] = useState('Validando acesso e carregando conferência.');
   const [participantCount, setParticipantCount] = useState(1);
   const [lastEvent, setLastEvent] = useState<string>('Aguardando inicialização do Jitsi');
+
+  const runPrecheck = useCallback(async () => {
+    setPrecheckState('running');
+    setPrecheckMessage('Executando verificação de dispositivos...');
+    setPrecheckDetails('Solicitando acesso ao microfone e câmera.');
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setPrecheckState('failed');
+      setPrecheckMessage('Navegador sem suporte para mídia');
+      setPrecheckDetails('Use uma versão recente de Chrome, Edge, Firefox ou Safari.');
+      return;
+    }
+
+    let stream: MediaStream | null = null;
+
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const hasMic = devices.some((device) => device.kind === 'audioinput');
+      const hasCamera = devices.some((device) => device.kind === 'videoinput');
+
+      if (hasMic && hasCamera) {
+        setPrecheckState('passed');
+        setPrecheckMessage('Dispositivos prontos para teleconsulta');
+        setPrecheckDetails('Microfone e câmera detectados e com permissão concedida.');
+      } else {
+        setPrecheckState('failed');
+        setPrecheckMessage('Dispositivos incompletos');
+        setPrecheckDetails('Conecte microfone e câmera para uma melhor experiência de chamada.');
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao verificar dispositivos.';
+      const lower = message.toLowerCase();
+      setPrecheckState('failed');
+
+      if (lower.includes('notallowed') || lower.includes('permission')) {
+        setPrecheckMessage('Permissão negada para câmera/microfone');
+        setPrecheckDetails('Libere as permissões no navegador e clique em verificar novamente.');
+      } else if (lower.includes('notfound')) {
+        setPrecheckMessage('Dispositivo não encontrado');
+        setPrecheckDetails('Conecte câmera/microfone e tente novamente.');
+      } else {
+        setPrecheckMessage('Falha no pré-check de dispositivos');
+        setPrecheckDetails(message);
+      }
+    } finally {
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (precheckState === 'idle') {
+      void runPrecheck();
+    }
+  }, [precheckState, runPrecheck]);
 
   const logEvent = useCallback((message: string, payload?: unknown) => {
     console.log(`[JitsiRoom:${roomId}] ${message}`, payload);
@@ -161,6 +223,10 @@ export default function JitsiRoom({
   }, [logEvent, onLeave]);
 
   useEffect(() => {
+    if (!precheckApproved) {
+      return;
+    }
+
     let active = true;
 
     const initJitsi = async () => {
@@ -312,6 +378,53 @@ export default function JitsiRoom({
       apiRef.current = null;
     };
   }, [displayName, loadMeetingConfig, logEvent, reportJoin, safeLeave]);
+
+  if (!precheckApproved) {
+    const precheckClass =
+      precheckState === 'passed'
+        ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+        : precheckState === 'running'
+        ? 'border-sky-300 bg-sky-50 text-sky-700'
+        : precheckState === 'failed'
+        ? 'border-amber-300 bg-amber-50 text-amber-700'
+        : 'border-slate-300 bg-slate-50 text-slate-700';
+
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#0c161c] p-4">
+        <div className="w-full max-w-xl rounded-xl border border-[#26414f] bg-[#10202a] p-6 text-white shadow-xl">
+          <h2 className="text-xl font-bold">Pré-check da teleconsulta</h2>
+          <p className="mt-1 text-sm text-slate-300">
+            Antes de entrar, vamos validar microfone e câmera para evitar falhas na chamada.
+          </p>
+
+          <div className={`mt-4 rounded-lg border p-4 ${precheckClass}`}>
+            <p className="text-sm font-semibold">{precheckMessage || 'Aguardando verificação'}</p>
+            <p className="mt-1 text-xs opacity-90">{precheckDetails || 'Clique em verificar para iniciar.'}</p>
+          </div>
+
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => {
+                void runPrecheck();
+              }}
+              className="rounded-md border border-[#37627a] bg-[#173447] px-4 py-2 text-sm font-medium text-white hover:bg-[#1f455c]"
+            >
+              {precheckState === 'running' ? 'Verificando...' : 'Verificar novamente'}
+            </button>
+
+            <button
+              onClick={() => {
+                setPrecheckApproved(true);
+              }}
+              className="rounded-md bg-[#1ea58c] px-4 py-2 text-sm font-semibold text-white hover:bg-[#18956e]"
+            >
+              {precheckState === 'passed' ? 'Entrar na sala' : 'Entrar mesmo assim'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleHangup = async () => {
     if (apiRef.current) {
