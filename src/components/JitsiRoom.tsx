@@ -7,6 +7,9 @@ type RoomRole = 'professional' | 'patient';
 type ConnectionVisualState = 'connecting' | 'active' | 'reconnecting' | 'device-warning' | 'error';
 type PrecheckState = 'idle' | 'running' | 'passed' | 'failed';
 
+const MAX_RECONNECT_ATTEMPTS = 3;
+const RECONNECT_DELAY_SECONDS = 5;
+
 interface JitsiRoomProps {
   roomId: string;
   role: RoomRole;
@@ -108,8 +111,12 @@ export default function JitsiRoom({
   const containerRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<JitsiApi | null>(null);
   const hasLeftRef = useRef(false);
+  const manualHangupRef = useRef(false);
   const joinedAtRef = useRef<number | null>(null);
   const joinReportedRef = useRef(false);
+  const reconnectAttemptRef = useRef(0);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -120,8 +127,25 @@ export default function JitsiRoom({
   const [statusState, setStatusState] = useState<ConnectionVisualState>('connecting');
   const [statusMessage, setStatusMessage] = useState('Conectando na sala...');
   const [statusDetail, setStatusDetail] = useState('Validando acesso e carregando conferência.');
+  const [reconnectActive, setReconnectActive] = useState(false);
+  const [reconnectReason, setReconnectReason] = useState('');
+  const [reconnectCountdown, setReconnectCountdown] = useState(RECONNECT_DELAY_SECONDS);
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const [reconnectCycle, setReconnectCycle] = useState(0);
   const [participantCount, setParticipantCount] = useState(1);
   const [lastEvent, setLastEvent] = useState<string>('Aguardando inicialização do Jitsi');
+
+  const clearReconnectTimers = useCallback(() => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
+    if (reconnectIntervalRef.current) {
+      clearInterval(reconnectIntervalRef.current);
+      reconnectIntervalRef.current = null;
+    }
+  }, []);
 
   const runPrecheck = useCallback(async () => {
     setPrecheckState('running');
@@ -213,6 +237,7 @@ export default function JitsiRoom({
   const safeLeave = useCallback(async (reason: JitsiLeaveReason) => {
     if (hasLeftRef.current) return;
     hasLeftRef.current = true;
+    clearReconnectTimers();
 
     const durationSeconds = joinedAtRef.current
       ? Math.max(0, Math.round((Date.now() - joinedAtRef.current) / 1000))
@@ -220,7 +245,81 @@ export default function JitsiRoom({
 
     logEvent(`Saindo da sala. Motivo: ${reason}`);
     await onLeave?.({ durationSeconds, reason });
-  }, [logEvent, onLeave]);
+  }, [clearReconnectTimers, logEvent, onLeave]);
+
+  const triggerReconnect = useCallback((reason: string) => {
+    if (manualHangupRef.current || hasLeftRef.current) {
+      return;
+    }
+
+    if (reconnectActive) {
+      return;
+    }
+
+    const nextAttempt = reconnectAttemptRef.current + 1;
+    reconnectAttemptRef.current = nextAttempt;
+    setReconnectAttempt(nextAttempt);
+
+    if (nextAttempt > MAX_RECONNECT_ATTEMPTS) {
+      setStatusState('error');
+      setStatusMessage('Não foi possível reconectar automaticamente');
+      setStatusDetail('Tente reconectar manualmente ou encerre a consulta.');
+      setReconnectActive(false);
+      setReconnectReason(reason);
+      clearReconnectTimers();
+      apiRef.current?.dispose();
+      apiRef.current = null;
+      return;
+    }
+
+    clearReconnectTimers();
+    setReconnectReason(reason);
+    setReconnectActive(true);
+    setReconnectCountdown(RECONNECT_DELAY_SECONDS);
+    setStatusState('reconnecting');
+    setStatusMessage('Reconectando à sala...');
+    setStatusDetail(`Tentativa ${nextAttempt} de ${MAX_RECONNECT_ATTEMPTS}.`);
+
+    apiRef.current?.dispose();
+    apiRef.current = null;
+
+    reconnectIntervalRef.current = setInterval(() => {
+      setReconnectCountdown((prev) => {
+        if (prev <= 1) {
+          if (reconnectIntervalRef.current) {
+            clearInterval(reconnectIntervalRef.current);
+            reconnectIntervalRef.current = null;
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    reconnectTimeoutRef.current = setTimeout(() => {
+      setReconnectActive(false);
+      setLoading(true);
+      setStatusState('connecting');
+      setStatusMessage('Reconectando à sala...');
+      setStatusDetail('Restabelecendo conexão com a teleconsulta.');
+      setReconnectCycle((prev) => prev + 1);
+    }, RECONNECT_DELAY_SECONDS * 1000);
+  }, [clearReconnectTimers, reconnectActive]);
+
+  const handleReconnectNow = useCallback(() => {
+    clearReconnectTimers();
+    setReconnectActive(false);
+    setReconnectCountdown(0);
+    setLoading(true);
+    setStatusState('connecting');
+    setStatusMessage('Reconectando à sala...');
+    setStatusDetail('Tentativa manual de reconexão em andamento.');
+    setReconnectCycle((prev) => prev + 1);
+  }, [clearReconnectTimers]);
+
+  const handleExitCall = useCallback(async () => {
+    await safeLeave('conference-left');
+  }, [safeLeave]);
 
   useEffect(() => {
     if (!precheckApproved) {
@@ -231,6 +330,10 @@ export default function JitsiRoom({
 
     const initJitsi = async () => {
       try {
+        if (hasLeftRef.current) {
+          return;
+        }
+
         setLoading(true);
         setError(null);
         setStatusState('connecting');
@@ -278,6 +381,10 @@ export default function JitsiRoom({
 
         api.addEventListener('videoConferenceJoined', (payload) => {
           if (!active) return;
+          clearReconnectTimers();
+          reconnectAttemptRef.current = 0;
+          setReconnectAttempt(0);
+          setReconnectActive(false);
           joinedAtRef.current = Date.now();
           setLoading(false);
           setStatusState('active');
@@ -288,19 +395,31 @@ export default function JitsiRoom({
         });
 
         api.addEventListener('videoConferenceLeft', (payload) => {
-          setStatusState('error');
-          setStatusMessage('Consulta encerrada');
-          setStatusDetail('A sala foi encerrada pelo Jitsi.');
           logEvent('Conferência encerrada pelo Jitsi', payload);
-          void safeLeave('conference-left');
+
+          if (manualHangupRef.current) {
+            setStatusState('error');
+            setStatusMessage('Consulta encerrada');
+            setStatusDetail('A chamada foi finalizada por você.');
+            void safeLeave('conference-left');
+            return;
+          }
+
+          triggerReconnect('A conferência foi encerrada inesperadamente.');
         });
 
         api.addEventListener('readyToClose', (payload) => {
-          setStatusState('error');
-          setStatusMessage('Finalizando teleconsulta');
-          setStatusDetail('A interface solicitou o fechamento da sala.');
           logEvent('Iframe sinalizou pronto para fechar', payload);
-          void safeLeave('ready-to-close');
+
+          if (manualHangupRef.current) {
+            setStatusState('error');
+            setStatusMessage('Finalizando teleconsulta');
+            setStatusDetail('A interface solicitou o fechamento da sala.');
+            void safeLeave('ready-to-close');
+            return;
+          }
+
+          triggerReconnect('A sala sinalizou fechamento antes do esperado.');
         });
 
         api.addEventListener('participantJoined', (payload) => {
@@ -312,9 +431,9 @@ export default function JitsiRoom({
         });
 
         api.addEventListener('participantLeft', (payload) => {
-          setStatusState('reconnecting');
+          setStatusState('active');
           setStatusMessage('Participante desconectado');
-          setStatusDetail('Aguardando retorno do participante ou nova conexão.');
+          setStatusDetail('Aguardando retorno do participante. Sua conexão permanece ativa.');
           setParticipantCount((prev) => Math.max(1, prev - 1));
           logEvent('Participante saiu da sala', payload);
         });
@@ -342,10 +461,8 @@ export default function JitsiRoom({
         });
 
         api.addEventListener('suspendDetected', (payload) => {
-          setStatusState('reconnecting');
-          setStatusMessage('Navegador suspendeu a aba ou conexão');
-          setStatusDetail('Tente manter esta aba ativa para evitar quedas na chamada.');
           logEvent('Suspensão detectada', payload);
+          triggerReconnect('A aba foi suspensa e a conexão precisa ser retomada.');
         });
 
         api.addEventListener('browserSupport', (payload) => {
@@ -357,6 +474,10 @@ export default function JitsiRoom({
           setStatusMessage('Erro reportado pela API do Jitsi');
           setStatusDetail('Tentando manter a chamada. Verifique sua conexão de internet.');
           logEvent('Erro interno do Jitsi', payload);
+
+          if (!manualHangupRef.current) {
+            triggerReconnect('A API reportou uma falha de conexão.');
+          }
         });
 
         apiRef.current = api;
@@ -375,10 +496,21 @@ export default function JitsiRoom({
     return () => {
       active = false;
       apiRef.current?.dispose();
+      clearReconnectTimers();
       apiRef.current = null;
     };
   }, [displayName, loadMeetingConfig, logEvent, reportJoin, safeLeave]);
-
+  }, [
+    clearReconnectTimers,
+    displayName,
+    loadMeetingConfig,
+    logEvent,
+    precheckApproved,
+    reconnectCycle,
+    reportJoin,
+    safeLeave,
+    triggerReconnect,
+  ]);
   if (!precheckApproved) {
     const precheckClass =
       precheckState === 'passed'
@@ -427,9 +559,17 @@ export default function JitsiRoom({
   }
 
   const handleHangup = async () => {
+    manualHangupRef.current = true;
+
     if (apiRef.current) {
       logEvent('Encerramento manual solicitado pelo usuário');
       apiRef.current.executeCommand('hangup');
+
+      setTimeout(() => {
+        if (!hasLeftRef.current) {
+          void safeLeave('manual-hangup');
+        }
+      }, 1200);
     } else {
       await safeLeave('manual-hangup');
     }
@@ -467,6 +607,56 @@ export default function JitsiRoom({
           Participantes na sala: {participantCount} {loading ? '• conectando...' : ''}
         </p>
       </div>
+
+      {reconnectActive && (
+        <div className="absolute left-4 top-28 z-20 w-full max-w-lg rounded-lg border border-amber-300/40 bg-amber-500/15 p-3 text-amber-100 backdrop-blur">
+          <p className="text-sm font-semibold">Reconexão automática em andamento</p>
+          <p className="mt-1 text-xs opacity-90">
+            {reconnectReason} Nova tentativa em {reconnectCountdown}s (tentativa {reconnectAttempt} de {MAX_RECONNECT_ATTEMPTS}).
+          </p>
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              onClick={handleReconnectNow}
+              className="rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-black hover:bg-amber-400"
+            >
+              Reconectar agora
+            </button>
+            <button
+              onClick={() => {
+                void handleExitCall();
+              }}
+              className="rounded-md border border-amber-200/50 px-3 py-1.5 text-xs font-semibold text-amber-100 hover:bg-amber-100/10"
+            >
+              Encerrar consulta
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!reconnectActive && reconnectAttempt > MAX_RECONNECT_ATTEMPTS && (
+        <div className="absolute left-4 top-28 z-20 w-full max-w-lg rounded-lg border border-red-300/40 bg-red-500/15 p-3 text-red-100 backdrop-blur">
+          <p className="text-sm font-semibold">Não foi possível reconectar automaticamente</p>
+          <p className="mt-1 text-xs opacity-90">
+            Verifique sua internet e tente reconectar manualmente ou encerre a consulta.
+          </p>
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              onClick={handleReconnectNow}
+              className="rounded-md bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-400"
+            >
+              Tentar reconectar
+            </button>
+            <button
+              onClick={() => {
+                void handleExitCall();
+              }}
+              className="rounded-md border border-red-200/50 px-3 py-1.5 text-xs font-semibold text-red-100 hover:bg-red-100/10"
+            >
+              Encerrar consulta
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="absolute bottom-4 left-4 z-20 max-w-md rounded-md bg-black/60 px-3 py-2 text-xs text-white">
         Último evento: {lastEvent}
