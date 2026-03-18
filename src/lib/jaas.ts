@@ -94,8 +94,8 @@ export async function createJaasMeetingToken({
         moderator: isModerator ? 'true' : 'false',
       },
       features: {
-        livestreaming: false,
-        recording: false,
+        livestreaming: isModerator,
+        recording: isModerator,
         transcription: false,
         'outbound-call': false,
         'inbound-call': false,

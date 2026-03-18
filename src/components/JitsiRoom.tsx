@@ -394,6 +394,32 @@ export default function JitsiRoom({
           return;
         }
 
+        const isPatient = role === 'patient';
+
+        const patientToolbarButtons = [
+          'microphone',
+          'camera',
+          'desktop',
+          'chat',
+          'tileview',
+          'fullscreen',
+          'hangup',
+          'settings',
+          'videoquality',
+        ];
+
+        const professionalToolbarButtons = [
+          ...patientToolbarButtons,
+          'security',
+          'mute-everyone',
+          'participants-pane',
+          'recording',
+          'invite',
+          'stats',
+          'shortcuts',
+          'filmstrip',
+        ];
+
         const api = new window.JitsiMeetExternalAPI(meetingConfig.domain, {
           roomName: meetingConfig.roomName,
           parentNode: containerRef.current,
@@ -404,11 +430,14 @@ export default function JitsiRoom({
           configOverwrite: {
             prejoinPageEnabled: false,
             disableDeepLinking: true,
-            startWithAudioMuted: false,
+            startWithAudioMuted: isPatient,
             startWithVideoMuted: false,
+            toolbarButtons: isPatient ? patientToolbarButtons : professionalToolbarButtons,
+            disableRemoteMute: isPatient,
           },
           interfaceConfigOverwrite: {
             MOBILE_APP_PROMO: false,
+            DISABLE_JOIN_LEAVE_NOTIFICATIONS: isPatient,
           },
         });
 
@@ -707,7 +736,7 @@ export default function JitsiRoom({
         }}
         className="absolute right-4 top-4 z-20 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
       >
-        Encerrar consulta
+        {role === 'patient' ? 'Sair da consulta' : 'Encerrar consulta'}
       </button>
 
       <div ref={containerRef} className="h-full w-full" />
