@@ -188,6 +188,8 @@ export default function JitsiRoom({
   const [audioMuted, setAudioMuted] = useState(false);
   const [videoMuted, setVideoMuted] = useState(false);
   const [screenSharing, setScreenSharing] = useState(false);
+  const [audioFallbackOffered, setAudioFallbackOffered] = useState(false);
+  const [audioFallbackActive, setAudioFallbackActive] = useState(false);
   const [lastEvent, setLastEvent] = useState<string>('Aguardando inicialização do Jitsi');
 
   const clearReconnectTimers = useCallback(() => {
@@ -649,6 +651,7 @@ export default function JitsiRoom({
           setStatusState('device-warning');
           setStatusMessage('Erro de câmera detectado');
           setStatusDetail('Confira permissões de câmera e dispositivo selecionado.');
+          setAudioFallbackOffered(true);
           logEvent('Erro de câmera', payload);
         });
 
@@ -810,6 +813,11 @@ export default function JitsiRoom({
         {statusState === 'active' && (
           <>
             <p className="mt-0.5 text-xs font-mono opacity-75">Duração: {formatDuration(callDuration)}</p>
+            {audioFallbackActive && (
+              <span className="mt-1 inline-block rounded border border-orange-500/30 bg-orange-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-orange-300">
+                Modo só áudio
+              </span>
+            )}
             {connectionQuality !== 'unknown' && (() => {
               const ql = getQualityLabel(connectionQuality);
               return (
@@ -821,6 +829,38 @@ export default function JitsiRoom({
           </>
         )}
       </div>
+
+      {/* Banner de fallback de áudio */}
+      {audioFallbackOffered && !audioFallbackActive && (
+        <div className="absolute left-4 top-28 z-20 w-full max-w-lg rounded-lg border border-orange-400/40 bg-orange-500/15 p-3 text-orange-100 backdrop-blur">
+          <p className="text-sm font-semibold">Problema com a câmera detectado</p>
+          <p className="mt-1 text-xs opacity-90">
+            Não foi possível usar sua câmera. Você pode continuar a consulta apenas com áudio.
+          </p>
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              onClick={() => {
+                apiRef.current?.executeCommand('toggleVideo');
+                setAudioFallbackActive(true);
+                setAudioFallbackOffered(false);
+                setVideoMuted(true);
+                setStatusState('active');
+                setStatusMessage('Modo só áudio ativo');
+                setStatusDetail('Câmera desativada. Consulta prosseguindo por áudio.');
+              }}
+              className="rounded-md bg-orange-500 px-3 py-1.5 text-xs font-semibold text-black hover:bg-orange-400"
+            >
+              Continuar apenas com áudio
+            </button>
+            <button
+              onClick={() => setAudioFallbackOffered(false)}
+              className="rounded-md border border-orange-200/50 px-3 py-1.5 text-xs text-orange-100 hover:bg-orange-100/10"
+            >
+              Dispensar
+            </button>
+          </div>
+        </div>
+      )}
 
       {tokenExpiringSoon && !reconnectActive && (
         <div className="absolute left-4 top-28 z-20 w-full max-w-lg rounded-lg border border-yellow-400/40 bg-yellow-500/15 p-3 text-yellow-100 backdrop-blur">

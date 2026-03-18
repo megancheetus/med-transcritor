@@ -10,6 +10,8 @@ type LeaveDetails = {
   reason: 'manual-hangup' | 'conference-left' | 'ready-to-close' | 'initialization-error';
 };
 
+type CpfGateState = 'idle' | 'checking' | 'denied';
+
 /**
  * Página de teleconsulta (para prof e paciente)
  * Rota pública: /room/[id]
@@ -26,6 +28,9 @@ export default function VideoRoomPage() {
   const [error, setError] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<'professional' | 'patient' | null>(null);
   const [publicAccessToken, setPublicAccessToken] = useState<string | null>(null);
+  const [cpfVerified, setCpfVerified] = useState(false);
+  const [cpfInput, setCpfInput] = useState('');
+  const [cpfGateState, setCpfGateState] = useState<CpfGateState>('idle');
   const joinReportedRef = useRef(false);
 
   // Carregar dados da sala e determinar role
@@ -123,8 +128,27 @@ export default function VideoRoomPage() {
     }
   }, [publicAccessToken, roomData?.status, roomId]);
 
-  const handleEndCall = async (duration: number, reason?: LeaveDetails['reason']) => {
+  const handleVerifyCpf = async () => {
+    if (!cpfInput.trim() || !publicAccessToken || !roomId) return;
+    setCpfGateState('checking');
     try {
+      const res = await fetch(`/api/videoconsultations/${roomId}/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: publicAccessToken, cpf: cpfInput.trim() }),
+      });
+      const data = await res.json() as { valid?: boolean };
+      if (data.valid) {
+        setCpfVerified(true);
+      } else {
+        setCpfGateState('denied');
+      }
+    } catch {
+      setCpfGateState('denied');
+    }
+  };
+
+  const handleEndCall = async (duration: number, reason?: LeaveDetails['reason']) => {    try {
       console.log('[VideoRoomPage] Encerrando chamada', { roomId, duration, reason, userRole });
 
       if (userRole === 'professional' && roomData) {
@@ -186,6 +210,53 @@ export default function VideoRoomPage() {
     return (
       <div className="flex h-screen items-center justify-center bg-[#0c161c]">
         <p className="text-white">Carregando...</p>
+      </div>
+    );
+  }
+
+  // CPF gate — apenas para pacientes (acesso por token público)
+  if (userRole === 'patient' && !cpfVerified) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#0c161c] p-4">
+        <div className="w-full max-w-md rounded-xl border border-[#26414f] bg-[#10202a] p-6 text-white shadow-xl">
+          <h2 className="text-xl font-bold text-[#1ea58c]">Verificação de identidade</h2>
+          <p className="mt-1 text-sm text-slate-300">
+            Para garantir a segurança da consulta, informe seu CPF para confirmar sua identidade.
+          </p>
+
+          <div className="mt-5">
+            <label htmlFor="cpf-input" className="block text-xs font-semibold text-slate-400 mb-1">
+              CPF (somente números ou com pontuação)
+            </label>
+            <input
+              id="cpf-input"
+              type="text"
+              inputMode="numeric"
+              maxLength={14}
+              value={cpfInput}
+              onChange={(e) => {
+                setCpfInput(e.target.value);
+                if (cpfGateState === 'denied') setCpfGateState('idle');
+              }}
+              onKeyDown={(e) => { if (e.key === 'Enter') void handleVerifyCpf(); }}
+              placeholder="000.000.000-00"
+              className="w-full rounded-lg border border-[#37627a] bg-[#0c161c] px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-[#1ea58c] focus:outline-none"
+            />
+            {cpfGateState === 'denied' && (
+              <p className="mt-2 text-xs font-medium text-red-400">
+                CPF não corresponde ao cadastro desta teleconsulta. Verifique e tente novamente.
+              </p>
+            )}
+          </div>
+
+          <button
+            onClick={() => void handleVerifyCpf()}
+            disabled={cpfGateState === 'checking' || !cpfInput.trim()}
+            className="mt-4 w-full rounded-lg bg-[#1ea58c] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#18956e] disabled:opacity-50 disabled:cursor-not-allowed transition"
+          >
+            {cpfGateState === 'checking' ? 'Verificando...' : 'Confirmar e entrar'}
+          </button>
+        </div>
       </div>
     );
   }
