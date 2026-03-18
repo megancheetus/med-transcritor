@@ -127,6 +127,8 @@ export default function JitsiRoom({
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const callDurationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const tokenExpiryWarnTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const tokenExpiryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -144,6 +146,7 @@ export default function JitsiRoom({
   const [reconnectCycle, setReconnectCycle] = useState(0);
   const [participantCount, setParticipantCount] = useState(1);
   const [callDuration, setCallDuration] = useState(0);
+  const [tokenExpiringSoon, setTokenExpiringSoon] = useState(false);
   const [lastEvent, setLastEvent] = useState<string>('Aguardando inicialização do Jitsi');
 
   const clearReconnectTimers = useCallback(() => {
@@ -160,6 +163,16 @@ export default function JitsiRoom({
     if (callDurationIntervalRef.current) {
       clearInterval(callDurationIntervalRef.current);
       callDurationIntervalRef.current = null;
+    }
+
+    if (tokenExpiryWarnTimeoutRef.current) {
+      clearTimeout(tokenExpiryWarnTimeoutRef.current);
+      tokenExpiryWarnTimeoutRef.current = null;
+    }
+
+    if (tokenExpiryTimeoutRef.current) {
+      clearTimeout(tokenExpiryTimeoutRef.current);
+      tokenExpiryTimeoutRef.current = null;
     }
   }, []);
 
@@ -449,8 +462,27 @@ export default function JitsiRoom({
           setReconnectActive(false);
           joinedAtRef.current = Date.now();
           setCallDuration(0);
+          setTokenExpiringSoon(false);
           if (callDurationIntervalRef.current) clearInterval(callDurationIntervalRef.current);
           callDurationIntervalRef.current = setInterval(() => setCallDuration((s) => s + 1), 1000);
+
+          // Watcher de expiração do JWT
+          const expiresMs = new Date(meetingConfig.expiresAt).getTime() - Date.now();
+          const warnMs = expiresMs - 5 * 60 * 1000; // avisar 5 min antes
+          if (warnMs > 0) {
+            tokenExpiryWarnTimeoutRef.current = setTimeout(() => {
+              setTokenExpiringSoon(true);
+            }, warnMs);
+          } else {
+            setTokenExpiringSoon(true);
+          }
+          if (expiresMs > 0) {
+            tokenExpiryTimeoutRef.current = setTimeout(() => {
+              // Token expirou: reconectar para obter um novo
+              triggerReconnect('O token da sessão expirou. Renovando conexão automaticamente.');
+            }, expiresMs);
+          }
+
           setLoading(false);
           setStatusState('active');
           setStatusMessage('Teleconsulta ativa');
@@ -672,9 +704,26 @@ export default function JitsiRoom({
         <p className="mt-0.5 text-xs opacity-90">{statusDetail}</p>
         <p className="mt-1 text-[11px] opacity-80">
           Participantes na sala: {participantCount} {loading ? '• conectando...' : ''}
-        </p>        {statusState === 'active' && (
+        </p>
+        {statusState === 'active' && (
           <p className="mt-0.5 text-xs font-mono opacity-75">Duração: {formatDuration(callDuration)}</p>
-        )}      </div>
+        )}
+      </div>
+
+      {tokenExpiringSoon && !reconnectActive && (
+        <div className="absolute left-4 top-28 z-20 w-full max-w-lg rounded-lg border border-yellow-400/40 bg-yellow-500/15 p-3 text-yellow-100 backdrop-blur">
+          <p className="text-sm font-semibold">Sessão próxima do limite</p>
+          <p className="mt-1 text-xs opacity-90">
+            O token desta teleconsulta expira em breve. A reconexão será feita automaticamente — você não perderá a chamada.
+          </p>
+          <button
+            onClick={() => setTokenExpiringSoon(false)}
+            className="mt-2 text-xs underline opacity-75 hover:opacity-100"
+          >
+            Dispensar aviso
+          </button>
+        </div>
+      )}
 
       {reconnectActive && (
         <div className="absolute left-4 top-28 z-20 w-full max-w-lg rounded-lg border border-amber-300/40 bg-amber-500/15 p-3 text-amber-100 backdrop-blur">
