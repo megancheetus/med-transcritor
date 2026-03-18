@@ -272,12 +272,26 @@ export async function deletePatient(id: string, username: string): Promise<boole
   const client = await pool.connect();
 
   try {
+    await client.query('BEGIN');
+
+    // Teleconsultas antigas podem referenciar o paciente sem ON DELETE CASCADE.
+    // Limpamos os vínculos antes de remover o paciente para evitar erro de FK.
+    await client.query(
+      `DELETE FROM videoconsulta_rooms WHERE patient_id = $1 AND professional_username = $2`,
+      [id, username]
+    );
+
     const result = await client.query(
       `DELETE FROM patients WHERE id = $1 AND username = $2`,
       [id, username]
     );
 
+    await client.query('COMMIT');
+
     return result.rowCount ? result.rowCount > 0 : false;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
   } finally {
     client.release();
   }

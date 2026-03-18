@@ -1,14 +1,41 @@
 import type { NextConfig } from "next";
 
+const jaasDomains = [
+  'https://8x8.vc',
+  'https://*.8x8.vc',
+  'wss://8x8.vc',
+  'wss://*.8x8.vc',
+];
+
+const meetDomains = [
+  'https://meet.jit.si',
+  'https://*.jit.si',
+  'wss://meet.jit.si',
+  'wss://*.jit.si',
+];
+
+const scriptSources = ["'self'", "'unsafe-inline'", 'https://meet.jit.si', 'https://*.jit.si', 'https://8x8.vc', 'https://*.8x8.vc'];
+const frameSources = ["'self'", 'https://meet.jit.si', 'https://*.jit.si', 'https://8x8.vc', 'https://*.8x8.vc'];
+const connectSources = [
+  "'self'",
+  'https://generativelanguage.googleapis.com',
+  'https://*.supabase.co',
+  'https://vercel.com',
+  'https://*.vercel-storage.com',
+  ...meetDomains,
+  ...jaasDomains,
+];
+
 const contentSecurityPolicy = process.env.NODE_ENV === 'production'
   ? // PRODUÇÃO: Next.js/Tailwind precisam de unsafe-inline para hidrataçã e estilos
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
+      `script-src ${scriptSources.join(' ')}`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
-      "connect-src 'self' https://generativelanguage.googleapis.com https://*.supabase.co https://vercel.com https://*.vercel-storage.com",
+      `connect-src ${connectSources.join(' ')}`,
+      `frame-src ${frameSources.join(' ')}`,
       "media-src 'self' blob: data:",
       "object-src 'none'",
       "frame-ancestors 'none'",
@@ -19,11 +46,12 @@ const contentSecurityPolicy = process.env.NODE_ENV === 'production'
   : // DESENVOLVIMENTO: Relaxado para permitir logs/debug
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      `script-src ${[...scriptSources, "'unsafe-eval'"].join(' ')}`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
-      "connect-src 'self' https://generativelanguage.googleapis.com https://*.supabase.co https://vercel.com https://*.vercel-storage.com localhost:*",
+      `connect-src ${[...connectSources, 'localhost:*'].join(' ')}`,
+      `frame-src ${frameSources.join(' ')}`,
       "media-src 'self' blob: data:",
       "object-src 'none'",
       "frame-ancestors 'none'",

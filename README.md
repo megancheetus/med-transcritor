@@ -67,6 +67,12 @@ AUTH_ADMIN_USERNAME=admin
 
 # Opcional para geração de links absolutos
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# Jitsi as a Service (JaaS)
+JAAS_APP_ID=seu_app_id_jaas
+JAAS_KEY_ID=seu_key_id_jaas
+JAAS_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nSUA_CHAVE_PRIVADA_AQUI\n-----END PRIVATE KEY-----"
+NEXT_PUBLIC_JAAS_DOMAIN=8x8.vc
 ```
 
 Notas importantes:
@@ -76,6 +82,8 @@ Notas importantes:
 - Em produção, prefira `POSTGRES_SSL=true`.
 - Evite `POSTGRES_SSL_REJECT_UNAUTHORIZED=false` fora de desenvolvimento local.
 - `AUTH_USERS` e `AUTH_ADMIN_USERNAME` devem ser usados somente para bootstrap local.
+- `JAAS_PRIVATE_KEY` deve ser armazenada apenas no servidor.
+- Em provedores que não aceitam multiline, mantenha a chave privada PEM com `\n` no valor.
 
 ## Como Executar
 
@@ -118,6 +126,9 @@ npm run lint
 - Profissional e paciente entram pela rota pública de sala.
 - A aplicação mantém status de sessão (aguardando, ativa, encerrada, expirada).
 - O fluxo registra eventos de entrada e encerramento para auditoria operacional.
+- O embed de produção usa Jitsi as a Service (JaaS) com JWT assinado no backend.
+- O profissional entra como moderador e o paciente entra com permissões reduzidas.
+- A rota [src/app/api/videoconsultations/[id]/jaas/route.ts](src/app/api/videoconsultations/[id]/jaas/route.ts) emite tokens por sala e papel.
 
 ## Persistência e Privacidade
 

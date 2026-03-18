@@ -156,6 +156,47 @@ export default function ProntuarioPage() {
     }
   }, [selectedPatient, router]);
 
+  const handleDeletePatient = useCallback(async () => {
+    if (!selectedPatient) {
+      alert('Selecione um paciente primeiro');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Tem certeza que deseja excluir o paciente ${selectedPatient.nomeCompleto}? Esta ação removerá também os registros médicos vinculados.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/patients/${selectedPatient.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao excluir paciente');
+      }
+
+      const deletedPatientId = selectedPatient.id;
+
+      setPatients((prev) => prev.filter((p) => p.id !== deletedPatientId));
+      setSelectedPatient((prev) => {
+        if (!prev || prev.id !== deletedPatientId) {
+          return prev;
+        }
+
+        const remaining = patients.filter((p) => p.id !== deletedPatientId);
+        return remaining.length > 0 ? remaining[0] : null;
+      });
+    } catch (err) {
+      console.error('Erro ao excluir paciente:', err);
+      alert(err instanceof Error ? err.message : 'Erro ao excluir paciente');
+    }
+  }, [patients, selectedPatient]);
+
   return (
     <AppShell
       title="Prontuário Eletrônico"
@@ -196,6 +237,7 @@ export default function ProntuarioPage() {
                 onEditClick={() => setIsEditModalOpen(true)}
                 onAddMedicalRecord={() => setIsAddMedicalRecordModalOpen(true)}
                 onStartTeleconsulta={handleStartTeleconsulta}
+                onDeletePatient={handleDeletePatient}
               />
             ) : (
               <EmptyState />

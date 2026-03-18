@@ -20,6 +20,7 @@ interface PatientDashboardProps {
   onEditClick?: () => void;
   onAddMedicalRecord?: () => void;
   onStartTeleconsulta?: () => void;
+  onDeletePatient?: () => void;
 }
 
 function getDocumentIcon(tipoDocumento: string) {
@@ -69,6 +70,7 @@ export function PatientDashboard({
   onEditClick,
   onAddMedicalRecord,
   onStartTeleconsulta,
+  onDeletePatient,
 }: PatientDashboardProps) {
   const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -132,28 +134,37 @@ export function PatientDashboard({
             {onAddMedicalRecord && (
               <button
                 onClick={onAddMedicalRecord}
-                className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 font-medium text-white hover:bg-green-700 transition"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 transition"
               >
-                <Plus className="h-4 w-4" />
+                <Plus className="h-3.5 w-3.5" />
                 Novo Registro
               </button>
             )}
             {onStartTeleconsulta && (
               <button
                 onClick={onStartTeleconsulta}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#1ea58c] px-4 py-2 font-medium text-white hover:bg-[#18956e] transition"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#1ea58c] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#18956e] transition"
               >
-                <Phone className="h-4 w-4" />
+                <Phone className="h-3.5 w-3.5" />
                 Teleconsulta
               </button>
             )}
             {onEditClick && (
               <button
                 onClick={onEditClick}
-                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 transition"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 transition"
               >
-                <Edit2 className="h-4 w-4" />
+                <Edit2 className="h-3.5 w-3.5" />
                 Editar
+              </button>
+            )}
+            {onDeletePatient && (
+              <button
+                onClick={onDeletePatient}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 transition"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Excluir Paciente
               </button>
             )}
             <div className="rounded-full bg-blue-100 p-3">
@@ -258,10 +269,11 @@ export function PatientDashboard({
                         </span>
                         <button
                           onClick={() => handleDeleteRecord(record.id)}
-                          className="text-slate-400 hover:text-red-600 transition p-1"
+                          className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 transition hover:bg-red-100"
                           title="Deletar registro"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Excluir
                         </button>
                       </div>
                     </div>

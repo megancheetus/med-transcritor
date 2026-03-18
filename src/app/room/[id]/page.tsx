@@ -1,8 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { VideoCallComponent } from '@/components/VideoCallComponent';
+import JitsiRoom from '@/components/JitsiRoom';
+import { VideoConsultaRoom } from '@/lib/types';
+
+type LeaveDetails = {
+  durationSeconds: number;
+  reason: 'manual-hangup' | 'conference-left' | 'ready-to-close' | 'initialization-error';
+};
 
 /**
  * Página de teleconsulta (para prof e paciente)
@@ -15,10 +21,12 @@ export default function VideoRoomPage() {
   const params = useParams();
   const roomId = params.id as string;
   
-  const [roomData, setRoomData] = useState<any | null>(null);
+  const [roomData, setRoomData] = useState<VideoConsultaRoom | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<'professional' | 'patient' | null>(null);
+  const [publicAccessToken, setPublicAccessToken] = useState<string | null>(null);
+  const joinReportedRef = useRef(false);
 
   // Carregar dados da sala e determinar role
   useEffect(() => {
@@ -29,6 +37,7 @@ export default function VideoRoomPage() {
 
         // Obter token do URL se existir
         const token = new URLSearchParams(window.location.search).get('token');
+        setPublicAccessToken(token);
 
         // URL base da requisição
         let url = `/api/videoconsultations/${roomId}`;
@@ -74,8 +83,50 @@ export default function VideoRoomPage() {
     }
   }, [roomId]);
 
-  const handleEndCall = async (duration: number) => {
+  const handleJoinCall = useCallback(async (role: 'professional' | 'patient') => {
+    if (joinReportedRef.current) {
+      return;
+    }
+
+    joinReportedRef.current = true;
+
     try {
+      if (role === 'professional') {
+        if (roomData?.status !== 'active') {
+          const response = await fetch(`/api/videoconsultations/${roomId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'start' }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data.room) {
+              setRoomData(data.room);
+            }
+          }
+        }
+
+        return;
+      }
+
+      await fetch(`/api/videoconsultations/${roomId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'log_patient_joined',
+          token: publicAccessToken,
+        }),
+      });
+    } catch (err) {
+      console.error('Erro ao registrar entrada na teleconsulta:', err);
+    }
+  }, [publicAccessToken, roomData?.status, roomId]);
+
+  const handleEndCall = async (duration: number, reason?: LeaveDetails['reason']) => {
+    try {
+      console.log('[VideoRoomPage] Encerrando chamada', { roomId, duration, reason, userRole });
+
       if (userRole === 'professional' && roomData) {
         // Profissional finaliza
         await fetch(`/api/videoconsultations/${roomId}`, {
@@ -140,13 +191,21 @@ export default function VideoRoomPage() {
   }
 
   return (
-    <VideoCallComponent
+    <JitsiRoom
       roomId={roomId}
-      roomToken={roomData.roomToken}
       role={userRole}
-      professionalName={roomData.professionalUsername}
-      patientName={roomData.patientName}
-      onEndCall={handleEndCall}
+      displayName={
+        userRole === 'professional'
+          ? roomData.professionalUsername
+          : roomData.patientName || 'Paciente'
+      }
+      publicAccessToken={publicAccessToken}
+      onJoin={async ({ role }) => {
+        await handleJoinCall(role);
+      }}
+      onLeave={async ({ durationSeconds, reason }) => {
+        await handleEndCall(durationSeconds, reason);
+      }}
     />
   );
 }

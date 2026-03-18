@@ -77,19 +77,19 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
 
+    const body = await request.json();
+    const { status, action, duracaoSegundos, foiGravada, transcricaoId, token } = body;
+
     // Autenticação
     const authToken = request.cookies.get('auth_token')?.value;
     const username = await getUsernameFromAuthToken(authToken);
 
-    if (!username) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
-    }
-
-    const body = await request.json();
-    const { status, action, duracaoSegundos, foiGravada, transcricaoId } = body;
-
     // Ações disponíveis
     if (action === 'start') {
+      if (!username) {
+        return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+      }
+
       // Iniciar a consutla (mudar status para active)
       const updated = await updateVideoConsultaRoomStatus(id, 'active', username);
       await logVideoConsultaEvent(id, 'professional_joined', username);
@@ -101,6 +101,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     if (action === 'end') {
+      if (!username) {
+        return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+      }
+
       // Encerrar a consulta
       const updated = await finalizeVideoConsultaRoom(
         id,
@@ -118,6 +122,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     if (action === 'log_patient_joined') {
+      if (!token || typeof token !== 'string') {
+        return NextResponse.json({ error: 'Token público inválido' }, { status: 400 });
+      }
+
+      const room = await getVideoConsultaRoomByToken(token);
+      if (!room || room.id !== id) {
+        return NextResponse.json({ error: 'Teleconsulta não encontrada' }, { status: 404 });
+      }
+
       // Registrar que paciente entrou
       await logVideoConsultaEvent(id, 'patient_joined', 'patient');
       
@@ -127,6 +140,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     if (status) {
+      if (!username) {
+        return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+      }
+
       // Atualizar status genérico
       const updated = await updateVideoConsultaRoomStatus(id, status, username);
       return NextResponse.json({

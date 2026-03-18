@@ -89,13 +89,13 @@ export default function TeleconsultaDashboardPage() {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'waiting':
-        return '⏳ Aguardando';
+        return 'Aguardando';
       case 'active':
-        return '🟢 Em andamento';
+        return 'Em andamento';
       case 'ended':
-        return '✅ Finalizada';
+        return 'Finalizada';
       case 'expired':
-        return '❌ Expirada';
+        return 'Expirada';
       default:
         return status;
     }
@@ -159,7 +159,7 @@ export default function TeleconsultaDashboardPage() {
             {/* Active consultations */}
             {activeCons.length > 0 && (
               <div className="space-y-3">
-                <h2 className="text-lg font-bold text-[#155b79]">🔴 Ativas</h2>
+                <h2 className="text-lg font-bold text-[#155b79]">Ativas</h2>
                 <div className="grid gap-3 sm:grid-cols-1 lg:grid-cols-2">
                   {activeCons.map((consultation) => (
                     <div
@@ -229,7 +229,7 @@ export default function TeleconsultaDashboardPage() {
             {/* History */}
             {historyCons.length > 0 && (
               <div className="space-y-3">
-                <h2 className="text-lg font-bold text-[#155b79]">📋 Histórico</h2>
+                <h2 className="text-lg font-bold text-[#155b79]">Histórico</h2>
                 <div className="rounded-lg bg-white shadow-sm border border-[#cfe0e8] overflow-hidden">
                   <table className="w-full">
                     <thead className="bg-[#f3f7f9] border-b border-[#cfe0e8]">
