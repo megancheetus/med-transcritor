@@ -23,6 +23,19 @@ export interface MedicalRecord {
   especialidade: string;
   conteudo: string;
   resumo?: string;
+  soapSubjetivo?: string;
+  soapObjetivo?: string;
+  soapAvaliacao?: string;
+  soapPlano?: string;
+  cid10Codes?: string[];
+  medications?: string[];
+  allergies?: string[];
+  followUpDate?: string;
+  sourceType?: 'manual' | 'transcription' | 'teleconsulta';
+  sourceRefId?: string;
+  aiGenerated?: boolean;
+  clinicianReviewed?: boolean;
+  reviewedAt?: string;
 }
 
 export type SortOrder = 'asc' | 'desc';

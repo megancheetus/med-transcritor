@@ -7,6 +7,7 @@ interface TranscriptionResultProps {
   model: TranscriptionModelType;
   isLoading?: boolean;
   errorMessage?: string;
+  onSendToMedicalRecord?: () => void;
 }
 
 export default function TranscriptionResult({
@@ -14,6 +15,7 @@ export default function TranscriptionResult({
   model,
   isLoading = false,
   errorMessage = '',
+  onSendToMedicalRecord,
 }: TranscriptionResultProps) {
   const transcriptionModel = getModelById(model);
 
@@ -32,12 +34,22 @@ export default function TranscriptionResult({
           <p className="text-xs text-[#4b6573] mt-1">{transcriptionModel.description}</p>
         </div>
         {!isLoading && content && (
-          <button
-            onClick={() => copyToClipboard(content)}
-            className="w-full sm:w-auto px-4 py-2 bg-[#1a6a8d] hover:bg-[#155b79] text-white rounded-md transition font-medium text-sm tracking-wide"
-          >
-            Copiar tudo
-          </button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            {onSendToMedicalRecord && (
+              <button
+                onClick={onSendToMedicalRecord}
+                className="w-full sm:w-auto rounded-md bg-[#1ea58c] px-4 py-2 text-sm font-medium tracking-wide text-white transition hover:bg-[#18956e]"
+              >
+                Enviar ao prontuario
+              </button>
+            )}
+            <button
+              onClick={() => copyToClipboard(content)}
+              className="w-full sm:w-auto px-4 py-2 bg-[#1a6a8d] hover:bg-[#155b79] text-white rounded-md transition font-medium text-sm tracking-wide"
+            >
+              Copiar tudo
+            </button>
+          </div>
         )}
       </div>
 

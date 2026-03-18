@@ -9,6 +9,18 @@ import { MedicalRecord } from '@/lib/types';
 
 export const runtime = 'nodejs';
 
+function isOptionalString(value: unknown): boolean {
+  return value === undefined || value === null || typeof value === 'string';
+}
+
+function isOptionalStringArray(value: unknown): boolean {
+  return (
+    value === undefined ||
+    value === null ||
+    (Array.isArray(value) && value.every((item) => typeof item === 'string'))
+  );
+}
+
 function isValidMedicalRecord(data: unknown): data is Omit<MedicalRecord, 'id'> {
   if (typeof data !== 'object' || data === null) return false;
 
@@ -27,7 +39,16 @@ function isValidMedicalRecord(data: unknown): data is Omit<MedicalRecord, 'id'> 
     typeof m.especialidade === 'string' &&
     m.especialidade.trim().length > 0 &&
     typeof m.conteudo === 'string' &&
-    m.conteudo.trim().length > 0
+    m.conteudo.trim().length > 0 &&
+    isOptionalString(m.resumo) &&
+    isOptionalString(m.soapSubjetivo) &&
+    isOptionalString(m.soapObjetivo) &&
+    isOptionalString(m.soapAvaliacao) &&
+    isOptionalString(m.soapPlano) &&
+    isOptionalStringArray(m.cid10Codes) &&
+    isOptionalStringArray(m.medications) &&
+    isOptionalStringArray(m.allergies) &&
+    isOptionalString(m.followUpDate)
   );
 }
 
@@ -107,6 +128,14 @@ export async function POST(request: NextRequest) {
         especialidade: payload.especialidade,
         conteudo: payload.conteudo,
         resumo: payload.resumo,
+        soapSubjetivo: payload.soapSubjetivo,
+        soapObjetivo: payload.soapObjetivo,
+        soapAvaliacao: payload.soapAvaliacao,
+        soapPlano: payload.soapPlano,
+        cid10Codes: payload.cid10Codes,
+        medications: payload.medications,
+        allergies: payload.allergies,
+        followUpDate: payload.followUpDate,
       }
     );
 

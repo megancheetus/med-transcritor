@@ -1,9 +1,11 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import AppShell from '@/components/AppShell';
 import AudioRecorder from '@/components/AudioRecorder';
 import AudioFileUpload from '@/components/AudioFileUpload';
 import TranscriptionResult from '@/components/TranscriptionResult';
+import { SendToMedicalRecordModal } from '@/components/SendToMedicalRecordModal';
 import { getAllModels } from '@/lib/transcriptionModels';
 import { formatBytes } from '@/lib/audioUtils';
 import { useTranscriptionWorkspace } from '@/components/TranscriptionWorkspaceProvider';
@@ -11,6 +13,9 @@ import { useTranscriptionWorkspace } from '@/components/TranscriptionWorkspacePr
 const ENABLE_LEGACY_TEST_UPLOAD = false;
 
 export default function TranscricaoPage() {
+  const [isSendModalOpen, setIsSendModalOpen] = useState(false);
+  const [saveFeedback, setSaveFeedback] = useState('');
+
   const {
     selectedModel,
     setSelectedModel,
@@ -20,9 +25,12 @@ export default function TranscricaoPage() {
     processingError,
     compressionStatus,
     processingMeta,
+    history,
     handleRecordingComplete,
     handleFileUpload,
   } = useTranscriptionWorkspace();
+
+  const latestHistoryEntryId = useMemo(() => history[0]?.id, [history]);
 
   return (
     <AppShell
@@ -93,11 +101,35 @@ export default function TranscricaoPage() {
           </p>
         </div>
 
+        {saveFeedback && (
+          <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+            {saveFeedback}
+          </div>
+        )}
+
         <TranscriptionResult
           content={transcriptionContent}
           model={selectedModel}
           isLoading={isLoading}
           errorMessage={processingError}
+          onSendToMedicalRecord={
+            transcriptionContent && !processingError
+              ? () => {
+                  setSaveFeedback('');
+                  setIsSendModalOpen(true);
+                }
+              : undefined
+          }
+        />
+
+        <SendToMedicalRecordModal
+          isOpen={isSendModalOpen}
+          transcriptionContent={transcriptionContent}
+          sourceRefId={latestHistoryEntryId}
+          onClose={() => setIsSendModalOpen(false)}
+          onSaved={() => {
+            setSaveFeedback('Registro criado com sucesso no prontuario do paciente.');
+          }}
         />
       </div>
     </AppShell>

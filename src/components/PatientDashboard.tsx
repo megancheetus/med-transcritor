@@ -65,6 +65,30 @@ function formatDate(dateString: string): string {
   });
 }
 
+function getSourceBadge(sourceType?: MedicalRecord['sourceType']): {
+  label: string;
+  className: string;
+} {
+  switch (sourceType) {
+    case 'transcription':
+      return {
+        label: 'Transcrição IA',
+        className: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+      };
+    case 'teleconsulta':
+      return {
+        label: 'Teleconsulta',
+        className: 'bg-cyan-100 text-cyan-700 border-cyan-200',
+      };
+    case 'manual':
+    default:
+      return {
+        label: 'Manual',
+        className: 'bg-slate-100 text-slate-700 border-slate-200',
+      };
+  }
+}
+
 export function PatientDashboard({
   patient,
   onEditClick,
@@ -252,6 +276,20 @@ export function PatientDashboard({
 
                   {/* Card */}
                   <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md hover:border-slate-300">
+                    {(() => {
+                      const sourceBadge = getSourceBadge(record.sourceType);
+                      return (
+                        <div className="mb-3 flex items-center justify-end">
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${sourceBadge.className}`}
+                            title={`Origem: ${sourceBadge.label}`}
+                          >
+                            {sourceBadge.label}
+                          </span>
+                        </div>
+                      );
+                    })()}
+
                     <div className="mb-3 flex items-start justify-between">
                       <div className="flex items-center gap-3">
                         <div className={`rounded-lg p-2 ${getDocumentColor(record.tipoDocumento)}`}>
