@@ -3,17 +3,26 @@
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { CookieConsentBanner } from '@/components/CookieConsentBanner';
+import Link from 'next/link';
+import { CookieConsentBanner, useCookieConsent } from '@/components/CookieConsentBanner';
+
+const NAV_LINKS = [
+  { href: '#planos', label: 'Planos' },
+  { href: '#como-funciona', label: 'Como funciona' },
+  { href: '#criador', label: 'Criador' },
+];
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const cookiesAccepted = useCookieConsent();
   const router = useRouter();
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!cookiesAccepted) return;
     setError('');
     setLoading(true);
 
@@ -44,7 +53,31 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#155b79] via-[#1a6a8d] to-[#0c161c] flex items-center justify-center p-4">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#155b79] via-[#1a6a8d] to-[#0c161c]">
+      {/* Public nav */}
+      <header className="w-full px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Image src="/favicon.png" alt="OmniNote" width={32} height={32} className="w-8 h-8" priority />
+          <span className="text-white font-bold text-lg tracking-tight">OmniNote</span>
+        </div>
+        <nav className="hidden sm:flex items-center gap-6">
+          {NAV_LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="text-white/80 hover:text-white text-sm font-medium transition"
+            >
+              {link.label}
+            </Link>
+          ))}
+          <span className="text-white text-sm font-semibold border border-white/40 rounded-lg px-3 py-1.5 bg-white/10 cursor-default">
+            Entrar
+          </span>
+        </nav>
+      </header>
+
+      {/* Login card */}
+      <div className="flex-1 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-10">
@@ -99,9 +132,15 @@ export default function LoginPage() {
             </div>
           )}
 
+          {!cookiesAccepted && (
+            <p className="text-xs text-[#7b8d97] text-center">
+              Aceite os cookies para continuar
+            </p>
+          )}
+
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !cookiesAccepted}
             className="w-full bg-[#1a6a8d] hover:bg-[#155b79] text-white text-sm font-bold py-3 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed tracking-wide shadow-md hover:shadow-lg"
           >
             {loading ? 'Autenticando...' : 'Entrar'}
@@ -112,6 +151,12 @@ export default function LoginPage() {
           Acesso restrito para usuários autorizados
         </p>
       </div>
+      </div>
+
+      {/* Copyright footer */}
+      <footer className="w-full text-center py-4 text-white/50 text-xs">
+        &copy; {new Date().getFullYear()} OmniNote. Todos os direitos reservados.
+      </footer>
 
       <CookieConsentBanner />
     </div>

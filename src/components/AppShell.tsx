@@ -196,6 +196,10 @@ export default function AppShell({ title, subtitle, children }: AppShellProps) {
         </header>
 
         <div className="p-4 sm:p-6 lg:p-8">{children}</div>
+
+        <footer className="border-t border-[#cfe0e8] bg-white px-4 sm:px-6 lg:px-8 py-4 text-center text-xs text-[#7b8d97]">
+          &copy; {new Date().getFullYear()} OmniNote. Todos os direitos reservados.
+        </footer>
       </main>
     </div>
   );

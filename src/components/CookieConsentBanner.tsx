@@ -3,6 +3,22 @@
 import { useEffect, useState } from 'react';
 import { X, Check } from 'lucide-react';
 
+export function useCookieConsent() {
+  const [accepted, setAccepted] = useState(false);
+
+  useEffect(() => {
+    setAccepted(localStorage.getItem('cookie-consent-accepted') === 'true');
+
+    const handler = () => {
+      setAccepted(localStorage.getItem('cookie-consent-accepted') === 'true');
+    };
+    window.addEventListener('cookie-consent-changed', handler);
+    return () => window.removeEventListener('cookie-consent-changed', handler);
+  }, []);
+
+  return accepted;
+}
+
 export function CookieConsentBanner() {
   const [isVisible, setIsVisible] = useState(false);
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
@@ -22,6 +38,7 @@ export function CookieConsentBanner() {
   const handleAccept = () => {
     localStorage.setItem('cookie-consent-accepted', 'true');
     localStorage.setItem('cookie-consent-date', new Date().toISOString());
+    window.dispatchEvent(new Event('cookie-consent-changed'));
     setIsAnimatingOut(true);
     setTimeout(() => setIsVisible(false), 300);
   };
@@ -29,6 +46,7 @@ export function CookieConsentBanner() {
   const handleReject = () => {
     localStorage.setItem('cookie-consent-rejected', 'true');
     localStorage.setItem('cookie-consent-date', new Date().toISOString());
+    window.dispatchEvent(new Event('cookie-consent-changed'));
     setIsAnimatingOut(true);
     setTimeout(() => setIsVisible(false), 300);
   };
