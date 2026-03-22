@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUsernameFromAuthToken } from '@/lib/auth';
+import { getAuthenticatedUserFromRequest } from '@/lib/authSession';
 import { createJaasMeetingToken, getJaasEnvironmentStatus } from '@/lib/jaas';
 import { getVideoConsultaRoom, getVideoConsultaRoomByToken } from '@/lib/videoConsultationManager';
 import { rateLimitMiddleware } from '@/lib/rateLimit';
@@ -21,13 +21,23 @@ export async function GET(request: NextRequest, context: RouteContext) {
     if (rateLimitResponse) return rateLimitResponse;
 
     const { id } = await context.params;
-    const authToken = request.cookies.get('auth_token')?.value;
-    const username = await getUsernameFromAuthToken(authToken);
+    const user = await getAuthenticatedUserFromRequest(request);
+    const username = user?.username || null;
     const publicToken = request.nextUrl.searchParams.get('token') || undefined;
     const role = request.nextUrl.searchParams.get('role');
 
     if (role !== 'professional' && role !== 'patient') {
       return NextResponse.json({ error: 'role inválido' }, { status: 400 });
+    }
+
+    if (role === 'professional') {
+      if (!user) {
+        return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+      }
+
+      if (!user.isAdmin && !user.moduleAccess.teleconsulta) {
+        return NextResponse.json({ error: 'Seu plano não possui acesso ao módulo de teleconsulta' }, { status: 403 });
+      }
     }
 
     const jaasStatus = getJaasEnvironmentStatus();

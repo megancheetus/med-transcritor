@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUsernameFromAuthToken } from '@/lib/auth';
+import { getAuthenticatedUserFromRequest } from '@/lib/authSession';
 import {
   getMedicalRecordById,
   updateMedicalRecord,
@@ -37,11 +37,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return rateLimitResponse;
     }
 
-    const authToken = request.cookies.get('auth_token')?.value;
-    const username = await getUsernameFromAuthToken(authToken);
+    const user = await getAuthenticatedUserFromRequest(request);
 
-    if (!username) {
+    if (!user) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+
+    if (!user.isAdmin && !user.moduleAccess.prontuario) {
+      return NextResponse.json({ error: 'Seu plano não possui acesso ao módulo de prontuário' }, { status: 403 });
     }
 
     const idValidation = parseWithSchema(routeIdSchema, await params);
@@ -51,7 +54,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const { id } = idValidation.data;
 
-    const record = await getMedicalRecordById(id, username);
+    const record = await getMedicalRecordById(id, user.username);
 
     if (!record) {
       return NextResponse.json(
@@ -62,7 +65,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const auditContext = getRequestAuditContext(request);
     await logMedicalRecordAudit({
-      username,
+      username: user.username,
       action: 'view',
       resourceType: 'medical_record',
       resourceId: id,
@@ -97,11 +100,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return rateLimitResponse;
     }
 
-    const authToken = request.cookies.get('auth_token')?.value;
-    const username = await getUsernameFromAuthToken(authToken);
+    const user = await getAuthenticatedUserFromRequest(request);
 
-    if (!username) {
+    if (!user) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+
+    if (!user.isAdmin && !user.moduleAccess.prontuario) {
+      return NextResponse.json({ error: 'Seu plano não possui acesso ao módulo de prontuário' }, { status: 403 });
     }
 
     const idValidation = parseWithSchema(routeIdSchema, await params);
@@ -117,7 +123,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     const { changeReason, ...patchData } = payloadValidation.data;
 
-    const record = await updateMedicalRecord(id, username, patchData, changeReason);
+    const record = await updateMedicalRecord(id, user.username, patchData, changeReason);
 
     if (!record) {
       return NextResponse.json(
@@ -128,7 +134,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     const auditContext = getRequestAuditContext(request);
     await logMedicalRecordAudit({
-      username,
+      username: user.username,
       action: 'update',
       resourceType: 'medical_record',
       resourceId: id,
@@ -166,11 +172,14 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       return rateLimitResponse;
     }
 
-    const authToken = request.cookies.get('auth_token')?.value;
-    const username = await getUsernameFromAuthToken(authToken);
+    const user = await getAuthenticatedUserFromRequest(request);
 
-    if (!username) {
+    if (!user) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+
+    if (!user.isAdmin && !user.moduleAccess.prontuario) {
+      return NextResponse.json({ error: 'Seu plano não possui acesso ao módulo de prontuário' }, { status: 403 });
     }
 
     const idValidation = parseWithSchema(routeIdSchema, await params);
@@ -193,7 +202,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     const success = await deleteMedicalRecord(
       id,
-      username,
+      user.username,
       changeReason
     );
 
@@ -206,7 +215,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     const auditContext = getRequestAuditContext(request);
     await logMedicalRecordAudit({
-      username,
+      username: user.username,
       action: 'delete',
       resourceType: 'medical_record',
       resourceId: id,

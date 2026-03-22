@@ -1,5 +1,12 @@
 import { compare, hash } from 'bcryptjs';
 import { getPostgresPool } from '@/lib/postgres';
+import { randomBytes } from 'crypto';
+import {
+  AccountPlan,
+  ModuleAccess,
+  getModuleAccessForPlan,
+  normalizeAccountPlan,
+} from '@/lib/accountPlan';
 
 interface EnvAuthUser {
   username: string;
@@ -11,6 +18,12 @@ export interface AppUserRecord {
   fullName: string | null;
   email: string | null;
   isAdmin: boolean;
+  accountPlan: AccountPlan;
+  trialExpiresAt: string | null;
+  trialExpired: boolean;
+  emailVerified: boolean;
+  emailVerificationRequired: boolean;
+  moduleAccess: ModuleAccess;
   createdAt: string;
   updatedAt: string;
   lastLoginAt: string | null;
@@ -32,20 +45,53 @@ function normalizeNullableString(value: string | null | undefined): string | nul
   return normalized.length > 0 ? normalized : null;
 }
 
+function buildTrialExpiryDate(): Date {
+  const trialExpiry = new Date();
+  trialExpiry.setDate(trialExpiry.getDate() + 3);
+  return trialExpiry;
+}
+
+function isExpired(dateValue: Date | string): boolean {
+  return new Date(dateValue).getTime() <= Date.now();
+}
+
+function buildEmailVerificationToken(): string {
+  return randomBytes(32).toString('hex');
+}
+
 function mapUserRow(row: {
   username: string;
   full_name: string | null;
   email: string | null;
   is_admin: boolean;
+  account_plan: string;
+  trial_expires_at: Date | string | null;
+  email_verified_at: Date | string | null;
+  email_verification_required: boolean;
   created_at: Date | string;
   updated_at: Date | string;
   last_login_at: Date | string | null;
 }): AppUserRecord {
+  const accountPlan = normalizeAccountPlan(row.account_plan);
+  const trialExpiresAt = row.trial_expires_at ? new Date(row.trial_expires_at).toISOString() : null;
+  const trialExpired = accountPlan === 'trial' && !!trialExpiresAt && isExpired(trialExpiresAt);
   return {
     username: row.username,
     fullName: row.full_name,
     email: row.email,
     isAdmin: row.is_admin,
+    accountPlan,
+    trialExpiresAt,
+    trialExpired,
+    emailVerified: !!row.email_verified_at,
+    emailVerificationRequired: row.email_verification_required,
+    moduleAccess: row.is_admin
+      ? {
+          transcricao: true,
+          teleconsulta: true,
+          prontuario: true,
+        }
+      : getModuleAccessForPlan(accountPlan),
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
     lastLoginAt: row.last_login_at ? new Date(row.last_login_at).toISOString() : null,
@@ -92,10 +138,47 @@ async function ensureUsersTable(): Promise<void> {
             full_name TEXT,
             email TEXT,
             is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+            account_plan TEXT NOT NULL DEFAULT 'basic',
+            trial_expires_at TIMESTAMPTZ,
+            email_verified_at TIMESTAMPTZ,
+            email_verification_required BOOLEAN NOT NULL DEFAULT FALSE,
+            email_verification_token TEXT,
+            email_verification_sent_at TIMESTAMPTZ,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             last_login_at TIMESTAMPTZ
           )
+        `);
+
+        // Migration segura para bancos existentes
+        await pool.query(`
+          ALTER TABLE app_users
+          ADD COLUMN IF NOT EXISTS account_plan TEXT NOT NULL DEFAULT 'basic'
+        `);
+
+        await pool.query(`
+          ALTER TABLE app_users
+          ADD COLUMN IF NOT EXISTS trial_expires_at TIMESTAMPTZ
+        `);
+
+        await pool.query(`
+          ALTER TABLE app_users
+          ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ
+        `);
+
+        await pool.query(`
+          ALTER TABLE app_users
+          ADD COLUMN IF NOT EXISTS email_verification_required BOOLEAN NOT NULL DEFAULT FALSE
+        `);
+
+        await pool.query(`
+          ALTER TABLE app_users
+          ADD COLUMN IF NOT EXISTS email_verification_token TEXT
+        `);
+
+        await pool.query(`
+          ALTER TABLE app_users
+          ADD COLUMN IF NOT EXISTS email_verification_sent_at TIMESTAMPTZ
         `);
 
         // Criar índice de forma segura
@@ -192,7 +275,7 @@ export async function authenticateUser(username: string, password: string): Prom
   }
 
   const normalizedUsername = normalizeUsername(username);
-  const result = await pool.query('SELECT username, password_hash FROM app_users WHERE username = $1 LIMIT 1', [
+  const result = await pool.query('SELECT username, password_hash, account_plan, trial_expires_at, email_verification_required, email_verified_at FROM app_users WHERE username = $1 LIMIT 1', [
     normalizedUsername,
   ]);
 
@@ -200,11 +283,27 @@ export async function authenticateUser(username: string, password: string): Prom
     return false;
   }
 
-  const user = result.rows[0] as { username: string; password_hash: string };
+  const user = result.rows[0] as {
+    username: string;
+    password_hash: string;
+    account_plan: string;
+    trial_expires_at: Date | string | null;
+    email_verification_required: boolean;
+    email_verified_at: Date | string | null;
+  };
   const passwordMatches = await compare(password, user.password_hash);
 
   if (!passwordMatches) {
     return false;
+  }
+
+  const accountPlan = normalizeAccountPlan(user.account_plan);
+  if (accountPlan === 'trial' && user.trial_expires_at && isExpired(user.trial_expires_at)) {
+    throw new Error('TRIAL_EXPIRED');
+  }
+
+  if (user.email_verification_required && !user.email_verified_at) {
+    throw new Error('EMAIL_NOT_VERIFIED');
   }
 
   await ensureAdminUserExists(user.username);
@@ -220,6 +319,7 @@ export async function getUserByUsername(username: string): Promise<AppUserRecord
   const result = await pool.query(
     `
       SELECT username, full_name, email, is_admin, created_at, updated_at, last_login_at
+      , account_plan, trial_expires_at, email_verified_at, email_verification_required
       FROM app_users
       WHERE username = $1
       LIMIT 1
@@ -236,6 +336,10 @@ export async function getUserByUsername(username: string): Promise<AppUserRecord
     full_name: string | null;
     email: string | null;
     is_admin: boolean;
+    account_plan: string;
+    trial_expires_at: Date | string | null;
+    email_verified_at: Date | string | null;
+    email_verification_required: boolean;
     created_at: Date | string;
     updated_at: Date | string;
     last_login_at: Date | string | null;
@@ -248,6 +352,7 @@ export async function listUsers(): Promise<AppUserRecord[]> {
   const pool = getPostgresPool();
   const result = await pool.query(`
     SELECT username, full_name, email, is_admin, created_at, updated_at, last_login_at
+    , account_plan, trial_expires_at, email_verified_at, email_verification_required
     FROM app_users
     ORDER BY is_admin DESC, username ASC
   `);
@@ -258,6 +363,10 @@ export async function listUsers(): Promise<AppUserRecord[]> {
       full_name: string | null;
       email: string | null;
       is_admin: boolean;
+      account_plan: string;
+      trial_expires_at: Date | string | null;
+      email_verified_at: Date | string | null;
+      email_verification_required: boolean;
       created_at: Date | string;
       updated_at: Date | string;
       last_login_at: Date | string | null;
@@ -271,6 +380,10 @@ export async function createUser(params: {
   fullName?: string | null;
   email?: string | null;
   isAdmin?: boolean;
+  accountPlan?: AccountPlan;
+  allowBootstrapAdmin?: boolean;
+  emailVerificationRequired?: boolean;
+  emailVerificationToken?: string;
 }): Promise<AppUserRecord> {
   await ensureUsersTable();
 
@@ -278,16 +391,49 @@ export async function createUser(params: {
   const passwordHash = await hash(params.password, 12);
   const fullName = normalizeNullableString(params.fullName);
   const email = normalizeNullableString(params.email)?.toLowerCase() ?? null;
-  const desiredAdmin = params.isAdmin === true || !(await hasAnyAdminUsers());
+  const allowBootstrapAdmin = params.allowBootstrapAdmin !== false;
+  const desiredAdmin = params.isAdmin === true || (allowBootstrapAdmin && !(await hasAnyAdminUsers()));
+  const accountPlan = normalizeAccountPlan(params.accountPlan);
+  const trialExpiresAt = accountPlan === 'trial' ? buildTrialExpiryDate().toISOString() : null;
+  const emailVerificationRequired = params.emailVerificationRequired === true;
+  const emailVerificationToken = emailVerificationRequired
+    ? params.emailVerificationToken || buildEmailVerificationToken()
+    : null;
+  const emailVerificationSentAt = emailVerificationRequired ? new Date().toISOString() : null;
+  const emailVerifiedAt = emailVerificationRequired ? null : new Date().toISOString();
   const pool = getPostgresPool();
 
   const result = await pool.query(
     `
-      INSERT INTO app_users (username, password_hash, full_name, email, is_admin)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING username, full_name, email, is_admin, created_at, updated_at, last_login_at
+      INSERT INTO app_users (
+        username,
+        password_hash,
+        full_name,
+        email,
+        is_admin,
+        account_plan,
+        trial_expires_at,
+        email_verified_at,
+        email_verification_required,
+        email_verification_token,
+        email_verification_sent_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      RETURNING username, full_name, email, is_admin, account_plan, trial_expires_at, email_verified_at, email_verification_required, created_at, updated_at, last_login_at
     `,
-    [username, passwordHash, fullName, email, desiredAdmin]
+    [
+      username,
+      passwordHash,
+      fullName,
+      email,
+      desiredAdmin,
+      accountPlan,
+      trialExpiresAt,
+      emailVerifiedAt,
+      emailVerificationRequired,
+      emailVerificationToken,
+      emailVerificationSentAt,
+    ]
   );
 
   return mapUserRow(result.rows[0] as {
@@ -295,6 +441,10 @@ export async function createUser(params: {
     full_name: string | null;
     email: string | null;
     is_admin: boolean;
+    account_plan: string;
+    trial_expires_at: Date | string | null;
+    email_verified_at: Date | string | null;
+    email_verification_required: boolean;
     created_at: Date | string;
     updated_at: Date | string;
     last_login_at: Date | string | null;
@@ -315,6 +465,94 @@ export async function updateUserPassword(username: string, newPassword: string):
   if (!result.rowCount) {
     throw new Error('USER_NOT_FOUND');
   }
+}
+
+export async function updateUserAccountPlan(
+  username: string,
+  accountPlan: AccountPlan
+): Promise<AppUserRecord> {
+  await ensureUsersTable();
+
+  const normalizedUsername = normalizeUsername(username);
+  const normalizedPlan = normalizeAccountPlan(accountPlan);
+  const trialExpiresAt = normalizedPlan === 'trial' ? buildTrialExpiryDate().toISOString() : null;
+  const pool = getPostgresPool();
+  const result = await pool.query(
+    `
+      UPDATE app_users
+      SET account_plan = $2, trial_expires_at = $3, updated_at = NOW()
+      WHERE username = $1
+      RETURNING username, full_name, email, is_admin, account_plan, trial_expires_at, email_verified_at, email_verification_required, created_at, updated_at, last_login_at
+    `,
+    [normalizedUsername, normalizedPlan, trialExpiresAt]
+  );
+
+  if (!result.rowCount) {
+    throw new Error('USER_NOT_FOUND');
+  }
+
+  return mapUserRow(result.rows[0] as {
+    username: string;
+    full_name: string | null;
+    email: string | null;
+    is_admin: boolean;
+    account_plan: string;
+    trial_expires_at: Date | string | null;
+    email_verified_at: Date | string | null;
+    email_verification_required: boolean;
+    created_at: Date | string;
+    updated_at: Date | string;
+    last_login_at: Date | string | null;
+  });
+}
+
+export async function confirmUserEmailByToken(token: string): Promise<boolean> {
+  await ensureUsersTable();
+
+  const normalizedToken = token.trim();
+  if (!normalizedToken) {
+    return false;
+  }
+
+  const pool = getPostgresPool();
+  const result = await pool.query(
+    `
+      UPDATE app_users
+      SET
+        email_verified_at = NOW(),
+        email_verification_required = FALSE,
+        email_verification_token = NULL,
+        updated_at = NOW()
+      WHERE email_verification_token = $1
+      RETURNING username
+    `,
+    [normalizedToken]
+  );
+
+  return (result.rowCount ?? 0) > 0;
+}
+
+export async function getPendingEmailVerificationToken(username: string): Promise<string | null> {
+  await ensureUsersTable();
+
+  const normalizedUsername = normalizeUsername(username);
+  const pool = getPostgresPool();
+  const result = await pool.query(
+    `
+      SELECT email_verification_token
+      FROM app_users
+      WHERE username = $1 AND email_verification_required = TRUE
+      LIMIT 1
+    `,
+    [normalizedUsername]
+  );
+
+  if (!result.rowCount) {
+    return null;
+  }
+
+  const row = result.rows[0] as { email_verification_token: string | null };
+  return row.email_verification_token;
 }
 
 export async function deleteUser(username: string): Promise<void> {

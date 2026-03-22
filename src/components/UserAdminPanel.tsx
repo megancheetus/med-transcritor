@@ -7,6 +7,14 @@ interface ManagedUser {
   fullName: string | null;
   email: string | null;
   isAdmin: boolean;
+  accountPlan: 'basic' | 'clinical' | 'pro' | 'trial';
+  trialExpiresAt: string | null;
+  trialExpired: boolean;
+  moduleAccess: {
+    transcricao: boolean;
+    teleconsulta: boolean;
+    prontuario: boolean;
+  };
   createdAt: string;
   updatedAt: string;
   lastLoginAt: string | null;
@@ -37,10 +45,14 @@ export default function UserAdminPanel({ currentUsername }: UserAdminPanelProps)
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newUserIsAdmin, setNewUserIsAdmin] = useState(false);
+  const [newAccountPlan, setNewAccountPlan] = useState<'basic' | 'clinical' | 'pro' | 'trial'>('basic');
   const [selectedUsername, setSelectedUsername] = useState('');
+  const [selectedPlanUsername, setSelectedPlanUsername] = useState('');
+  const [selectedPlanValue, setSelectedPlanValue] = useState<'basic' | 'clinical' | 'pro' | 'trial'>('basic');
   const [replacementPassword, setReplacementPassword] = useState('');
   const [isSubmittingCreate, setIsSubmittingCreate] = useState(false);
   const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
+  const [isSubmittingPlan, setIsSubmittingPlan] = useState(false);
   const [deletingUsername, setDeletingUsername] = useState('');
 
   const loadUsers = async () => {
@@ -64,6 +76,17 @@ export default function UserAdminPanel({ currentUsername }: UserAdminPanelProps)
 
         return loadedUsers[0]?.username || '';
       });
+      setSelectedPlanUsername((current) => {
+        if (current && loadedUsers.some((user) => user.username === current)) {
+          return current;
+        }
+
+        return loadedUsers[0]?.username || '';
+      });
+      setSelectedPlanValue((current) => {
+        const selected = loadedUsers.find((u) => u.username === (selectedPlanUsername || loadedUsers[0]?.username));
+        return selected?.accountPlan || current;
+      });
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Não foi possível carregar os usuários');
     } finally {
@@ -74,6 +97,13 @@ export default function UserAdminPanel({ currentUsername }: UserAdminPanelProps)
   useEffect(() => {
     void loadUsers();
   }, []);
+
+  useEffect(() => {
+    const selectedUser = users.find((user) => user.username === selectedPlanUsername);
+    if (selectedUser) {
+      setSelectedPlanValue(selectedUser.accountPlan);
+    }
+  }, [selectedPlanUsername, users]);
 
   const handleCreateUser = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -93,6 +123,7 @@ export default function UserAdminPanel({ currentUsername }: UserAdminPanelProps)
           email: newEmail,
           password: newPassword,
           isAdmin: newUserIsAdmin,
+          accountPlan: newAccountPlan,
         }),
       });
 
@@ -107,6 +138,7 @@ export default function UserAdminPanel({ currentUsername }: UserAdminPanelProps)
       setNewEmail('');
       setNewPassword('');
       setNewUserIsAdmin(false);
+      setNewAccountPlan('basic');
       setSuccessMessage(`Usuário ${data.user.username} cadastrado com sucesso.`);
       await loadUsers();
     } catch (requestError) {
@@ -144,6 +176,36 @@ export default function UserAdminPanel({ currentUsername }: UserAdminPanelProps)
       setError(requestError instanceof Error ? requestError.message : 'Não foi possível trocar a senha');
     } finally {
       setIsSubmittingPassword(false);
+    }
+  };
+
+  const handlePlanUpdate = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError('');
+    setSuccessMessage('');
+    setIsSubmittingPlan(true);
+
+    try {
+      const response = await fetch(`/api/admin/users/${encodeURIComponent(selectedPlanUsername)}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ accountPlan: selectedPlanValue }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Não foi possível atualizar o plano');
+      }
+
+      setSuccessMessage(`Plano da conta ${selectedPlanUsername} atualizado com sucesso.`);
+      await loadUsers();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Não foi possível atualizar o plano');
+    } finally {
+      setIsSubmittingPlan(false);
     }
   };
 
@@ -233,6 +295,25 @@ export default function UserAdminPanel({ currentUsername }: UserAdminPanelProps)
               required
               disabled={isSubmittingCreate}
             />
+          </div>
+
+          <div>
+            <label htmlFor="new-account-plan" className="block text-xs font-semibold text-[#4b6573] uppercase tracking-wide mb-2">
+              Plano da conta
+            </label>
+            <select
+              id="new-account-plan"
+              value={newAccountPlan}
+              onChange={(event) => setNewAccountPlan(event.target.value as 'basic' | 'clinical' | 'pro' | 'trial')}
+              className="w-full px-4 py-3 text-sm border border-[#cfe0e8] rounded-lg focus:outline-none focus:border-[#1ea58c] bg-white"
+              disabled={isSubmittingCreate}
+              required
+            >
+              <option value="basic">Básico (Transcrição)</option>
+              <option value="clinical">Clínico (Transcrição + Teleconsulta)</option>
+              <option value="pro">Pró (Todos os módulos)</option>
+              <option value="trial">Teste (3 dias - acesso completo)</option>
+            </select>
           </div>
 
           <div>
@@ -326,6 +407,63 @@ export default function UserAdminPanel({ currentUsername }: UserAdminPanelProps)
         </form>
       </div>
 
+      <form onSubmit={handlePlanUpdate} className="bg-white border border-[#cfe0e8] rounded-xl p-6 shadow-sm space-y-4">
+        <div>
+          <h3 className="text-lg font-bold text-[#155b79]">Editar plano de usuário existente</h3>
+          <p className="text-sm text-[#4b6573] mt-1">Atualize o plano contratado para refletir os módulos liberados da conta.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="selected-plan-username" className="block text-xs font-semibold text-[#4b6573] uppercase tracking-wide mb-2">
+              Usuário
+            </label>
+            <select
+              id="selected-plan-username"
+              value={selectedPlanUsername}
+              onChange={(event) => setSelectedPlanUsername(event.target.value)}
+              className="w-full px-4 py-3 text-sm border border-[#cfe0e8] rounded-lg focus:outline-none focus:border-[#1ea58c] bg-white"
+              disabled={isSubmittingPlan || users.length === 0}
+              required
+            >
+              {users.length === 0 && <option value="">Nenhum usuário disponível</option>}
+              {users.map((user) => (
+                <option key={user.username} value={user.username}>
+                  {user.username}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="selected-plan-value" className="block text-xs font-semibold text-[#4b6573] uppercase tracking-wide mb-2">
+              Novo plano
+            </label>
+            <select
+              id="selected-plan-value"
+              value={selectedPlanValue}
+              onChange={(event) => setSelectedPlanValue(event.target.value as 'basic' | 'clinical' | 'pro' | 'trial')}
+              className="w-full px-4 py-3 text-sm border border-[#cfe0e8] rounded-lg focus:outline-none focus:border-[#1ea58c] bg-white"
+              disabled={isSubmittingPlan || users.length === 0}
+              required
+            >
+              <option value="basic">Básico (Transcrição)</option>
+              <option value="clinical">Clínico (Transcrição + Teleconsulta)</option>
+              <option value="pro">Pró (Todos os módulos)</option>
+              <option value="trial">Teste (3 dias - acesso completo)</option>
+            </select>
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={isSubmittingPlan || users.length === 0 || !selectedPlanUsername}
+          className="w-full md:w-auto bg-[#155b79] hover:bg-[#124e68] text-white text-sm font-bold px-6 py-3 rounded-lg transition disabled:opacity-50"
+        >
+          {isSubmittingPlan ? 'Atualizando plano...' : 'Salvar plano'}
+        </button>
+      </form>
+
       {(error || successMessage) && (
         <div className={`rounded-xl border px-4 py-3 text-sm font-medium ${error ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
           {error || successMessage}
@@ -356,6 +494,9 @@ export default function UserAdminPanel({ currentUsername }: UserAdminPanelProps)
                 <th className="px-6 py-3 text-xs font-semibold text-[#4b6573] uppercase tracking-wider">Nome</th>
                 <th className="px-6 py-3 text-xs font-semibold text-[#4b6573] uppercase tracking-wider">E-mail</th>
                 <th className="px-6 py-3 text-xs font-semibold text-[#4b6573] uppercase tracking-wider">Perfil</th>
+                <th className="px-6 py-3 text-xs font-semibold text-[#4b6573] uppercase tracking-wider">Plano</th>
+                <th className="px-6 py-3 text-xs font-semibold text-[#4b6573] uppercase tracking-wider">Validade teste</th>
+                <th className="px-6 py-3 text-xs font-semibold text-[#4b6573] uppercase tracking-wider">Módulos</th>
                 <th className="px-6 py-3 text-xs font-semibold text-[#4b6573] uppercase tracking-wider">Último acesso</th>
                 <th className="px-6 py-3 text-xs font-semibold text-[#4b6573] uppercase tracking-wider text-right">Ações</th>
               </tr>
@@ -363,7 +504,7 @@ export default function UserAdminPanel({ currentUsername }: UserAdminPanelProps)
             <tbody className="divide-y divide-[#edf4f6]">
               {!isLoading && users.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-6 text-sm text-[#4b6573]">
+                  <td colSpan={9} className="px-6 py-6 text-sm text-[#4b6573]">
                     Nenhum usuário encontrado.
                   </td>
                 </tr>
@@ -380,6 +521,27 @@ export default function UserAdminPanel({ currentUsername }: UserAdminPanelProps)
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.isAdmin ? 'bg-[#e5f4f8] text-[#155b79]' : 'bg-[#effaf7] text-[#1ea58c]'}`}>
                         {user.isAdmin ? 'Administrador' : 'Usuário padrão'}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-[#4b6573]">
+                      {user.accountPlan === 'pro'
+                        ? 'Pró'
+                        : user.accountPlan === 'clinical'
+                          ? 'Clínico'
+                          : user.accountPlan === 'trial'
+                            ? 'Teste'
+                            : 'Básico'}
+                    </td>
+                    <td className="px-6 py-4 text-xs text-[#4b6573]">
+                      {user.accountPlan === 'trial'
+                        ? user.trialExpiresAt
+                          ? `${formatDate(user.trialExpiresAt)}${user.trialExpired ? ' (expirado)' : ''}`
+                          : 'Sem data'
+                        : '-'}
+                    </td>
+                    <td className="px-6 py-4 text-xs text-[#4b6573]">
+                      {user.moduleAccess.transcricao ? 'Transcrição' : ''}
+                      {user.moduleAccess.teleconsulta ? `${user.moduleAccess.transcricao ? ', ' : ''}Teleconsulta` : ''}
+                      {user.moduleAccess.prontuario ? `${user.moduleAccess.transcricao || user.moduleAccess.teleconsulta ? ', ' : ''}Prontuário` : ''}
                     </td>
                     <td className="px-6 py-4 text-sm text-[#4b6573]">{formatDate(user.lastLoginAt)}</td>
                     <td className="px-6 py-4 text-right">

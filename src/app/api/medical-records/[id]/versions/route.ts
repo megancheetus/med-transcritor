@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUsernameFromAuthToken } from '@/lib/auth';
+import { getAuthenticatedUserFromRequest } from '@/lib/authSession';
 import {
   getMedicalRecordVersions,
   initializeMedicalRecordsTable,
@@ -28,11 +28,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return rateLimitResponse;
     }
 
-    const authToken = request.cookies.get('auth_token')?.value;
-    const username = await getUsernameFromAuthToken(authToken);
+    const user = await getAuthenticatedUserFromRequest(request);
 
-    if (!username) {
+    if (!user) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+
+    if (!user.isAdmin && !user.moduleAccess.prontuario) {
+      return NextResponse.json({ error: 'Seu plano não possui acesso ao módulo de prontuário' }, { status: 403 });
     }
 
     await initializeMedicalRecordsTable();
@@ -43,11 +46,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     const { id } = idValidation.data;
-    const versions = await getMedicalRecordVersions(id, username);
+    const versions = await getMedicalRecordVersions(id, user.username);
 
     const auditContext = getRequestAuditContext(request);
     await logMedicalRecordAudit({
-      username,
+      username: user.username,
       action: 'view_versions',
       resourceType: 'medical_record',
       resourceId: id,

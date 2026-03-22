@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useCallback, useRef } from 'react';
 import { Search, Users, Plus } from 'lucide-react';
 import { Patient } from '@/lib/types';
 
@@ -8,21 +8,41 @@ interface PatientListProps {
   patients: Patient[];
   selectedPatient: Patient | null;
   onSelectPatient: (patient: Patient) => void;
+  searchQuery: string;
+  onSearchQueryChange: (query: string) => void;
+  onLoadMore: () => void;
+  hasMore: boolean;
+  isLoading: boolean;
+  isLoadingMore: boolean;
   onAddClick?: () => void;
 }
 
-export function PatientList({ patients, selectedPatient, onSelectPatient, onAddClick }: PatientListProps) {
-  const [searchQuery, setSearchQuery] = useState('');
+export function PatientList({
+  patients,
+  selectedPatient,
+  onSelectPatient,
+  searchQuery,
+  onSearchQueryChange,
+  onLoadMore,
+  hasMore,
+  isLoading,
+  isLoadingMore,
+  onAddClick,
+}: PatientListProps) {
+  const listRef = useRef<HTMLDivElement | null>(null);
 
-  const filteredPatients = useMemo(() => {
-    const lowerQuery = searchQuery.toLowerCase();
-    return patients.filter(
-      (patient) =>
-        patient.nome.toLowerCase().includes(lowerQuery) ||
-        patient.nomeCompleto.toLowerCase().includes(lowerQuery) ||
-        patient.cpf.includes(searchQuery)
-    );
-  }, [patients, searchQuery]);
+  const handleListScroll = useCallback(() => {
+    if (!hasMore || isLoadingMore || !listRef.current) {
+      return;
+    }
+
+    const { scrollTop, scrollHeight, clientHeight } = listRef.current;
+    const distanceToBottom = scrollHeight - scrollTop - clientHeight;
+
+    if (distanceToBottom < 120) {
+      onLoadMore();
+    }
+  }, [hasMore, isLoadingMore, onLoadMore]);
 
   return (
     <div className="flex h-full flex-col border-r border-slate-200 bg-white">
@@ -52,21 +72,25 @@ export function PatientList({ patients, selectedPatient, onSelectPatient, onAddC
             type="text"
             placeholder="Buscar por nome ou CPF..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => onSearchQueryChange(e.target.value)}
             className="w-full rounded-lg border border-slate-300 bg-slate-50 py-2 pl-9 pr-3 text-sm placeholder-slate-500 transition focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-200"
           />
         </div>
       </div>
 
       {/* Patient List */}
-      <div className="flex-1 overflow-y-auto">
-        {filteredPatients.length === 0 ? (
+      <div ref={listRef} onScroll={handleListScroll} className="flex-1 overflow-y-auto">
+        {isLoading ? (
+          <div className="flex h-32 items-center justify-center px-4 py-8 text-center">
+            <p className="text-sm text-slate-500">Carregando pacientes...</p>
+          </div>
+        ) : patients.length === 0 ? (
           <div className="flex h-32 items-center justify-center px-4 py-8 text-center">
             <p className="text-sm text-slate-500">Nenhum paciente encontrado</p>
           </div>
         ) : (
           <ul className="divide-y divide-slate-200">
-            {filteredPatients.map((patient) => (
+            {patients.map((patient) => (
               <li key={patient.id}>
                 <button
                   onClick={() => onSelectPatient(patient)}
@@ -89,6 +113,18 @@ export function PatientList({ patients, selectedPatient, onSelectPatient, onAddC
                 </button>
               </li>
             ))}
+
+            {isLoadingMore && (
+              <li className="px-4 py-3 text-center text-xs text-slate-500">
+                Carregando mais pacientes...
+              </li>
+            )}
+
+            {!hasMore && patients.length > 0 && (
+              <li className="px-4 py-3 text-center text-xs text-slate-400">
+                Fim da lista
+              </li>
+            )}
           </ul>
         )}
       </div>
@@ -96,7 +132,7 @@ export function PatientList({ patients, selectedPatient, onSelectPatient, onAddC
       {/* Footer */}
       <div className="border-t border-slate-200 bg-slate-50 px-4 py-3">
         <p className="text-xs text-slate-500">
-          {filteredPatients.length} de {patients.length} paciente(s)
+          {patients.length} paciente(s) carregado(s)
         </p>
       </div>
     </div>

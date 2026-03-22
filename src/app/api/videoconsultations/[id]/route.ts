@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUsernameFromAuthToken } from '@/lib/auth';
+import { getAuthenticatedUserFromRequest } from '@/lib/authSession';
 import {
   getVideoConsultaRoom,
   getVideoConsultaRoomByToken,
@@ -24,9 +24,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
     console.log(`GET /api/videoconsultations/${id}`);
     
     // Tentar autenticar (opcional - paciente pode estar não autenticado)
-    const authToken = request.cookies.get('auth_token')?.value;
-    const username = await getUsernameFromAuthToken(authToken);
+    const user = await getAuthenticatedUserFromRequest(request);
+    const username = user?.username || null;
     console.log(`Usuário autenticado: ${username || 'não-autenticado'}`);
+
+    if (user && !user.isAdmin && !user.moduleAccess.teleconsulta) {
+      return NextResponse.json({ error: 'Seu plano não possui acesso ao módulo de teleconsulta' }, { status: 403 });
+    }
 
     // Tentar obter pelo ID (autenticado)
     if (username) {
@@ -81,13 +85,17 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const { status, action, duracaoSegundos, foiGravada, transcricaoId, token } = body;
 
     // Autenticação
-    const authToken = request.cookies.get('auth_token')?.value;
-    const username = await getUsernameFromAuthToken(authToken);
+    const user = await getAuthenticatedUserFromRequest(request);
+    const username = user?.username || null;
 
     // Ações disponíveis
     if (action === 'start') {
       if (!username) {
         return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+      }
+
+      if (!user?.isAdmin && !user?.moduleAccess.teleconsulta) {
+        return NextResponse.json({ error: 'Seu plano não possui acesso ao módulo de teleconsulta' }, { status: 403 });
       }
 
       // Iniciar a consutla (mudar status para active)
@@ -103,6 +111,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (action === 'end') {
       if (!username) {
         return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+      }
+
+      if (!user?.isAdmin && !user?.moduleAccess.teleconsulta) {
+        return NextResponse.json({ error: 'Seu plano não possui acesso ao módulo de teleconsulta' }, { status: 403 });
       }
 
       // Encerrar a consulta
@@ -144,6 +156,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
       }
 
+      if (!user?.isAdmin && !user?.moduleAccess.teleconsulta) {
+        return NextResponse.json({ error: 'Seu plano não possui acesso ao módulo de teleconsulta' }, { status: 403 });
+      }
+
       // Atualizar status genérico
       const updated = await updateVideoConsultaRoomStatus(id, status, username);
       return NextResponse.json({
@@ -176,11 +192,15 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     const { id } = await context.params;
 
     // Autenticação
-    const authToken = request.cookies.get('auth_token')?.value;
-    const username = await getUsernameFromAuthToken(authToken);
+    const user = await getAuthenticatedUserFromRequest(request);
+    const username = user?.username || null;
 
     if (!username) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+    }
+
+    if (!user?.isAdmin && !user?.moduleAccess.teleconsulta) {
+      return NextResponse.json({ error: 'Seu plano não possui acesso ao módulo de teleconsulta' }, { status: 403 });
     }
 
     // Obter sala para validar propriedade

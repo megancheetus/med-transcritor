@@ -15,7 +15,7 @@ import {
   History,
   X,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 interface PatientDashboardProps {
   patient: Patient;
@@ -23,6 +23,7 @@ interface PatientDashboardProps {
   onAddMedicalRecord?: () => void;
   onStartTeleconsulta?: () => void;
   onDeletePatient?: () => void;
+  refreshKey?: number;
 }
 
 interface MedicalRecordVersionItem {
@@ -33,6 +34,29 @@ interface MedicalRecordVersionItem {
   changedBy: string;
   changeReason?: string;
   createdAt: string;
+}
+
+const MEDICAL_RECORDS_PAGE_SIZE = 20;
+const DOCUMENT_TYPE_FILTERS: Array<MedicalRecord['tipoDocumento']> = [
+  'Consulta',
+  'Exame',
+  'Procedimento',
+  'Prescrição',
+  'Internação',
+];
+
+function mergeUniqueRecords(current: MedicalRecord[], incoming: MedicalRecord[]): MedicalRecord[] {
+  const map = new Map<string, MedicalRecord>();
+
+  for (const record of current) {
+    map.set(record.id, record);
+  }
+
+  for (const record of incoming) {
+    map.set(record.id, record);
+  }
+
+  return Array.from(map.values());
 }
 
 function getDocumentIcon(tipoDocumento: string) {
@@ -117,40 +141,124 @@ export function PatientDashboard({
   onAddMedicalRecord,
   onStartTeleconsulta,
   onDeletePatient,
+  refreshKey = 0,
 }: PatientDashboardProps) {
   const [records, setRecords] = useState<MedicalRecord[]>([]);
+  const [recordsCursor, setRecordsCursor] = useState<string | null>(null);
+  const [hasMoreRecords, setHasMoreRecords] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [filters, setFilters] = useState({
+    tipoDocumento: '',
+    profissional: '',
+    dateFrom: '',
+    dateTo: '',
+  });
+  const [debouncedProfissional, setDebouncedProfissional] = useState('');
   const [versions, setVersions] = useState<MedicalRecordVersionItem[]>([]);
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
   const [versionsError, setVersionsError] = useState<string | null>(null);
   const [selectedRecordForVersions, setSelectedRecordForVersions] = useState<MedicalRecord | null>(null);
+  const timelineRef = useRef<HTMLDivElement | null>(null);
 
-  // Carrega registros médicos do servidor
+  const normalizedFilters = useMemo(
+    () => ({
+      tipoDocumento: filters.tipoDocumento,
+      profissional: debouncedProfissional.trim(),
+      dateFrom: filters.dateFrom,
+      dateTo: filters.dateTo,
+    }),
+    [debouncedProfissional, filters.dateFrom, filters.dateTo, filters.tipoDocumento]
+  );
+
   useEffect(() => {
-    const fetchRecords = async () => {
+    const timeout = setTimeout(() => {
+      setDebouncedProfissional(filters.profissional);
+    }, 350);
+
+    return () => clearTimeout(timeout);
+  }, [filters.profissional]);
+
+  const fetchRecords = useCallback(
+    async (options?: { reset?: boolean; cursor?: string | null }) => {
+      const shouldReset = options?.reset ?? false;
+      const cursor = options?.cursor || null;
+
       try {
-        setIsLoading(true);
+        if (shouldReset) {
+          setIsLoading(true);
+        } else {
+          setIsLoadingMore(true);
+        }
+
         setError(null);
 
-        const response = await fetch(`/api/medical-records?patientId=${patient.id}`);
+        const params = new URLSearchParams();
+        params.set('patientId', patient.id);
+        params.set('limit', String(MEDICAL_RECORDS_PAGE_SIZE));
+
+        if (!shouldReset && cursor) {
+          params.set('cursor', cursor);
+        }
+
+        if (normalizedFilters.tipoDocumento) {
+          params.set('tipoDocumento', normalizedFilters.tipoDocumento);
+        }
+
+        if (normalizedFilters.profissional) {
+          params.set('profissional', normalizedFilters.profissional);
+        }
+
+        if (normalizedFilters.dateFrom) {
+          params.set('dateFrom', normalizedFilters.dateFrom);
+        }
+
+        if (normalizedFilters.dateTo) {
+          params.set('dateTo', normalizedFilters.dateTo);
+        }
+
+        const response = await fetch(`/api/medical-records?${params.toString()}`);
 
         if (!response.ok) {
           throw new Error('Erro ao buscar registros médicos');
         }
 
         const data = await response.json();
-        setRecords(data.records || []);
+        const fetchedRecords: MedicalRecord[] = Array.isArray(data?.records) ? data.records : [];
+
+        setRecords((prev) =>
+          shouldReset ? fetchedRecords : mergeUniqueRecords(prev, fetchedRecords)
+        );
+        setRecordsCursor(typeof data?.nextCursor === 'string' ? data.nextCursor : null);
+        setHasMoreRecords(Boolean(data?.hasMore));
       } catch (err) {
         console.error('Erro ao carregar registros:', err);
         setError(err instanceof Error ? err.message : 'Erro desconhecido');
       } finally {
         setIsLoading(false);
+        setIsLoadingMore(false);
       }
-    };
+    },
+    [normalizedFilters, patient.id]
+  );
 
-    fetchRecords();
-  }, [patient.id]);
+  useEffect(() => {
+    fetchRecords({ reset: true, cursor: null });
+  }, [fetchRecords, refreshKey]);
+
+  const handleTimelineScroll = useCallback(() => {
+    if (!timelineRef.current || isLoading || isLoadingMore || !hasMoreRecords) {
+      return;
+    }
+
+    const { scrollTop, scrollHeight, clientHeight } = timelineRef.current;
+    const distanceToBottom = scrollHeight - scrollTop - clientHeight;
+
+    if (distanceToBottom < 160) {
+      fetchRecords({ reset: false, cursor: recordsCursor });
+    }
+  }, [fetchRecords, hasMoreRecords, isLoading, isLoadingMore, recordsCursor]);
 
   const handleDeleteRecord = async (recordId: string) => {
     if (!confirm('Tem certeza que deseja deletar este registro?')) return;
@@ -286,7 +394,10 @@ export function PatientDashboard({
           </div>
           <div className="rounded-lg bg-slate-50 p-3">
             <p className="text-xs font-medium text-slate-600">Registros</p>
-            <p className="mt-1 text-lg font-semibold text-slate-900">{records.length}</p>
+            <p className="mt-1 text-lg font-semibold text-slate-900">
+              {records.length}
+              {hasMoreRecords ? '+' : ''}
+            </p>
           </div>
         </div>
 
@@ -310,12 +421,57 @@ export function PatientDashboard({
       </div>
 
       {/* Timeline */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div ref={timelineRef} onScroll={handleTimelineScroll} className="flex-1 overflow-y-auto p-6">
         {error && (
           <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700 border border-red-200">
             {error}
           </div>
         )}
+
+        <div className="mb-5 grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-4">
+          <select
+            value={filters.tipoDocumento}
+            onChange={(event) =>
+              setFilters((prev) => ({ ...prev, tipoDocumento: event.target.value }))
+            }
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
+          >
+            <option value="">Todos os tipos</option>
+            {DOCUMENT_TYPE_FILTERS.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="text"
+            value={filters.profissional}
+            onChange={(event) =>
+              setFilters((prev) => ({ ...prev, profissional: event.target.value }))
+            }
+            placeholder="Filtrar por profissional"
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 placeholder-slate-400 focus:border-blue-500 focus:outline-none"
+          />
+
+          <input
+            type="date"
+            value={filters.dateFrom}
+            onChange={(event) =>
+              setFilters((prev) => ({ ...prev, dateFrom: event.target.value }))
+            }
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
+          />
+
+          <input
+            type="date"
+            value={filters.dateTo}
+            onChange={(event) =>
+              setFilters((prev) => ({ ...prev, dateTo: event.target.value }))
+            }
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
+          />
+        </div>
 
         {isLoading ? (
           <div className="flex h-40 items-center justify-center">
@@ -407,6 +563,14 @@ export function PatientDashboard({
                   </div>
                 </div>
               ))}
+
+              {isLoadingMore && (
+                <div className="pl-2 text-xs text-slate-500">Carregando mais registros...</div>
+              )}
+
+              {!hasMoreRecords && records.length > 0 && (
+                <div className="pl-2 text-xs text-slate-400">Fim dos registros carregados</div>
+              )}
             </div>
           </div>
         )}

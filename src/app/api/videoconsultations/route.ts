@@ -1,11 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUsernameFromAuthToken } from '@/lib/auth';
+import { getAuthenticatedUserFromRequest } from '@/lib/authSession';
+import { createPatient, getPatientById, initializePatientsTable } from '@/lib/patientManager';
 import {
   createVideoConsultaRoom,
   getVideoConsultasOfProfessional,
   getVideoConsultasOfPatient,
   initializeVideoConsultationTables,
 } from '@/lib/videoConsultationManager';
+
+function digitsOnly(value: string): string {
+  return value.replace(/\D/g, '');
+}
+
+function buildSyntheticCpf(): string {
+  const seed = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+  const digits = seed.slice(-11).padStart(11, '0');
+  return digits;
+}
 
 /**
  * GET /api/videoconsultations
@@ -14,11 +25,14 @@ import {
 export async function GET(request: NextRequest) {
   try {
     // Autenticação
-    const authToken = request.cookies.get('auth_token')?.value;
-    const username = await getUsernameFromAuthToken(authToken);
+    const user = await getAuthenticatedUserFromRequest(request);
 
-    if (!username) {
+    if (!user) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+    }
+
+    if (!user.isAdmin && !user.moduleAccess.teleconsulta) {
+      return NextResponse.json({ error: 'Seu plano não possui acesso ao módulo de teleconsulta' }, { status: 403 });
     }
 
     // Query params
@@ -31,10 +45,10 @@ export async function GET(request: NextRequest) {
 
     if (patientId) {
       // Listar teleconsultas de um paciente específico
-      consultations = await getVideoConsultasOfPatient(patientId, username);
+      consultations = await getVideoConsultasOfPatient(patientId, user.username);
     } else {
       // Listar teleconsultas onde o usuário é profissional
-      consultations = await getVideoConsultasOfProfessional(username);
+      consultations = await getVideoConsultasOfProfessional(user.username);
     }
 
     return NextResponse.json({
@@ -59,30 +73,67 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Autenticação
-    const authToken = request.cookies.get('auth_token')?.value;
-    const username = await getUsernameFromAuthToken(authToken);
+    const user = await getAuthenticatedUserFromRequest(request);
 
-    if (!username) {
+    if (!user) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+    }
+
+    if (!user.isAdmin && !user.moduleAccess.teleconsulta) {
+      return NextResponse.json({ error: 'Seu plano não possui acesso ao módulo de teleconsulta' }, { status: 403 });
     }
 
     // Parse body
     const body = await request.json();
-    const { patientId } = body;
+    const { patientId, patientName, patientCpf } = body as {
+      patientId?: unknown;
+      patientName?: unknown;
+      patientCpf?: unknown;
+    };
 
     // Validação
-    if (!patientId || typeof patientId !== 'string') {
+    if ((typeof patientId !== 'string' || !patientId.trim()) && (typeof patientName !== 'string' || !patientName.trim())) {
       return NextResponse.json(
-        { error: 'patient_id é obrigatório' },
+        { error: 'Informe patientId ou patientName para criar a teleconsulta' },
         { status: 400 }
       );
     }
 
     // Inicializar tabelas se necessário
     await initializeVideoConsultationTables();
+    await initializePatientsTable();
+
+    let resolvedPatientId = typeof patientId === 'string' ? patientId.trim() : '';
+
+    if (resolvedPatientId) {
+      const existingPatient = await getPatientById(resolvedPatientId, user.username);
+
+      if (!existingPatient) {
+        return NextResponse.json(
+          { error: 'Paciente não encontrado para esta conta' },
+          { status: 404 }
+        );
+      }
+    } else {
+      const fullName = String(patientName).trim();
+      const firstName = fullName.split(' ').filter(Boolean)[0] || 'Paciente';
+      const cpfInput = typeof patientCpf === 'string' ? digitsOnly(patientCpf) : '';
+      const cpf = cpfInput.length === 11 ? cpfInput : buildSyntheticCpf();
+
+      const createdPatient = await createPatient(user.username, {
+        nome: firstName,
+        nomeCompleto: fullName,
+        idade: 0,
+        sexo: 'Outro',
+        cpf,
+        dataNascimento: '1900-01-01',
+      });
+
+      resolvedPatientId = createdPatient.id;
+    }
 
     // Criar sala
-    const room = await createVideoConsultaRoom(username, patientId);
+    const room = await createVideoConsultaRoom(user.username, resolvedPatientId);
 
     // Gerar URL de acesso
     const joinUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/teleconsulta/${room.id}`;

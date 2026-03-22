@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUsernameFromAuthToken } from '@/lib/auth';
+import { getAuthenticatedUserFromRequest } from '@/lib/authSession';
 import {
   getPatientById,
   updatePatient,
@@ -31,11 +31,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return rateLimitResponse;
     }
 
-    const authToken = request.cookies.get('auth_token')?.value;
-    const username = await getUsernameFromAuthToken(authToken);
+    const user = await getAuthenticatedUserFromRequest(request);
 
-    if (!username) {
+    if (!user) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+
+    if (!user.isAdmin && !user.moduleAccess.prontuario) {
+      return NextResponse.json({ error: 'Seu plano não possui acesso ao módulo de prontuário' }, { status: 403 });
     }
 
     const idValidation = parseWithSchema(routeIdSchema, await params);
@@ -45,7 +48,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const { id } = idValidation.data;
 
-    const patient = await getPatientById(id, username);
+    const patient = await getPatientById(id, user.username);
 
     if (!patient) {
       return NextResponse.json(
@@ -80,11 +83,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return rateLimitResponse;
     }
 
-    const authToken = request.cookies.get('auth_token')?.value;
-    const username = await getUsernameFromAuthToken(authToken);
+    const user = await getAuthenticatedUserFromRequest(request);
 
-    if (!username) {
+    if (!user) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+
+    if (!user.isAdmin && !user.moduleAccess.prontuario) {
+      return NextResponse.json({ error: 'Seu plano não possui acesso ao módulo de prontuário' }, { status: 403 });
     }
 
     const idValidation = parseWithSchema(routeIdSchema, await params);
@@ -101,7 +107,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     const payload = payloadValidation.data;
 
-    const patient = await updatePatient(id, username, payload);
+    const patient = await updatePatient(id, user.username, payload);
 
     if (!patient) {
       return NextResponse.json(
@@ -147,11 +153,14 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       return rateLimitResponse;
     }
 
-    const authToken = request.cookies.get('auth_token')?.value;
-    const username = await getUsernameFromAuthToken(authToken);
+    const user = await getAuthenticatedUserFromRequest(request);
 
-    if (!username) {
+    if (!user) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+
+    if (!user.isAdmin && !user.moduleAccess.prontuario) {
+      return NextResponse.json({ error: 'Seu plano não possui acesso ao módulo de prontuário' }, { status: 403 });
     }
 
     const idValidation = parseWithSchema(routeIdSchema, await params);
@@ -161,7 +170,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     const { id } = idValidation.data;
 
-    const success = await deletePatient(id, username);
+    const success = await deletePatient(id, user.username);
 
     if (!success) {
       return NextResponse.json(

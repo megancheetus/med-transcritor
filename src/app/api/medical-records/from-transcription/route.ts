@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUsernameFromAuthToken } from '@/lib/auth';
+import { getAuthenticatedUserFromRequest } from '@/lib/authSession';
 import {
   createMedicalRecord,
   initializeMedicalRecordsTable,
@@ -97,11 +97,14 @@ export async function POST(request: NextRequest) {
       return rateLimitResponse;
     }
 
-    const authToken = request.cookies.get('auth_token')?.value;
-    const username = await getUsernameFromAuthToken(authToken);
+    const user = await getAuthenticatedUserFromRequest(request);
 
-    if (!username) {
+    if (!user) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+
+    if (!user.isAdmin && !user.moduleAccess.prontuario) {
+      return NextResponse.json({ error: 'Seu plano não possui acesso ao módulo de prontuário' }, { status: 403 });
     }
 
     const payloadValidation = parseWithSchema(
@@ -125,7 +128,7 @@ export async function POST(request: NextRequest) {
     await initializePatientsTable();
     await initializeMedicalRecordsTable();
 
-    const patient = await getPatientById(payload.patientId, username);
+    const patient = await getPatientById(payload.patientId, user.username);
 
     if (!patient) {
       return NextResponse.json(
@@ -136,7 +139,7 @@ export async function POST(request: NextRequest) {
 
     const reviewedAt = payload.clinicianReviewed ? new Date().toISOString() : undefined;
 
-    const record = await createMedicalRecord(payload.patientId, username, {
+    const record = await createMedicalRecord(payload.patientId, user.username, {
       patientId: payload.patientId,
       data: payload.data,
       tipoDocumento: payload.tipoDocumento,
@@ -153,7 +156,7 @@ export async function POST(request: NextRequest) {
 
     const auditContext = getRequestAuditContext(request);
     await logMedicalRecordAudit({
-      username,
+      username: user.username,
       action: 'create',
       resourceType: 'medical_record',
       resourceId: record.id,

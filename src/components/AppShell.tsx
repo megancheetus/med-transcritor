@@ -13,9 +13,9 @@ interface AppShellProps {
 
 const BASE_MENU_ITEMS = [
   { href: '/dashboard', label: 'Dashboard' },
-  { href: '/transcricao', label: 'Transcrição' },
-  { href: '/prontuario', label: 'Prontuário' },
-  { href: '/teleconsulta', label: 'Teleconsulta' },
+  { href: '/transcricao', label: 'Transcrição', module: 'transcricao' as const },
+  { href: '/prontuario', label: 'Prontuário', module: 'prontuario' as const },
+  { href: '/teleconsulta', label: 'Teleconsulta', module: 'teleconsulta' as const },
   { href: '/historico', label: 'Histórico' },
   { href: '/perfil', label: 'Perfil' },
 ];
@@ -24,7 +24,15 @@ const ADMIN_MENU_ITEM = { href: '/admin', label: 'Administração' };
 
 interface SessionUser {
   username: string;
+  fullName: string | null;
   isAdmin: boolean;
+  accountPlan: 'basic' | 'clinical' | 'pro' | 'trial';
+  trialExpired: boolean;
+  moduleAccess: {
+    transcricao: boolean;
+    teleconsulta: boolean;
+    prontuario: boolean;
+  };
 }
 
 export default function AppShell({ title, subtitle, children }: AppShellProps) {
@@ -63,7 +71,19 @@ export default function AppShell({ title, subtitle, children }: AppShellProps) {
     };
   }, []);
 
-  const menuItems = sessionUser?.isAdmin ? [...BASE_MENU_ITEMS, ADMIN_MENU_ITEM] : BASE_MENU_ITEMS;
+  const menuItems = BASE_MENU_ITEMS.filter((item) => {
+    if (!('module' in item) || !item.module) {
+      return true;
+    }
+
+    if (!sessionUser) {
+      return true;
+    }
+
+    return sessionUser.isAdmin || sessionUser.moduleAccess[item.module];
+  });
+
+  const menuItemsWithAdmin = sessionUser?.isAdmin ? [...menuItems, ADMIN_MENU_ITEM] : menuItems;
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout');
@@ -74,9 +94,11 @@ export default function AppShell({ title, subtitle, children }: AppShellProps) {
     setIsMobileMenuOpen(false);
   };
 
+  const sessionDisplayName = sessionUser?.fullName?.trim() || sessionUser?.username || '';
+
   const renderMenu = (mobile: boolean = false) => (
     <nav className="p-4 space-y-1">
-      {menuItems.map((item) => {
+      {menuItemsWithAdmin.map((item) => {
         const active = pathname === item.href;
         return (
           <Link
@@ -129,8 +151,8 @@ export default function AppShell({ title, subtitle, children }: AppShellProps) {
             {sessionUser && (
               <div className="mt-3 rounded-lg border border-[#edf4f6] bg-[#f7fbfc] px-3 py-2">
                 <p className="text-xs font-semibold text-[#4b6573] uppercase tracking-wide">Sessão atual</p>
-                <p className="text-sm font-medium text-[#0c161c] mt-1">{sessionUser.username}</p>
-                <p className="text-xs text-[#1ea58c] mt-1">{sessionUser.isAdmin ? 'Administrador' : 'Usuário padrão'}</p>
+                <p className="text-sm font-medium text-[#0c161c] mt-1">{sessionDisplayName}</p>
+                <p className="text-xs text-[#1ea58c] mt-1">{sessionUser.isAdmin ? 'Administrador' : sessionUser.accountPlan === 'trial' ? 'Plano Teste' : sessionUser.accountPlan === 'pro' ? 'Plano Pró' : sessionUser.accountPlan === 'clinical' ? 'Plano Clínico' : 'Plano Básico'}</p>
               </div>
             )}
           </div>
@@ -160,8 +182,8 @@ export default function AppShell({ title, subtitle, children }: AppShellProps) {
           {sessionUser && (
             <div className="mt-4 rounded-lg border border-[#edf4f6] bg-[#f7fbfc] px-3 py-3">
               <p className="text-xs font-semibold text-[#4b6573] uppercase tracking-wide">Sessão atual</p>
-              <p className="text-sm font-medium text-[#0c161c] mt-1">{sessionUser.username}</p>
-              <p className="text-xs text-[#1ea58c] mt-1">{sessionUser.isAdmin ? 'Administrador' : 'Usuário padrão'}</p>
+              <p className="text-sm font-medium text-[#0c161c] mt-1">{sessionDisplayName}</p>
+              <p className="text-xs text-[#1ea58c] mt-1">{sessionUser.isAdmin ? 'Administrador' : sessionUser.accountPlan === 'trial' ? 'Plano Teste' : sessionUser.accountPlan === 'pro' ? 'Plano Pró' : sessionUser.accountPlan === 'clinical' ? 'Plano Clínico' : 'Plano Básico'}</p>
             </div>
           )}
         </div>

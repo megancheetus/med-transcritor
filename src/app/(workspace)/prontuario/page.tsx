@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Patient, MedicalRecord } from '@/lib/types';
 import { PatientList } from '@/components/PatientList';
@@ -11,41 +11,123 @@ import { AddPatientModal } from '@/components/AddPatientModal';
 import { EditPatientModal } from '@/components/EditPatientModal';
 import { AddMedicalRecordModal } from '@/components/AddMedicalRecordModal';
 
+const PATIENTS_PAGE_SIZE = 30;
+
+function mergeUniquePatients(current: Patient[], incoming: Patient[]): Patient[] {
+  const map = new Map<string, Patient>();
+
+  for (const patient of current) {
+    map.set(patient.id, patient);
+  }
+
+  for (const patient of incoming) {
+    map.set(patient.id, patient);
+  }
+
+  return Array.from(map.values());
+}
+
 export default function ProntuarioPage() {
   const router = useRouter();
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [patientsCursor, setPatientsCursor] = useState<string | null>(null);
+  const [hasMorePatients, setHasMorePatients] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAddMedicalRecordModalOpen, setIsAddMedicalRecordModalOpen] = useState(false);
+  const [recordsRefreshKey, setRecordsRefreshKey] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMorePatients, setIsLoadingMorePatients] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const patientsCursorRef = useRef<string | null>(null);
 
-  // Carrega lista de pacientes do servidor
-  useEffect(() => {
-    const fetchPatients = async () => {
+  const fetchPatients = useCallback(
+    async (options?: { reset?: boolean; search?: string }) => {
+      const shouldReset = options?.reset ?? false;
+      const search = options?.search ?? debouncedSearchQuery;
+
       try {
-        setIsLoading(true);
+        if (shouldReset) {
+          setIsLoading(true);
+          setPatientsCursor(null);
+          patientsCursorRef.current = null;
+          setHasMorePatients(false);
+        } else {
+          setIsLoadingMorePatients(true);
+        }
+
         setError(null);
-        
-        const response = await fetch('/api/patients');
-        
+
+        const params = new URLSearchParams();
+        params.set('limit', String(PATIENTS_PAGE_SIZE));
+
+        if (search.trim()) {
+          params.set('search', search.trim());
+        }
+
+        const cursorToUse = shouldReset ? null : patientsCursorRef.current;
+
+        if (cursorToUse) {
+          params.set('cursor', cursorToUse);
+        }
+
+        const response = await fetch(`/api/patients?${params.toString()}`);
+
         if (!response.ok) {
           throw new Error('Erro ao buscar pacientes');
         }
-        
+
         const data = await response.json();
-        setPatients(data.patients || []);
+        const fetchedPatients: Patient[] = Array.isArray(data?.patients) ? data.patients : [];
+
+        setPatients((prev) =>
+          shouldReset ? fetchedPatients : mergeUniquePatients(prev, fetchedPatients)
+        );
+
+        const nextCursor = typeof data?.nextCursor === 'string' ? data.nextCursor : null;
+        setPatientsCursor(nextCursor);
+        patientsCursorRef.current = nextCursor;
+        setHasMorePatients(Boolean(data?.hasMore));
+
       } catch (err) {
         console.error('Erro ao carregar pacientes:', err);
         setError(err instanceof Error ? err.message : 'Erro desconhecido');
       } finally {
         setIsLoading(false);
+        setIsLoadingMorePatients(false);
       }
-    };
+    },
+    [debouncedSearchQuery]
+  );
 
-    fetchPatients();
-  }, []);
+  useEffect(() => {
+    setSelectedPatient((prev) => {
+      if (patients.length === 0) {
+        return null;
+      }
+
+      if (!prev) {
+        return patients[0];
+      }
+
+      return patients.find((patient) => patient.id === prev.id) || patients[0];
+    });
+  }, [patients]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 350);
+
+    return () => clearTimeout(timeout);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    fetchPatients({ reset: true, search: debouncedSearchQuery });
+  }, [debouncedSearchQuery, fetchPatients]);
 
   const handleAddPatient = useCallback(async (newPatient: Omit<Patient, 'id'>) => {
     try {
@@ -63,7 +145,8 @@ export default function ProntuarioPage() {
       }
 
       const createdPatient = await response.json();
-      setPatients((prev) => [createdPatient, ...prev]);
+      setPatients((prev) => [createdPatient, ...prev.filter((p) => p.id !== createdPatient.id)]);
+      setSelectedPatient(createdPatient);
       setIsAddModalOpen(false);
     } catch (err) {
       console.error('Erro ao adicionar paciente:', err);
@@ -117,8 +200,7 @@ export default function ProntuarioPage() {
         }
 
         setIsAddMedicalRecordModalOpen(false);
-        // Força recarregamento dos registros no PatientDashboard
-        setSelectedPatient(selectedPatient ? { ...selectedPatient } : null);
+        setRecordsRefreshKey((prev) => prev + 1);
       } catch (err) {
         console.error('Erro ao adicionar registro:', err);
         alert(err instanceof Error ? err.message : 'Erro ao adicionar registro');
@@ -183,14 +265,7 @@ export default function ProntuarioPage() {
       const deletedPatientId = selectedPatient.id;
 
       setPatients((prev) => prev.filter((p) => p.id !== deletedPatientId));
-      setSelectedPatient((prev) => {
-        if (!prev || prev.id !== deletedPatientId) {
-          return prev;
-        }
-
-        const remaining = patients.filter((p) => p.id !== deletedPatientId);
-        return remaining.length > 0 ? remaining[0] : null;
-      });
+      setSelectedPatient((prev) => (prev?.id === deletedPatientId ? null : prev));
     } catch (err) {
       console.error('Erro ao excluir paciente:', err);
       alert(err instanceof Error ? err.message : 'Erro ao excluir paciente');
@@ -225,6 +300,16 @@ export default function ProntuarioPage() {
               patients={patients}
               selectedPatient={selectedPatient}
               onSelectPatient={setSelectedPatient}
+              searchQuery={searchQuery}
+              onSearchQueryChange={setSearchQuery}
+              onLoadMore={() => {
+                if (!isLoadingMorePatients && hasMorePatients) {
+                  fetchPatients({ reset: false, search: debouncedSearchQuery });
+                }
+              }}
+              hasMore={hasMorePatients}
+              isLoading={isLoading}
+              isLoadingMore={isLoadingMorePatients}
               onAddClick={() => setIsAddModalOpen(true)}
             />
           </div>
@@ -238,6 +323,7 @@ export default function ProntuarioPage() {
                 onAddMedicalRecord={() => setIsAddMedicalRecordModalOpen(true)}
                 onStartTeleconsulta={handleStartTeleconsulta}
                 onDeletePatient={handleDeletePatient}
+                refreshKey={recordsRefreshKey}
               />
             ) : (
               <EmptyState />

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUsernameFromAuthToken } from '@/lib/auth';
+import { getAuthenticatedUserFromRequest } from '@/lib/authSession';
 import { HistoryEntry } from '@/lib/history';
 import { getUserHistory, saveUserHistoryEntries, saveUserHistoryEntry } from '@/lib/transcriptionHistoryStore';
 import { getModelById } from '@/lib/transcriptionModels';
@@ -7,8 +7,8 @@ import { getModelById } from '@/lib/transcriptionModels';
 export const runtime = 'nodejs';
 
 async function getAuthenticatedUsername(request: NextRequest): Promise<string | null> {
-  const authToken = request.cookies.get('auth_token')?.value;
-  return getUsernameFromAuthToken(authToken);
+  const user = await getAuthenticatedUserFromRequest(request);
+  return user?.username || null;
 }
 
 function isHistoryEntry(payload: unknown): payload is HistoryEntry {

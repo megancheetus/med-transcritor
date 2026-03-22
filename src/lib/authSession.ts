@@ -10,7 +10,17 @@ async function getAuthenticatedUserFromToken(authToken?: string): Promise<AppUse
     return null;
   }
 
-  return getUserByUsername(username);
+  const user = await getUserByUsername(username);
+
+  if (!user) {
+    return null;
+  }
+
+  if (!user.isAdmin && user.trialExpired) {
+    return null;
+  }
+
+  return user;
 }
 
 export async function getAuthenticatedUserFromRequest(request: NextRequest): Promise<AppUserRecord | null> {

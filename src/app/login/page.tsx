@@ -1,15 +1,15 @@
 'use client';
 
 import { useState, FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { CookieConsentBanner, useCookieConsent } from '@/components/CookieConsentBanner';
 
 const NAV_LINKS = [
-  { href: '#planos', label: 'Planos' },
-  { href: '#como-funciona', label: 'Como funciona' },
-  { href: '#criador', label: 'Criador' },
+  { href: '/planos', label: 'Planos' },
+  { href: '/funcionamento', label: 'Como funciona' },
+  { href: '/criar-conta', label: 'Criar conta' },
 ];
 
 export default function LoginPage() {
@@ -19,6 +19,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const cookiesAccepted = useCookieConsent();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const verifiedStatus = searchParams.get('verified');
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -60,17 +62,17 @@ export default function LoginPage() {
           <Image src="/favicon.png" alt="OmniNote" width={32} height={32} className="w-8 h-8" priority />
           <span className="text-white font-bold text-lg tracking-tight">OmniNote</span>
         </div>
-        <nav className="hidden sm:flex items-center gap-6">
+        <nav className="hidden sm:flex items-center gap-2 rounded-xl bg-white px-2 py-2 shadow-lg ring-1 ring-black/5">
           {NAV_LINKS.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className="text-white/80 hover:text-white text-sm font-medium transition"
+              className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
             >
               {link.label}
             </Link>
           ))}
-          <span className="text-white text-sm font-semibold border border-white/40 rounded-lg px-3 py-1.5 bg-white/10 cursor-default">
+          <span className="rounded-lg bg-[#155b79] px-3 py-1.5 text-sm font-semibold text-white cursor-default">
             Entrar
           </span>
         </nav>
@@ -94,6 +96,30 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
+          {verifiedStatus === 'success' && (
+            <div className="border border-emerald-200 bg-emerald-50 text-emerald-700 px-4 py-3 rounded-lg text-sm font-medium">
+              E-mail confirmado com sucesso. Faça login para continuar.
+            </div>
+          )}
+
+          {verifiedStatus === 'sent' && (
+            <div className="border border-blue-200 bg-blue-50 text-blue-700 px-4 py-3 rounded-lg text-sm font-medium">
+              Enviamos um link de confirmação para seu e-mail. Ative sua conta antes de entrar.
+            </div>
+          )}
+
+          {verifiedStatus === 'invalid' && (
+            <div className="border border-amber-200 bg-amber-50 text-amber-700 px-4 py-3 rounded-lg text-sm font-medium">
+              Link de confirmação inválido ou expirado. Solicite um novo cadastro de teste.
+            </div>
+          )}
+
+          {verifiedStatus === 'error' && (
+            <div className="border border-red-200 bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm font-medium">
+              Não foi possível confirmar seu e-mail no momento. Tente novamente.
+            </div>
+          )}
+
           <div>
             <label htmlFor="username" className="block text-xs font-semibold text-[#155b79] uppercase tracking-wider mb-2">
               Usuário
@@ -150,6 +176,12 @@ export default function LoginPage() {
         <p className="text-center text-[#7b8d97] text-xs mt-6">
           Acesso restrito para usuários autorizados
         </p>
+
+        <div className="mt-4 text-center">
+          <Link href="/criar-conta" className="text-xs font-semibold text-[#1a6a8d] hover:text-[#155b79]">
+            Não tem conta? Crie seu teste de 3 dias
+          </Link>
+        </div>
       </div>
       </div>
 

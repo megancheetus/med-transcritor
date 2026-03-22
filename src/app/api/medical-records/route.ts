@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUsernameFromAuthToken } from '@/lib/auth';
+import { getAuthenticatedUserFromRequest } from '@/lib/authSession';
 import {
-  getMedicalRecordsByPatient,
+  getMedicalRecordsByPatientPaginated,
   createMedicalRecord,
   initializeMedicalRecordsTable,
   logMedicalRecordAudit,
@@ -10,7 +10,7 @@ import { getRequestAuditContext } from '@/lib/requestAudit';
 import { rateLimitMiddleware } from '@/lib/rateLimit';
 import {
   medicalRecordCreateSchema,
-  patientIdQuerySchema,
+  medicalRecordListQuerySchema,
 } from '@/lib/schemas/medicalRecords';
 import { parseWithSchema } from '@/lib/schemas/apiValidation';
 
@@ -18,7 +18,7 @@ export const runtime = 'nodejs';
 
 /**
  * GET /api/medical-records?patientId=...
- * Obtém todos os registros médicos de um paciente
+ * Obtém registros médicos paginados de um paciente
  */
 export async function GET(request: NextRequest) {
   try {
@@ -32,42 +32,66 @@ export async function GET(request: NextRequest) {
       return rateLimitResponse;
     }
 
-    const authToken = request.cookies.get('auth_token')?.value;
-    const username = await getUsernameFromAuthToken(authToken);
+    const user = await getAuthenticatedUserFromRequest(request);
 
-    if (!username) {
+    if (!user) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    const queryValidation = parseWithSchema(patientIdQuerySchema, {
+    if (!user.isAdmin && !user.moduleAccess.prontuario) {
+      return NextResponse.json({ error: 'Seu plano não possui acesso ao módulo de prontuário' }, { status: 403 });
+    }
+
+    const queryValidation = parseWithSchema(medicalRecordListQuerySchema, {
       patientId: request.nextUrl.searchParams.get('patientId'),
+      cursor: request.nextUrl.searchParams.get('cursor') || undefined,
+      limit: request.nextUrl.searchParams.get('limit') || undefined,
+      tipoDocumento: request.nextUrl.searchParams.get('tipoDocumento') || undefined,
+      profissional: request.nextUrl.searchParams.get('profissional') || undefined,
+      dateFrom: request.nextUrl.searchParams.get('dateFrom') || undefined,
+      dateTo: request.nextUrl.searchParams.get('dateTo') || undefined,
     });
 
     if (!queryValidation.success) {
       return queryValidation.response;
     }
 
-    const { patientId } = queryValidation.data;
+    const { patientId, ...filters } = queryValidation.data;
 
     // Inicializar tabela se necessário
     await initializeMedicalRecordsTable();
 
-    const records = await getMedicalRecordsByPatient(patientId, username);
+    const result = await getMedicalRecordsByPatientPaginated(user.username, {
+      patientId,
+      ...filters,
+    });
 
     const auditContext = getRequestAuditContext(request);
     await logMedicalRecordAudit({
-      username,
+      username: user.username,
       action: 'view',
       resourceType: 'medical_record_list',
       resourceId: patientId,
-      metadataJson: { count: records.length, patientId },
+      metadataJson: {
+        count: result.records.length,
+        patientId,
+        hasMore: result.hasMore,
+        filters: {
+          tipoDocumento: filters.tipoDocumento,
+          profissional: filters.profissional,
+          dateFrom: filters.dateFrom,
+          dateTo: filters.dateTo,
+        },
+      },
       ipHash: auditContext.ipHash,
       userAgent: auditContext.userAgent,
     });
 
     return NextResponse.json({
-      records,
-      count: records.length,
+      records: result.records,
+      count: result.records.length,
+      nextCursor: result.nextCursor,
+      hasMore: result.hasMore,
     });
   } catch (error) {
     console.error('[medical-records] GET error:', error);
@@ -94,11 +118,14 @@ export async function POST(request: NextRequest) {
       return rateLimitResponse;
     }
 
-    const authToken = request.cookies.get('auth_token')?.value;
-    const username = await getUsernameFromAuthToken(authToken);
+    const user = await getAuthenticatedUserFromRequest(request);
 
-    if (!username) {
+    if (!user) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+
+    if (!user.isAdmin && !user.moduleAccess.prontuario) {
+      return NextResponse.json({ error: 'Seu plano não possui acesso ao módulo de prontuário' }, { status: 403 });
     }
 
     // Inicializar tabela se necessário
@@ -115,7 +142,7 @@ export async function POST(request: NextRequest) {
 
     const record = await createMedicalRecord(
       validatedPayload.patientId,
-      username,
+      user.username,
       {
         patientId: validatedPayload.patientId,
         data: validatedPayload.data,
@@ -137,7 +164,7 @@ export async function POST(request: NextRequest) {
 
     const auditContext = getRequestAuditContext(request);
     await logMedicalRecordAudit({
-      username,
+      username: user.username,
       action: 'create',
       resourceType: 'medical_record',
       resourceId: record.id,

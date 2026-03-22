@@ -3,6 +3,8 @@
 import AppShell from '@/components/AppShell';
 import { useTranscriptionWorkspace } from '@/components/TranscriptionWorkspaceProvider';
 import { getModelById } from '@/lib/transcriptionModels';
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
 
 const WEEKDAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
@@ -35,6 +37,64 @@ const getHistoryDate = (entryId: string, fallbackTimestamp: string) => {
 
 export default function DashboardPage() {
   const { history, recordingDuration, lastRecordingTime, selectedModel, isLoading } = useTranscriptionWorkspace();
+  const [sessionUser, setSessionUser] = useState<{
+    isAdmin: boolean;
+    accountPlan: 'basic' | 'clinical' | 'pro' | 'trial';
+    trialExpired: boolean;
+    trialExpiresAt: string | null;
+    moduleAccess: {
+      transcricao: boolean;
+      teleconsulta: boolean;
+      prontuario: boolean;
+    };
+  } | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadSession = async () => {
+      try {
+        const response = await fetch('/api/auth/session', { cache: 'no-store' });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = await response.json();
+        if (isMounted) {
+          setSessionUser(data.user);
+        }
+      } catch {
+        if (isMounted) {
+          setSessionUser(null);
+        }
+      }
+    };
+
+    void loadSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const blockedModules = useMemo(() => {
+    if (!sessionUser || sessionUser.isAdmin) {
+      return [] as string[];
+    }
+
+    const blocked: string[] = [];
+
+    if (!sessionUser.moduleAccess.teleconsulta) {
+      blocked.push('Teleconsulta');
+    }
+
+    if (!sessionUser.moduleAccess.prontuario) {
+      blocked.push('Prontuário e gestão de pacientes');
+    }
+
+    return blocked;
+  }, [sessionUser]);
 
   const totalSessionDuration = history.reduce((sum, entry) => sum + entry.duration, 0);
   const today = new Date();
@@ -92,6 +152,47 @@ export default function DashboardPage() {
       subtitle="Visão executiva da conta e atividade de transcrição"
     >
       <div className="space-y-6">
+        {blockedModules.length > 0 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">Módulos bloqueados no seu plano</p>
+            <p className="mt-2 text-sm text-amber-900">
+              Seu plano atual ainda não inclui: <strong>{blockedModules.join(', ')}</strong>.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Link
+                href="/planos"
+                className="inline-flex items-center rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 transition"
+              >
+                Ver opções de upgrade
+              </Link>
+              <Link
+                href="https://wa.me/5581992871707"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 transition"
+              >
+                Falar com comercial
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {sessionUser?.accountPlan === 'trial' && sessionUser.trialExpiresAt && !sessionUser.trialExpired && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Período de teste ativo</p>
+            <p className="mt-2 text-sm text-blue-900">
+              Seu acesso de teste expira em{' '}
+              <strong>
+                {new Intl.DateTimeFormat('pt-BR', {
+                  dateStyle: 'short',
+                  timeStyle: 'short',
+                }).format(new Date(sessionUser.trialExpiresAt))}
+              </strong>
+              .
+            </p>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white border border-[#cfe0e8] rounded-xl p-5 shadow-sm">
             <p className="text-sm text-[#4b6573]">Usos registrados</p>

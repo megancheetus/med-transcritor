@@ -14,14 +14,36 @@ const meetDomains = [
   'wss://*.jit.si',
 ];
 
-const scriptSources = ["'self'", "'unsafe-inline'", 'https://meet.jit.si', 'https://*.jit.si', 'https://8x8.vc', 'https://*.8x8.vc'];
-const frameSources = ["'self'", 'https://meet.jit.si', 'https://*.jit.si', 'https://8x8.vc', 'https://*.8x8.vc'];
+const recaptchaDomains = [
+  'https://www.google.com',
+  'https://www.gstatic.com',
+  'https://recaptcha.google.com',
+];
+
+const scriptSources = [
+  "'self'",
+  "'unsafe-inline'",
+  'https://meet.jit.si',
+  'https://*.jit.si',
+  'https://8x8.vc',
+  'https://*.8x8.vc',
+  ...recaptchaDomains,
+];
+const frameSources = [
+  "'self'",
+  'https://meet.jit.si',
+  'https://*.jit.si',
+  'https://8x8.vc',
+  'https://*.8x8.vc',
+  ...recaptchaDomains,
+];
 const connectSources = [
   "'self'",
   'https://generativelanguage.googleapis.com',
   'https://*.supabase.co',
   'https://vercel.com',
   'https://*.vercel-storage.com',
+  ...recaptchaDomains,
   ...meetDomains,
   ...jaasDomains,
 ];
@@ -32,7 +54,7 @@ const contentSecurityPolicy = process.env.NODE_ENV === 'production'
       "default-src 'self'",
       `script-src ${scriptSources.join(' ')}`,
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob:",
+      `img-src 'self' data: blob: ${recaptchaDomains.join(' ')}`,
       "font-src 'self' data:",
       `connect-src ${connectSources.join(' ')}`,
       `frame-src ${frameSources.join(' ')}`,
@@ -48,7 +70,7 @@ const contentSecurityPolicy = process.env.NODE_ENV === 'production'
       "default-src 'self'",
       `script-src ${[...scriptSources, "'unsafe-eval'"].join(' ')}`,
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob:",
+      `img-src 'self' data: blob: ${recaptchaDomains.join(' ')}`,
       "font-src 'self' data:",
       `connect-src ${[...connectSources, 'localhost:*'].join(' ')}`,
       `frame-src ${frameSources.join(' ')}`,

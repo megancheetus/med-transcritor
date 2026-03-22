@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUsernameFromAuthToken } from '@/lib/auth';
+import { getAuthenticatedUserFromRequest } from '@/lib/authSession';
 import {
-  getPatientsByUsername,
+  getPatientsPageByUsername,
   createPatient,
   initializePatientsTable,
 } from '@/lib/patientManager';
 import { rateLimitMiddleware } from '@/lib/rateLimit';
-import { patientCreateSchema } from '@/lib/schemas/patients';
+import { patientCreateSchema, patientListQuerySchema } from '@/lib/schemas/patients';
 import { parseWithSchema } from '@/lib/schemas/apiValidation';
 
 export const runtime = 'nodejs';
 
 /**
  * GET /api/patients
- * Obtém todos os pacientes do usuário logado
+ * Obtém pacientes paginados do usuário logado
  */
 export async function GET(request: NextRequest) {
   try {
@@ -27,21 +27,36 @@ export async function GET(request: NextRequest) {
       return rateLimitResponse;
     }
 
-    const authToken = request.cookies.get('auth_token')?.value;
-    const username = await getUsernameFromAuthToken(authToken);
+    const user = await getAuthenticatedUserFromRequest(request);
 
-    if (!username) {
+    if (!user) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+
+    if (!user.isAdmin && !user.moduleAccess.prontuario) {
+      return NextResponse.json({ error: 'Seu plano não possui acesso ao módulo de prontuário' }, { status: 403 });
     }
 
     // Inicializar tabela se necessário
     await initializePatientsTable();
 
-    const patients = await getPatientsByUsername(username);
+    const queryValidation = parseWithSchema(patientListQuerySchema, {
+      cursor: request.nextUrl.searchParams.get('cursor') || undefined,
+      limit: request.nextUrl.searchParams.get('limit') || undefined,
+      search: request.nextUrl.searchParams.get('search') || undefined,
+    });
+
+    if (!queryValidation.success) {
+      return queryValidation.response;
+    }
+
+    const result = await getPatientsPageByUsername(user.username, queryValidation.data);
 
     return NextResponse.json({
-      patients,
-      count: patients.length,
+      patients: result.patients,
+      count: result.patients.length,
+      nextCursor: result.nextCursor,
+      hasMore: result.hasMore,
     });
   } catch (error) {
     console.error('[patients] GET error:', error);
@@ -68,11 +83,14 @@ export async function POST(request: NextRequest) {
       return rateLimitResponse;
     }
 
-    const authToken = request.cookies.get('auth_token')?.value;
-    const username = await getUsernameFromAuthToken(authToken);
+    const user = await getAuthenticatedUserFromRequest(request);
 
-    if (!username) {
+    if (!user) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+
+    if (!user.isAdmin && !user.moduleAccess.prontuario) {
+      return NextResponse.json({ error: 'Seu plano não possui acesso ao módulo de prontuário' }, { status: 403 });
     }
 
     // Inicializar tabela se necessário
@@ -86,7 +104,7 @@ export async function POST(request: NextRequest) {
 
     const payload = payloadValidation.data;
 
-    const patient = await createPatient(username, payload);
+    const patient = await createPatient(user.username, payload);
 
     return NextResponse.json(patient, { status: 201 });
   } catch (error) {

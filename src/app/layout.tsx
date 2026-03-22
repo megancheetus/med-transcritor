@@ -10,7 +10,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "OmniNote",
-  description: "Transcrição clínica multiprofissional com formatação SOAP",
+  description: "Transcrição clínica multiprofissional.",
   icons: {
     icon: [{ url: "/favicon.png", type: "image/png" }],
     shortcut: "/favicon.png",

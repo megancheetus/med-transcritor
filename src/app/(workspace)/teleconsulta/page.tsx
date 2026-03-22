@@ -12,6 +12,10 @@ export default function TeleconsultaDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+  const [newPatientName, setNewPatientName] = useState('');
+  const [newPatientCpf, setNewPatientCpf] = useState('');
+  const [isCreatingConsultation, setIsCreatingConsultation] = useState(false);
 
   // Carregar teleconsultas
   useEffect(() => {
@@ -52,7 +56,49 @@ export default function TeleconsultaDashboardPage() {
   };
 
   const handleNewConsultation = () => {
-    router.push('/prontuario');
+    setError(null);
+    setIsNewModalOpen(true);
+  };
+
+  const handleCreateConsultation = async () => {
+    if (!newPatientName.trim()) {
+      setError('Informe o nome do paciente para criar a teleconsulta.');
+      return;
+    }
+
+    try {
+      setIsCreatingConsultation(true);
+      setError(null);
+
+      const response = await fetch('/api/videoconsultations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          patientName: newPatientName.trim(),
+          patientCpf: newPatientCpf.trim() || undefined,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao criar teleconsulta');
+      }
+
+      setIsNewModalOpen(false);
+      setNewPatientName('');
+      setNewPatientCpf('');
+
+      if (data?.room?.id) {
+        router.push(`/room/${data.room.id}?role=professional`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao criar teleconsulta');
+    } finally {
+      setIsCreatingConsultation(false);
+    }
   };
 
   const formatDate = (dateStr: string) => {
@@ -128,6 +174,70 @@ export default function TeleconsultaDashboardPage() {
             Nova Teleconsulta
           </button>
         </div>
+
+        {isNewModalOpen && (
+          <div className="rounded-xl border border-[#cfe0e8] bg-white p-5 shadow-sm space-y-4">
+            <div>
+              <h3 className="text-base font-bold text-[#155b79]">Nova teleconsulta</h3>
+              <p className="text-sm text-[#4b6573] mt-1">
+                Crie a sala informando o paciente sem depender do módulo de prontuário.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="tele-new-patient-name" className="block text-xs font-semibold text-[#4b6573] uppercase tracking-wide mb-2">
+                  Nome do paciente
+                </label>
+                <input
+                  id="tele-new-patient-name"
+                  value={newPatientName}
+                  onChange={(event) => setNewPatientName(event.target.value)}
+                  className="w-full px-4 py-2.5 text-sm border border-[#cfe0e8] rounded-lg focus:outline-none focus:border-[#1ea58c]"
+                  placeholder="Ex.: João da Silva"
+                  disabled={isCreatingConsultation}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="tele-new-patient-cpf" className="block text-xs font-semibold text-[#4b6573] uppercase tracking-wide mb-2">
+                  CPF (opcional)
+                </label>
+                <input
+                  id="tele-new-patient-cpf"
+                  value={newPatientCpf}
+                  onChange={(event) => setNewPatientCpf(event.target.value)}
+                  className="w-full px-4 py-2.5 text-sm border border-[#cfe0e8] rounded-lg focus:outline-none focus:border-[#1ea58c]"
+                  placeholder="Somente números"
+                  disabled={isCreatingConsultation}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsNewModalOpen(false);
+                  setNewPatientName('');
+                  setNewPatientCpf('');
+                }}
+                className="px-4 py-2.5 text-sm font-medium rounded-lg border border-[#cfe0e8] text-[#4b6573] hover:bg-[#f7fbfc]"
+                disabled={isCreatingConsultation}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleCreateConsultation()}
+                className="px-4 py-2.5 text-sm font-semibold rounded-lg bg-[#1ea58c] hover:bg-[#18956e] text-white disabled:opacity-50"
+                disabled={isCreatingConsultation}
+              >
+                {isCreatingConsultation ? 'Criando...' : 'Criar sala'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Loading state */}
         {loading ? (

@@ -1,12 +1,10 @@
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { isValidAuthToken } from '@/lib/auth';
+import { getAuthenticatedUserFromCookies } from '@/lib/authSession';
 
 export default async function Home() {
-  const cookieStore = await cookies();
-  const authToken = cookieStore.get('auth_token')?.value;
+  const user = await getAuthenticatedUserFromCookies();
 
-  if (!(await isValidAuthToken(authToken))) {
+  if (!user) {
     redirect('/login');
   }
 

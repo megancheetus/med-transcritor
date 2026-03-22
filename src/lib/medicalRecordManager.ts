@@ -22,6 +22,55 @@ interface ClinicalData {
   followUpDate?: string;
 }
 
+interface MedicalRecordCursorData {
+  data: string;
+  id: string;
+}
+
+export interface MedicalRecordListFilters {
+  patientId: string;
+  cursor?: string;
+  limit?: number;
+  tipoDocumento?: MedicalRecord['tipoDocumento'];
+  profissional?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface PaginatedMedicalRecordsResult {
+  records: MedicalRecord[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+function encodeMedicalRecordCursor(data: MedicalRecordCursorData): string {
+  return Buffer.from(JSON.stringify(data), 'utf-8').toString('base64url');
+}
+
+function decodeMedicalRecordCursor(cursor: string): MedicalRecordCursorData | null {
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(cursor, 'base64url').toString('utf-8')
+    ) as Partial<MedicalRecordCursorData>;
+
+    if (
+      typeof parsed?.data !== 'string' ||
+      typeof parsed?.id !== 'string' ||
+      !parsed.data ||
+      !parsed.id
+    ) {
+      return null;
+    }
+
+    return {
+      data: parsed.data,
+      id: parsed.id,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function sanitizeStringArray(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) {
     return undefined;
@@ -79,6 +128,51 @@ function mapClinicalData(value: unknown): ClinicalData {
       typeof clinicalData.followUpDate === 'string'
         ? clinicalData.followUpDate
         : undefined,
+  };
+}
+
+function mapMedicalRecordRow(
+  row: {
+    id: string;
+    patient_id: string;
+    data: string;
+    tipo_documento: MedicalRecord['tipoDocumento'];
+    profissional: string;
+    especialidade: string;
+    conteudo: string;
+    resumo: string | null;
+    source_type: MedicalRecord['sourceType'];
+    source_ref_id: string | null;
+    ai_generated: boolean;
+    clinician_reviewed: boolean;
+    reviewed_at: string | null;
+    clinical_data: unknown;
+  }
+): MedicalRecord {
+  const mappedClinicalData = mapClinicalData(row.clinical_data);
+
+  return {
+    id: row.id,
+    patientId: row.patient_id,
+    data: row.data,
+    tipoDocumento: row.tipo_documento,
+    profissional: row.profissional,
+    especialidade: row.especialidade,
+    conteudo: row.conteudo,
+    resumo: row.resumo || undefined,
+    sourceType: row.source_type,
+    sourceRefId: row.source_ref_id || undefined,
+    aiGenerated: row.ai_generated,
+    clinicianReviewed: row.clinician_reviewed,
+    reviewedAt: row.reviewed_at || undefined,
+    soapSubjetivo: mappedClinicalData.soapSubjetivo,
+    soapObjetivo: mappedClinicalData.soapObjetivo,
+    soapAvaliacao: mappedClinicalData.soapAvaliacao,
+    soapPlano: mappedClinicalData.soapPlano,
+    cid10Codes: mappedClinicalData.cid10Codes,
+    medications: mappedClinicalData.medications,
+    allergies: mappedClinicalData.allergies,
+    followUpDate: mappedClinicalData.followUpDate,
   };
 }
 
@@ -195,6 +289,8 @@ export async function initializeMedicalRecordsTable(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_medical_records_username ON medical_records(username);
       CREATE INDEX IF NOT EXISTS idx_medical_records_data ON medical_records(data DESC);
       CREATE INDEX IF NOT EXISTS idx_medical_records_clinical_data_gin ON medical_records USING GIN (clinical_data);
+      CREATE INDEX IF NOT EXISTS idx_medical_records_username_patient_data ON medical_records(username, patient_id, data DESC, id DESC);
+      CREATE INDEX IF NOT EXISTS idx_medical_records_username_tipo_data ON medical_records(username, tipo_documento, data DESC, id DESC);
 
       CREATE TABLE IF NOT EXISTS medical_record_versions (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -377,47 +473,121 @@ export async function getMedicalRecordsByPatient(
   patientId: string,
   username: string
 ): Promise<MedicalRecord[]> {
+  const result = await getMedicalRecordsByPatientPaginated(username, {
+    patientId,
+    limit: 10_000,
+  });
+
+  return result.records;
+}
+
+/**
+ * Obtém registros médicos paginados de um paciente com filtros clínicos
+ */
+export async function getMedicalRecordsByPatientPaginated(
+  username: string,
+  filters: MedicalRecordListFilters
+): Promise<PaginatedMedicalRecordsResult> {
   const pool = getPostgresPool();
   const client = await pool.connect();
 
   try {
+    const limit = Math.min(Math.max(filters.limit || 20, 1), 100);
+    const profissional = filters.profissional?.trim();
+    const cursorData = filters.cursor
+      ? decodeMedicalRecordCursor(filters.cursor)
+      : null;
+
+    const whereClauses = ['patient_id = $1', 'username = $2'];
+    const values: unknown[] = [filters.patientId, username];
+    let paramIndex = 3;
+
+    if (filters.tipoDocumento) {
+      whereClauses.push(`tipo_documento = $${paramIndex}`);
+      values.push(filters.tipoDocumento);
+      paramIndex += 1;
+    }
+
+    if (profissional) {
+      whereClauses.push(`profissional ILIKE $${paramIndex}`);
+      values.push(`%${profissional}%`);
+      paramIndex += 1;
+    }
+
+    if (filters.dateFrom) {
+      whereClauses.push(`data >= $${paramIndex}`);
+      values.push(filters.dateFrom);
+      paramIndex += 1;
+    }
+
+    if (filters.dateTo) {
+      whereClauses.push(`data <= $${paramIndex}`);
+      values.push(filters.dateTo);
+      paramIndex += 1;
+    }
+
+    if (cursorData) {
+      whereClauses.push(
+        `(data < $${paramIndex} OR (data = $${paramIndex} AND id < $${paramIndex + 1}))`
+      );
+      values.push(cursorData.data, cursorData.id);
+      paramIndex += 2;
+    }
+
+    values.push(limit + 1);
+
     const result = await client.query(
       `SELECT id, data, tipo_documento, profissional, especialidade, 
-              conteudo, resumo, source_type, source_ref_id,
+              conteudo, resumo, source_type, source_ref_id, patient_id,
               ai_generated, clinician_reviewed, reviewed_at, clinical_data
        FROM medical_records
-       WHERE patient_id = $1 AND username = $2
-       ORDER BY data DESC`,
-      [patientId, username]
+       WHERE ${whereClauses.join(' AND ')}
+       ORDER BY data DESC, id DESC
+       LIMIT $${paramIndex}`,
+      values
     );
 
-    return result.rows.map((row) => {
-      const mappedClinicalData = mapClinicalData(row.clinical_data);
+    const hasMore = result.rows.length > limit;
+    const rows = hasMore ? result.rows.slice(0, limit) : result.rows;
 
-      return {
-        id: row.id,
-        patientId,
-        data: row.data,
-        tipoDocumento: row.tipo_documento,
-        profissional: row.profissional,
-        especialidade: row.especialidade,
-        conteudo: row.conteudo,
-        resumo: row.resumo,
-        sourceType: row.source_type,
-        sourceRefId: row.source_ref_id,
-        aiGenerated: row.ai_generated,
-        clinicianReviewed: row.clinician_reviewed,
-        reviewedAt: row.reviewed_at,
-        soapSubjetivo: mappedClinicalData.soapSubjetivo,
-        soapObjetivo: mappedClinicalData.soapObjetivo,
-        soapAvaliacao: mappedClinicalData.soapAvaliacao,
-        soapPlano: mappedClinicalData.soapPlano,
-        cid10Codes: mappedClinicalData.cid10Codes,
-        medications: mappedClinicalData.medications,
-        allergies: mappedClinicalData.allergies,
-        followUpDate: mappedClinicalData.followUpDate,
-      };
-    });
+    const records = rows.map((row) =>
+      mapMedicalRecordRow(
+        row as {
+          id: string;
+          patient_id: string;
+          data: string;
+          tipo_documento: MedicalRecord['tipoDocumento'];
+          profissional: string;
+          especialidade: string;
+          conteudo: string;
+          resumo: string | null;
+          source_type: MedicalRecord['sourceType'];
+          source_ref_id: string | null;
+          ai_generated: boolean;
+          clinician_reviewed: boolean;
+          reviewed_at: string | null;
+          clinical_data: unknown;
+        }
+      )
+    );
+
+    const lastRow = rows[rows.length - 1] as
+      | { data: string; id: string }
+      | undefined;
+
+    const nextCursor =
+      hasMore && lastRow
+        ? encodeMedicalRecordCursor({
+            data: String(lastRow.data),
+            id: lastRow.id,
+          })
+        : null;
+
+    return {
+      records,
+      nextCursor,
+      hasMore,
+    };
   } finally {
     client.release();
   }

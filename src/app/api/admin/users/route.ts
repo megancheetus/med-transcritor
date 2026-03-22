@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createUser, listUsers } from '@/lib/authUsers';
 import { getAuthenticatedUserFromRequest } from '@/lib/authSession';
+import { AccountPlan, normalizeAccountPlan } from '@/lib/accountPlan';
 
 export const runtime = 'nodejs';
 
@@ -23,6 +24,10 @@ function isValidEmail(email: unknown): email is string {
 
   const normalized = email.trim();
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized);
+}
+
+function isValidAccountPlan(value: unknown): value is AccountPlan {
+  return value === 'basic' || value === 'clinical' || value === 'pro' || value === 'trial';
 }
 
 async function requireAdmin(request: NextRequest) {
@@ -64,12 +69,13 @@ export async function POST(request: NextRequest) {
 
   try {
     const payload = await request.json();
-    const { username, password, fullName, email, isAdmin } = payload as {
+    const { username, password, fullName, email, isAdmin, accountPlan } = payload as {
       username?: unknown;
       password?: unknown;
       fullName?: unknown;
       email?: unknown;
       isAdmin?: unknown;
+      accountPlan?: unknown;
     };
 
     if (!isValidUsername(username)) {
@@ -88,12 +94,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Informe um e-mail válido' }, { status: 400 });
     }
 
+    if (accountPlan !== undefined && !isValidAccountPlan(accountPlan)) {
+      return NextResponse.json({ error: 'Informe um plano válido: basic, clinical, pro ou teste' }, { status: 400 });
+    }
+
     const user = await createUser({
       username,
       password,
       fullName,
       email,
       isAdmin: isAdmin === true,
+      accountPlan: normalizeAccountPlan(accountPlan),
     });
 
     return NextResponse.json({ user }, { status: 201 });

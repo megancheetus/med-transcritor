@@ -72,6 +72,22 @@ export async function POST(request: NextRequest) {
       { status: 401 }
     );
   } catch (error) {
+    if (error instanceof Error && error.message === 'TRIAL_EXPIRED') {
+      logger.warn('Login blocked - expired trial', { ip }, request);
+      return NextResponse.json(
+        { error: 'Seu período de teste de 3 dias expirou. Entre em contato para ativar um plano.' },
+        { status: 403 }
+      );
+    }
+
+    if (error instanceof Error && error.message === 'EMAIL_NOT_VERIFIED') {
+      logger.warn('Login blocked - email not verified', { ip }, request);
+      return NextResponse.json(
+        { error: 'Confirme seu e-mail antes de fazer login.' },
+        { status: 403 }
+      );
+    }
+
     const errorMessage = error instanceof Error ? error.message : 'Desconhecido';
     logger.error('Login error', 
       { 

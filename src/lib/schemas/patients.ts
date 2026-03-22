@@ -23,3 +23,9 @@ export const patientPatchSchema = patientCreateSchema.partial().refine((data) =>
 export const routeIdSchema = z.object({
   id: z.string().trim().min(1, 'id é obrigatório'),
 });
+
+export const patientListQuerySchema = z.object({
+  cursor: z.string().trim().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(30),
+  search: z.string().trim().max(120).optional(),
+});

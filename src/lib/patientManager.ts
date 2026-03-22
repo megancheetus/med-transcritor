@@ -1,6 +1,75 @@
 import { getPostgresPool } from './postgres';
 import { Patient } from './types';
 
+interface CursorData {
+  createdAt: string;
+  id: string;
+}
+
+export interface PaginatedPatientsResult {
+  patients: Patient[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+interface GetPatientsPageOptions {
+  cursor?: string;
+  limit?: number;
+  search?: string;
+}
+
+function encodeCursor(data: CursorData): string {
+  return Buffer.from(JSON.stringify(data), 'utf-8').toString('base64url');
+}
+
+function decodeCursor(cursor: string): CursorData | null {
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(cursor, 'base64url').toString('utf-8')
+    ) as Partial<CursorData>;
+
+    if (
+      typeof parsed?.createdAt !== 'string' ||
+      typeof parsed?.id !== 'string' ||
+      !parsed.createdAt ||
+      !parsed.id
+    ) {
+      return null;
+    }
+
+    return {
+      createdAt: parsed.createdAt,
+      id: parsed.id,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function mapPatientRow(row: {
+  id: string;
+  nome: string;
+  nome_completo: string;
+  idade: number;
+  sexo: string;
+  cpf: string;
+  data_nascimento: string;
+  telefone: string | null;
+  email: string | null;
+}): Patient {
+  return {
+    id: row.id,
+    nome: row.nome,
+    nomeCompleto: row.nome_completo,
+    idade: row.idade,
+    sexo: row.sexo === 'O' ? 'Outro' : row.sexo,
+    cpf: row.cpf,
+    dataNascimento: row.data_nascimento,
+    telefone: row.telefone || undefined,
+    email: row.email || undefined,
+  };
+}
+
 /**
  * Garante que a tabela de usuários existe
  * Precisa ser chamado antes de usar a tabela de pacientes
@@ -59,6 +128,8 @@ export async function initializePatientsTable(): Promise<void> {
 
       CREATE INDEX IF NOT EXISTS idx_patients_username ON patients(username);
       CREATE INDEX IF NOT EXISTS idx_patients_cpf ON patients(cpf);
+      CREATE INDEX IF NOT EXISTS idx_patients_username_nome_completo ON patients(username, nome_completo);
+      CREATE INDEX IF NOT EXISTS idx_patients_username_cpf ON patients(username, cpf);
     `);
   } finally {
     client.release();
@@ -117,30 +188,93 @@ export async function createPatient(
  * Obtém todos os pacientes de um usuário
  */
 export async function getPatientsByUsername(username: string): Promise<Patient[]> {
+  const result = await getPatientsPageByUsername(username, { limit: 10_000 });
+  return result.patients;
+}
+
+/**
+ * Obtém pacientes com paginação cursor-based e busca server-side
+ */
+export async function getPatientsPageByUsername(
+  username: string,
+  options: GetPatientsPageOptions = {}
+): Promise<PaginatedPatientsResult> {
   const pool = getPostgresPool();
   const client = await pool.connect();
 
   try {
+    const limit = Math.min(Math.max(options.limit || 30, 1), 100);
+    const normalizedSearch = options.search?.trim() || '';
+    const cursorData = options.cursor ? decodeCursor(options.cursor) : null;
+
+    const whereClauses = ['username = $1'];
+    const values: unknown[] = [username];
+    let paramIndex = 2;
+
+    if (normalizedSearch) {
+      whereClauses.push(
+        `(nome ILIKE $${paramIndex} OR nome_completo ILIKE $${paramIndex} OR cpf ILIKE $${paramIndex})`
+      );
+      values.push(`%${normalizedSearch}%`);
+      paramIndex += 1;
+    }
+
+    if (cursorData) {
+      whereClauses.push(
+        `(created_at < $${paramIndex} OR (created_at = $${paramIndex} AND id < $${paramIndex + 1}))`
+      );
+      values.push(cursorData.createdAt, cursorData.id);
+      paramIndex += 2;
+    }
+
+    values.push(limit + 1);
+
     const result = await client.query(
-      `SELECT id, nome, nome_completo, idade, sexo, cpf, 
-              data_nascimento, telefone, email
+      `SELECT id, nome, nome_completo, idade, sexo, cpf,
+              data_nascimento, telefone, email, created_at
        FROM patients
-       WHERE username = $1
-       ORDER BY created_at DESC`,
-      [username]
+       WHERE ${whereClauses.join(' AND ')}
+       ORDER BY created_at DESC, id DESC
+       LIMIT $${paramIndex}`,
+      values
     );
 
-    return result.rows.map((row) => ({
-      id: row.id,
-      nome: row.nome,
-      nomeCompleto: row.nome_completo,
-      idade: row.idade,
-      sexo: row.sexo === 'O' ? 'Outro' : row.sexo,
-      cpf: row.cpf,
-      dataNascimento: row.data_nascimento,
-      telefone: row.telefone,
-      email: row.email,
-    }));
+    const hasMore = result.rows.length > limit;
+    const rows = hasMore ? result.rows.slice(0, limit) : result.rows;
+
+    const patients = rows.map((row) =>
+      mapPatientRow(
+        row as {
+          id: string;
+          nome: string;
+          nome_completo: string;
+          idade: number;
+          sexo: string;
+          cpf: string;
+          data_nascimento: string;
+          telefone: string | null;
+          email: string | null;
+        }
+      )
+    );
+
+    const lastRow = rows[rows.length - 1] as
+      | { created_at: Date | string; id: string }
+      | undefined;
+
+    const nextCursor =
+      hasMore && lastRow
+        ? encodeCursor({
+            createdAt: new Date(lastRow.created_at).toISOString(),
+            id: lastRow.id,
+          })
+        : null;
+
+    return {
+      patients,
+      nextCursor,
+      hasMore,
+    };
   } finally {
     client.release();
   }

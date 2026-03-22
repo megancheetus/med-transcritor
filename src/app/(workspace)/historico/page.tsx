@@ -16,7 +16,7 @@ export default function HistoricoPage() {
   return (
     <AppShell
       title="Histórico"
-      subtitle="Histórico de uso do transcritor sem armazenamento do conteúdo clínico"
+      subtitle="Histórico de uso do transcritor e modelos utilizados"
     >
       <div className="bg-white border border-[#cfe0e8] rounded-xl shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-[#edf4f6] flex items-center justify-between">

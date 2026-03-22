@@ -83,6 +83,22 @@ export const patientIdQuerySchema = z.object({
   patientId: z.string().trim().min(1, 'patientId é obrigatório'),
 });
 
+const optionalDateString = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Data deve estar no formato YYYY-MM-DD')
+  .optional();
+
+export const medicalRecordListQuerySchema = z.object({
+  patientId: z.string().trim().min(1, 'patientId é obrigatório'),
+  cursor: z.string().trim().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  tipoDocumento: z.enum(medicalRecordDocumentTypes).optional(),
+  profissional: z.string().trim().min(1).optional(),
+  dateFrom: optionalDateString,
+  dateTo: optionalDateString,
+});
+
 export const routeIdSchema = z.object({
   id: z.string().trim().min(1, 'id é obrigatório'),
 });
