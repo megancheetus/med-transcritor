@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { Suspense, useState, FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -12,7 +12,7 @@ const NAV_LINKS = [
   { href: '/criar-conta', label: 'Criar conta' },
 ];
 
-export default function LoginPage() {
+function LoginPageContent() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -192,5 +192,13 @@ export default function LoginPage() {
 
       <CookieConsentBanner />
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-[#155b79] via-[#1a6a8d] to-[#0c161c]" />}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

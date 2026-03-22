@@ -36,7 +36,7 @@ export function getJaasEnvironmentStatus(): JaasEnvironmentStatus {
   const appId = process.env.JAAS_APP_ID?.trim();
   const keyId = process.env.JAAS_KEY_ID?.trim();
   const privateKey = process.env.JAAS_PRIVATE_KEY?.trim();
-  const domain = process.env.NEXT_PUBLIC_JAAS_DOMAIN?.trim() || JAAS_DEFAULT_DOMAIN;
+  const domain = process.env.JAAS_DOMAIN?.trim() || JAAS_DEFAULT_DOMAIN;
 
   const missingVars = [
     !appId ? 'JAAS_APP_ID' : null,

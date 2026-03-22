@@ -18,6 +18,14 @@ interface GetPatientsPageOptions {
   search?: string;
 }
 
+function mapDbSexToPatientSex(sexo: string): Patient['sexo'] {
+  if (sexo === 'M' || sexo === 'F') {
+    return sexo;
+  }
+
+  return 'Outro';
+}
+
 function encodeCursor(data: CursorData): string {
   return Buffer.from(JSON.stringify(data), 'utf-8').toString('base64url');
 }
@@ -62,7 +70,7 @@ function mapPatientRow(row: {
     nome: row.nome,
     nomeCompleto: row.nome_completo,
     idade: row.idade,
-    sexo: row.sexo === 'O' ? 'Outro' : row.sexo,
+    sexo: mapDbSexToPatientSex(row.sexo),
     cpf: row.cpf,
     dataNascimento: row.data_nascimento,
     telefone: row.telefone || undefined,
@@ -173,7 +181,7 @@ export async function createPatient(
       nome: row.nome,
       nomeCompleto: row.nome_completo,
       idade: row.idade,
-      sexo: row.sexo === 'O' ? 'Outro' : row.sexo,
+      sexo: mapDbSexToPatientSex(row.sexo),
       cpf: row.cpf,
       dataNascimento: row.data_nascimento,
       telefone: row.telefone,
@@ -304,7 +312,7 @@ export async function getPatientById(id: string, username: string): Promise<Pati
       nome: row.nome,
       nomeCompleto: row.nome_completo,
       idade: row.idade,
-      sexo: row.sexo === 'O' ? 'Outro' : row.sexo,
+      sexo: mapDbSexToPatientSex(row.sexo),
       cpf: row.cpf,
       dataNascimento: row.data_nascimento,
       telefone: row.telefone,
@@ -387,7 +395,7 @@ export async function updatePatient(
       nome: row.nome,
       nomeCompleto: row.nome_completo,
       idade: row.idade,
-      sexo: row.sexo === 'O' ? 'Outro' : row.sexo,
+      sexo: mapDbSexToPatientSex(row.sexo),
       cpf: row.cpf,
       dataNascimento: row.data_nascimento,
       telefone: row.telefone,

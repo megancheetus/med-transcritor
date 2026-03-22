@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
     const room = await createVideoConsultaRoom(user.username, resolvedPatientId);
 
     // Gerar URL de acesso
-    const joinUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/teleconsulta/${room.id}`;
+    const joinUrl = `${process.env.APP_URL || 'http://localhost:3000'}/teleconsulta/${room.id}`;
 
     return NextResponse.json({
       room,

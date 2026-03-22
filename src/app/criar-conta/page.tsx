@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';
@@ -16,7 +16,7 @@ declare global {
 
 export default function CriarContaPage() {
   const router = useRouter();
-  const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '';
+  const [recaptchaSiteKey, setRecaptchaSiteKey] = useState('');
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -25,9 +25,49 @@ export default function CriarContaPage() {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [recaptchaStatus, setRecaptchaStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>(
-    recaptchaSiteKey ? 'loading' : 'error'
-  );
+  const [recaptchaStatus, setRecaptchaStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadPublicConfig() {
+      try {
+        const response = await fetch('/api/public-config', {
+          method: 'GET',
+          cache: 'no-store',
+        });
+
+        if (!response.ok) {
+          throw new Error('PUBLIC_CONFIG_NOT_AVAILABLE');
+        }
+
+        const data = (await response.json()) as { recaptchaSiteKey?: string };
+        const key = typeof data.recaptchaSiteKey === 'string' ? data.recaptchaSiteKey.trim() : '';
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (!key) {
+          setRecaptchaStatus('error');
+          return;
+        }
+
+        setRecaptchaSiteKey(key);
+        setRecaptchaStatus('loading');
+      } catch {
+        if (isMounted) {
+          setRecaptchaStatus('error');
+        }
+      }
+    }
+
+    loadPublicConfig();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const waitForRecaptcha = async (): Promise<NonNullable<Window['grecaptcha']>> => {
     const timeoutAt = Date.now() + 8000;

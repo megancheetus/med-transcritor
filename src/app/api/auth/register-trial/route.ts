@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
       throw new Error('EMAIL_VERIFICATION_TOKEN_NOT_FOUND');
     }
 
-    const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
+    const appBaseUrl = process.env.APP_URL || request.nextUrl.origin;
     const verificationUrl = `${appBaseUrl}/api/auth/verify-email?token=${encodeURIComponent(
       verificationToken
     )}`;
