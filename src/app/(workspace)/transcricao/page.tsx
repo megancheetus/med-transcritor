@@ -38,7 +38,7 @@ export default function TranscricaoPage() {
       subtitle="Ferramenta de gravação e processamento de transcrição clínica"
     >
       <div className="space-y-5 max-w-5xl">
-        <div className="bg-white rounded-xl border border-[#cfe0e8] p-6 shadow-sm">
+        <div className="bg-white rounded-xl border border-[#cfe0e8] p-4 sm:p-6 shadow-sm">
           <label className="block text-xs font-bold text-[#155b79] tracking-widest uppercase mb-4">
             Selecione o modelo de transcrição
           </label>
@@ -50,14 +50,14 @@ export default function TranscricaoPage() {
                   setSelectedModel(model.id);
                   setTranscriptionContent('');
                 }}
-                className={`text-left p-4 rounded-xl border-2 transition ${
+                className={`text-left p-4 rounded-xl border-2 transition whitespace-normal ${
                   selectedModel === model.id
                     ? 'border-[#1ea58c] bg-gradient-to-br from-[#effaf7] to-[#e5f4f8] shadow-sm'
                     : 'border-[#cfe0e8] bg-white hover:border-[#155b79]'
                 }`}
               >
-                <p className="font-semibold text-[#155b79] text-sm">{model.name}</p>
-                <p className="text-xs text-[#4b6573] mt-1">{model.description}</p>
+                <p className="font-semibold text-[#155b79] text-sm leading-tight break-words">{model.name}</p>
+                <p className="text-xs text-[#4b6573] mt-1 leading-relaxed break-words">{model.description}</p>
               </button>
             ))}
           </div>

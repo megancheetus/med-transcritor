@@ -195,31 +195,31 @@ export default function DashboardPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white border border-[#cfe0e8] rounded-xl p-5 shadow-sm">
-            <p className="text-sm text-[#4b6573]">Usos registrados</p>
-            <p className="text-2xl font-bold text-[#155b79] mt-1">{history.length}</p>
-            <p className="text-xs text-[#1ea58c] mt-2">Somente metadados de uso, sem conteúdo transcrito salvo</p>
+            <p className="text-xs min-[360px]:text-sm leading-tight text-[#4b6573]">Usos registrados</p>
+            <p className="text-xl min-[360px]:text-2xl leading-tight font-bold text-[#155b79] mt-1">{history.length}</p>
+            <p className="text-[11px] min-[360px]:text-xs leading-relaxed text-[#1ea58c] mt-2">Somente metadados de uso, sem conteúdo transcrito salvo</p>
           </div>
 
           <div className="bg-white border border-[#cfe0e8] rounded-xl p-5 shadow-sm">
-            <p className="text-sm text-[#4b6573]">Última gravação</p>
-            <p className="text-2xl font-bold text-[#155b79] mt-1">{recordingDuration > 0 ? formatDurationLabel(recordingDuration) : '--:--'}</p>
-            <p className="text-xs text-[#1ea58c] mt-2">Duração da gravação mais recente</p>
+            <p className="text-xs min-[360px]:text-sm leading-tight text-[#4b6573]">Última gravação</p>
+            <p className="text-xl min-[360px]:text-2xl leading-tight font-bold text-[#155b79] mt-1">{recordingDuration > 0 ? formatDurationLabel(recordingDuration) : '--:--'}</p>
+            <p className="text-[11px] min-[360px]:text-xs leading-relaxed text-[#1ea58c] mt-2">Duração da gravação mais recente</p>
           </div>
 
           <div className="bg-white border border-[#cfe0e8] rounded-xl p-5 shadow-sm">
-            <p className="text-sm text-[#4b6573]">Tempo total acumulado</p>
-            <p className="text-2xl font-bold text-[#155b79] mt-1">{formatDurationLabel(totalSessionDuration)}</p>
-            <p className="text-xs text-[#1ea58c] mt-2">Soma das gravações salvas no histórico</p>
+            <p className="text-xs min-[360px]:text-sm leading-tight text-[#4b6573]">Tempo total acumulado</p>
+            <p className="text-xl min-[360px]:text-2xl leading-tight font-bold text-[#155b79] mt-1">{formatDurationLabel(totalSessionDuration)}</p>
+            <p className="text-[11px] min-[360px]:text-xs leading-relaxed text-[#1ea58c] mt-2">Soma das gravações salvas no histórico</p>
           </div>
         </div>
 
-        <div className="bg-white border border-[#cfe0e8] rounded-xl p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
+        <div className="bg-white border border-[#cfe0e8] rounded-xl p-4 sm:p-6 shadow-sm">
+          <div className="flex flex-col min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between gap-3 mb-5 sm:mb-6">
             <div>
-              <h3 className="text-lg font-bold text-[#155b79]">Atividade de transcrição</h3>
-              <p className="text-sm text-[#4b6573]">Últimos 7 dias: {weeklyTotal} transcrição(ões) registradas</p>
+              <h3 className="text-base min-[360px]:text-lg leading-tight font-bold text-[#155b79]">Atividade de transcrição</h3>
+              <p className="text-xs min-[360px]:text-sm leading-relaxed text-[#4b6573]">Últimos 7 dias: {weeklyTotal} transcrição(ões) registradas</p>
             </div>
-            <span className="text-xs px-3 py-1 rounded-full bg-[#effaf7] text-[#1ea58c] font-semibold">
+            <span className="inline-flex w-fit text-[11px] min-[360px]:text-xs px-3 py-1 rounded-full bg-[#effaf7] text-[#1ea58c] font-semibold">
               Modelo ativo: {getModelById(selectedModel).name}
             </span>
           </div>
@@ -241,7 +241,7 @@ export default function DashboardPage() {
                 </g>
               ))}
             </svg>
-            <div className="flex justify-between mt-3 px-1 text-xs text-[#4b6573] font-medium">
+            <div className="flex justify-between mt-3 px-1 text-[11px] min-[360px]:text-xs text-[#4b6573] font-medium">
               {chartSeries.map((item) => (
                 <span key={item.dayKey}>{item.label}</span>
               ))}
@@ -250,25 +250,25 @@ export default function DashboardPage() {
         </div>
 
         <div className="bg-white border border-[#cfe0e8] rounded-xl shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-[#edf4f6] flex items-center justify-between">
-            <h4 className="text-base font-bold text-[#155b79]">Transcrições recentes</h4>
-            <span className="text-xs text-[#4b6573]">{isLoading ? 'Processando...' : 'Atualizado'}</span>
+          <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-[#edf4f6] flex items-center justify-between gap-3">
+            <h4 className="text-sm min-[360px]:text-base leading-tight font-bold text-[#155b79]">Transcrições recentes</h4>
+            <span className="text-[11px] min-[360px]:text-xs text-[#4b6573] shrink-0">{isLoading ? 'Processando...' : 'Atualizado'}</span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-[#f7fbfc]">
-                  <th className="px-6 py-3 text-xs font-semibold text-[#4b6573] uppercase tracking-wider">Modelo</th>
-                  <th className="px-6 py-3 text-xs font-semibold text-[#4b6573] uppercase tracking-wider">Data</th>
-                  <th className="px-6 py-3 text-xs font-semibold text-[#4b6573] uppercase tracking-wider">Duração</th>
-                  <th className="px-6 py-3 text-xs font-semibold text-[#4b6573] uppercase tracking-wider">Status</th>
+                  <th className="px-4 sm:px-6 py-2.5 sm:py-3 text-[11px] min-[360px]:text-xs font-semibold text-[#4b6573] uppercase tracking-wide">Modelo</th>
+                  <th className="px-4 sm:px-6 py-2.5 sm:py-3 text-[11px] min-[360px]:text-xs font-semibold text-[#4b6573] uppercase tracking-wide">Data</th>
+                  <th className="px-4 sm:px-6 py-2.5 sm:py-3 text-[11px] min-[360px]:text-xs font-semibold text-[#4b6573] uppercase tracking-wide">Duração</th>
+                  <th className="px-4 sm:px-6 py-2.5 sm:py-3 text-[11px] min-[360px]:text-xs font-semibold text-[#4b6573] uppercase tracking-wide">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#edf4f6]">
                 {history.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-6 py-6 text-sm text-[#4b6573]">
+                    <td colSpan={4} className="px-4 sm:px-6 py-5 sm:py-6 text-xs min-[360px]:text-sm text-[#4b6573]">
                       Ainda não há transcrições para exibir.
                     </td>
                   </tr>
@@ -276,11 +276,11 @@ export default function DashboardPage() {
 
                 {history.slice(0, 6).map((entry) => (
                   <tr key={entry.id} className="hover:bg-[#f7fbfc] transition-colors">
-                    <td className="px-6 py-4 text-sm font-medium text-[#0c161c]">{getModelById(entry.model).name}</td>
-                    <td className="px-6 py-4 text-sm text-[#4b6573]">{entry.timestamp}</td>
-                    <td className="px-6 py-4 text-sm text-[#4b6573]">{formatDurationLabel(entry.duration)}</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#effaf7] text-[#1ea58c]">
+                    <td className="px-4 sm:px-6 py-3.5 sm:py-4 text-xs min-[360px]:text-sm font-medium leading-tight text-[#0c161c]">{getModelById(entry.model).name}</td>
+                    <td className="px-4 sm:px-6 py-3.5 sm:py-4 text-xs min-[360px]:text-sm leading-tight text-[#4b6573]">{entry.timestamp}</td>
+                    <td className="px-4 sm:px-6 py-3.5 sm:py-4 text-xs min-[360px]:text-sm leading-tight text-[#4b6573]">{formatDurationLabel(entry.duration)}</td>
+                    <td className="px-4 sm:px-6 py-3.5 sm:py-4">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] min-[360px]:text-xs font-medium bg-[#effaf7] text-[#1ea58c]">
                         Concluído
                       </span>
                     </td>
@@ -291,7 +291,7 @@ export default function DashboardPage() {
           </div>
 
           {lastRecordingTime && (
-            <div className="px-6 py-3 border-t border-[#edf4f6] text-xs text-[#4b6573]">
+            <div className="px-4 sm:px-6 py-3 border-t border-[#edf4f6] text-[11px] min-[360px]:text-xs text-[#4b6573]">
               Último processamento: {lastRecordingTime}
             </div>
           )}

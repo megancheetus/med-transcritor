@@ -192,25 +192,25 @@ export function SendToMedicalRecordModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4">
       <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white shadow-xl">
-        <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white p-6">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900">Enviar para prontuário</h2>
-            <p className="mt-1 text-sm text-slate-600">
+        <div className="sticky top-0 flex items-start justify-between gap-3 border-b border-slate-200 bg-white p-4 sm:p-6">
+          <div className="min-w-0">
+            <h2 className="text-lg sm:text-xl font-bold leading-tight break-words text-slate-900">Enviar para prontuário</h2>
+            <p className="mt-1 text-xs sm:text-sm text-slate-600 leading-relaxed">
               Revise o conteúdo antes de salvar no prontuário do paciente.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-md p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+            className="h-9 w-9 inline-flex items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 shrink-0"
             aria-label="Fechar"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 p-6">
+        <form onSubmit={handleSubmit} className="space-y-4 p-4 sm:p-6">
           {saveError && (
             <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               {saveError}
@@ -333,14 +333,14 @@ export function SendToMedicalRecordModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              className="w-full sm:w-auto min-h-11 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 text-center leading-tight whitespace-normal transition hover:bg-slate-50"
               disabled={isSaving}
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="rounded-lg bg-[#1ea58c] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#18956e] disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full sm:w-auto min-h-11 rounded-lg bg-[#1ea58c] px-4 py-2 text-sm font-semibold text-white text-center leading-tight whitespace-normal transition hover:bg-[#18956e] disabled:cursor-not-allowed disabled:opacity-60"
               disabled={isSaving || isLoadingPatients || !patients.length}
             >
               {isSaving ? 'Salvando...' : 'Salvar no prontuário'}

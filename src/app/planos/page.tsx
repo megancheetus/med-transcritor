@@ -92,13 +92,13 @@ export default function PlanosPage() {
   ];
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100 px-6 py-10">
+    <main className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100 px-4 min-[360px]:px-6 py-8 min-[360px]:py-10">
       <div className="mx-auto max-w-6xl">
-        <header className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <header className="mb-8 min-[360px]:mb-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#155b79]">OmniNote</p>
-            <h1 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">Planos para sua rotina clínica</h1>
-            <p className="mt-3 max-w-2xl text-slate-600">
+            <p className="text-xs min-[360px]:text-sm font-semibold uppercase tracking-[0.14em] min-[360px]:tracking-[0.18em] text-[#155b79]">OmniNote</p>
+            <h1 className="mt-2 text-2xl min-[360px]:text-3xl sm:text-4xl font-bold leading-tight text-slate-900">Planos para sua rotina clínica</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-600">
               Escolha o plano ideal para seu momento e evolua da transcrição para uma operação clínica
               completa.
             </p>
@@ -106,18 +106,18 @@ export default function PlanosPage() {
 
           <Link
             href="/login"
-            className="inline-flex h-11 items-center justify-center rounded-lg bg-[#155b79] px-5 text-sm font-semibold text-white transition hover:bg-[#124b63]"
+            className="inline-flex min-h-11 w-full sm:w-auto items-center justify-center rounded-lg bg-[#155b79] px-5 py-2 text-center text-sm font-semibold text-white transition hover:bg-[#124b63]"
           >
             Voltar para login
           </Link>
         </header>
 
-        <section className="grid gap-6 md:grid-cols-3">
+        <section className="grid gap-4 min-[360px]:gap-6 md:grid-cols-3">
           {plans.map((plan) => (
             <article
               key={plan.name}
               className={[
-                'rounded-2xl border bg-white p-6 shadow-sm transition',
+                'rounded-2xl border bg-white p-4 min-[360px]:p-6 shadow-sm transition',
                 plan.highlight
                   ? 'border-[#1ea58c] ring-2 ring-[#1ea58c]/20 md:-translate-y-1'
                   : 'border-slate-200 hover:-translate-y-1 hover:shadow-md',
@@ -129,13 +129,13 @@ export default function PlanosPage() {
                 </span>
               )}
 
-              <h2 className="mt-4 text-2xl font-bold text-slate-900">{plan.name}</h2>
-              <p className="mt-2 text-3xl font-extrabold text-[#155b79]">{plan.price}</p>
-              <p className="mt-3 text-sm leading-relaxed text-slate-600">{plan.description}</p>
+              <h2 className="mt-4 text-xl min-[360px]:text-2xl leading-tight font-bold text-slate-900">{plan.name}</h2>
+              <p className="mt-2 text-2xl min-[360px]:text-3xl leading-tight font-extrabold text-[#155b79]">{plan.price}</p>
+              <p className="mt-3 text-xs min-[360px]:text-sm leading-relaxed text-slate-600">{plan.description}</p>
 
               <ul className="mt-5 space-y-2">
                 {plan.features.map((feature) => (
-                  <li key={feature} className="flex items-start gap-2 text-sm text-slate-700">
+                  <li key={feature} className="flex items-start gap-2 text-xs min-[360px]:text-sm leading-relaxed text-slate-700">
                     <span className="mt-1 h-2 w-2 rounded-full bg-[#1ea58c]" aria-hidden />
                     <span>{feature}</span>
                   </li>
@@ -159,11 +159,11 @@ export default function PlanosPage() {
           ))}
         </section>
 
-        <section className="mt-8 rounded-2xl border border-[#1ea58c]/30 bg-[#1ea58c]/10 p-6">
+        <section className="mt-8 rounded-2xl border border-[#1ea58c]/30 bg-[#1ea58c]/10 p-4 min-[360px]:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-slate-900">Solicite um teste grátis de 3 dias da plataforma</h2>
-              <p className="mt-2 max-w-2xl text-sm text-slate-700">
+              <h2 className="text-xl min-[360px]:text-2xl leading-tight font-bold text-slate-900">Solicite um teste grátis de 3 dias da plataforma</h2>
+              <p className="mt-2 max-w-2xl text-xs min-[360px]:text-sm leading-relaxed text-slate-700">
                 Experimente os recursos essenciais do OmniNote por 3 dias e avalie como a plataforma se encaixa
                 na sua rotina clínica.
               </p>
@@ -171,7 +171,7 @@ export default function PlanosPage() {
 
             <Link
               href="/criar-conta"
-              className="inline-flex h-11 items-center justify-center rounded-lg bg-[#0d7b67] px-5 text-sm font-semibold text-white transition hover:bg-[#0b6a59]"
+              className="inline-flex min-h-11 w-full sm:w-auto items-center justify-center rounded-lg bg-[#0d7b67] px-5 py-2 text-center text-sm font-semibold text-white transition hover:bg-[#0b6a59]"
             >
               Criar conta de teste agora
             </Link>
@@ -179,10 +179,10 @@ export default function PlanosPage() {
         </section>
 
         {/* Seção de Comparação de Features */}
-        <section className="mt-16">
-          <div className="mb-10">
-            <h2 className="text-3xl font-bold text-slate-900">Compare os recursos de cada plano</h2>
-            <p className="mt-2 text-slate-600">
+        <section className="mt-12 min-[360px]:mt-16">
+          <div className="mb-8 min-[360px]:mb-10">
+            <h2 className="text-2xl min-[360px]:text-3xl leading-tight font-bold text-slate-900">Compare os recursos de cada plano</h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
               Veja quais funcionalidades estão incluídas em cada nível de serviço.
             </p>
           </div>
@@ -194,13 +194,13 @@ export default function PlanosPage() {
                   <h3 className="text-lg font-bold text-slate-900">{section.category}</h3>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-xs min-[360px]:text-sm">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50">
-                        <th className="px-6 py-3 text-left font-semibold text-slate-900">Funcionalidade</th>
-                        <th className="px-6 py-3 text-center font-semibold text-slate-900">Básico</th>
-                        <th className="px-6 py-3 text-center font-semibold text-slate-900">Clínico</th>
-                        <th className="px-6 py-3 text-center font-semibold text-slate-900">Pro</th>
+                        <th className="px-4 sm:px-6 py-2.5 sm:py-3 text-left font-semibold text-slate-900">Funcionalidade</th>
+                        <th className="px-4 sm:px-6 py-2.5 sm:py-3 text-center font-semibold text-slate-900">Básico</th>
+                        <th className="px-4 sm:px-6 py-2.5 sm:py-3 text-center font-semibold text-slate-900">Clínico</th>
+                        <th className="px-4 sm:px-6 py-2.5 sm:py-3 text-center font-semibold text-slate-900">Pro</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -212,8 +212,8 @@ export default function PlanosPage() {
                             idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50',
                           ].join(' ')}
                         >
-                          <td className="px-6 py-3 text-slate-700">{feature.name}</td>
-                          <td className="px-6 py-3 text-center">
+                          <td className="px-4 sm:px-6 py-2.5 sm:py-3 leading-relaxed text-slate-700">{feature.name}</td>
+                          <td className="px-4 sm:px-6 py-2.5 sm:py-3 text-center">
                             {feature.basico ? (
                               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#1ea58c]/20">
                                 <span className="h-2 w-2 rounded-full bg-[#1ea58c]" />
@@ -222,7 +222,7 @@ export default function PlanosPage() {
                               <span className="text-slate-400">—</span>
                             )}
                           </td>
-                          <td className="px-6 py-3 text-center">
+                          <td className="px-4 sm:px-6 py-2.5 sm:py-3 text-center">
                             {feature.clinico ? (
                               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#1ea58c]/20">
                                 <span className="h-2 w-2 rounded-full bg-[#1ea58c]" />
@@ -231,7 +231,7 @@ export default function PlanosPage() {
                               <span className="text-slate-400">—</span>
                             )}
                           </td>
-                          <td className="px-6 py-3 text-center">
+                          <td className="px-4 sm:px-6 py-2.5 sm:py-3 text-center">
                             {feature.pro ? (
                               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#1ea58c]/20">
                                 <span className="h-2 w-2 rounded-full bg-[#1ea58c]" />
@@ -251,10 +251,10 @@ export default function PlanosPage() {
         </section>
 
         {/* Seção de Evolução */}
-        <section className="mt-16">
-          <div className="mb-10">
-            <h2 className="text-3xl font-bold text-slate-900">A evolução do seu consultório digital</h2>
-            <p className="mt-2 text-slate-600">
+        <section className="mt-12 min-[360px]:mt-16">
+          <div className="mb-8 min-[360px]:mb-10">
+            <h2 className="text-2xl min-[360px]:text-3xl leading-tight font-bold text-slate-900">A evolução do seu consultório digital</h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
               Cada plano foi desenhado para um estágio diferente da sua jornada digital.
             </p>
           </div>
@@ -285,22 +285,22 @@ export default function PlanosPage() {
             ].map((item, idx) => (
               <div
                 key={item.title}
-                className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-lg transition"
+                className="rounded-2xl border border-slate-200 bg-white p-4 min-[360px]:p-6 shadow-sm hover:shadow-lg transition"
               >
                 <div className="text-4xl mb-3">{item.icon}</div>
-                <h3 className="text-lg font-bold text-slate-900">{item.title}</h3>
-                <p className="mt-1 text-sm font-semibold text-[#155b79]">{item.subtitle}</p>
-                <p className="mt-3 text-sm leading-relaxed text-slate-600">{item.description}</p>
+                <h3 className="text-base min-[360px]:text-lg leading-tight font-bold text-slate-900">{item.title}</h3>
+                <p className="mt-1 text-xs min-[360px]:text-sm font-semibold text-[#155b79]">{item.subtitle}</p>
+                <p className="mt-3 text-xs min-[360px]:text-sm leading-relaxed text-slate-600">{item.description}</p>
               </div>
             ))}
           </div>
         </section>
 
         {/* Seção FAQ */}
-        <section className="mt-16 mb-16">
-          <div className="mb-10">
-            <h2 className="text-3xl font-bold text-slate-900">Perguntas frequentes</h2>
-            <p className="mt-2 text-slate-600">
+        <section className="mt-12 min-[360px]:mt-16 mb-12 min-[360px]:mb-16">
+          <div className="mb-8 min-[360px]:mb-10">
+            <h2 className="text-2xl min-[360px]:text-3xl leading-tight font-bold text-slate-900">Perguntas frequentes</h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
               Dúvidas sobre os planos? Aqui estão as respostas que você procura.
             </p>
           </div>
@@ -309,29 +309,29 @@ export default function PlanosPage() {
             {faqs.map((faq, idx) => (
               <details
                 key={faq.question}
-                className="group rounded-2xl border border-slate-200 bg-white p-6 cursor-pointer hover:border-[#1ea58c]/50 transition"
+                className="group rounded-2xl border border-slate-200 bg-white p-4 min-[360px]:p-6 cursor-pointer hover:border-[#1ea58c]/50 transition"
               >
-                <summary className="flex items-center justify-between font-semibold text-slate-900 list-none">
-                  <span>{faq.question}</span>
+                <summary className="flex items-center justify-between gap-3 font-semibold text-slate-900 text-sm min-[360px]:text-base leading-tight list-none">
+                  <span className="leading-tight">{faq.question}</span>
                   <span className="text-2xl text-[#1ea58c] group-open:rotate-180 transition-transform">+</span>
                 </summary>
-                <p className="mt-4 text-slate-600 leading-relaxed">{faq.answer}</p>
+                <p className="mt-4 text-xs min-[360px]:text-sm text-slate-600 leading-relaxed">{faq.answer}</p>
               </details>
             ))}
           </div>
 
-          <div className="mt-10 rounded-2xl border border-[#155b79]/20 bg-[#155b79]/5 p-6 text-center">
-            <h3 className="text-xl font-bold text-slate-900">
+          <div className="mt-10 rounded-2xl border border-[#155b79]/20 bg-[#155b79]/5 p-4 min-[360px]:p-6 text-center">
+            <h3 className="text-lg min-[360px]:text-xl leading-tight font-bold text-slate-900">
               Ainda tem dúvidas? Converse conosco no WhatsApp!
             </h3>
-            <p className="mt-2 text-slate-600">
+            <p className="mt-2 text-xs min-[360px]:text-sm leading-relaxed text-slate-600">
               Nossa equipe está disponível para esclarecer qualquer dúvida sobre os planos.
             </p>
             <Link
               href={WHATSAPP_LINK}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-6 inline-flex h-11 items-center justify-center rounded-lg bg-[#155b79] px-6 text-sm font-semibold text-white transition hover:bg-[#124b63]"
+              className="mt-6 inline-flex min-h-11 w-full sm:w-auto items-center justify-center rounded-lg bg-[#155b79] px-6 py-2 text-center text-sm font-semibold text-white transition hover:bg-[#124b63]"
             >
               Enviar mensagem no WhatsApp
             </Link>

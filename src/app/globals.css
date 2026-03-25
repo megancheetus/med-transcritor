@@ -36,10 +36,17 @@ html {
 
 button {
   transition: all 0.3s ease;
+  line-height: 1.25;
 }
 
 @media (max-width: 640px) {
   body {
     font-size: 14px;
+  }
+
+  button {
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
   }
 }

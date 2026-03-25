@@ -325,17 +325,17 @@ export function PatientDashboard({
   return (
     <div className="flex h-full flex-col overflow-hidden bg-gradient-to-b from-slate-50 to-white">
       {/* Header */}
-      <div className="border-b border-slate-200 bg-white p-6">
-        <div className="mb-4 flex items-start justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">{patient.nomeCompleto}</h1>
-            <p className="text-sm text-slate-600">{patient.cpf}</p>
+      <div className="border-b border-slate-200 bg-white p-4 sm:p-6">
+        <div className="mb-4 flex flex-col min-[420px]:flex-row min-[420px]:items-start min-[420px]:justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-xl min-[360px]:text-2xl sm:text-3xl leading-tight break-words font-bold text-slate-900">{patient.nomeCompleto}</h1>
+            <p className="text-xs min-[360px]:text-sm leading-tight text-slate-600">{patient.cpf}</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {onAddMedicalRecord && (
               <button
                 onClick={onAddMedicalRecord}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 transition"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-xs min-[360px]:text-sm font-medium text-white hover:bg-green-700 transition"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Novo Registro
@@ -344,7 +344,7 @@ export function PatientDashboard({
             {onStartTeleconsulta && (
               <button
                 onClick={onStartTeleconsulta}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#1ea58c] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#18956e] transition"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#1ea58c] px-3 py-1.5 text-xs min-[360px]:text-sm font-medium text-white hover:bg-[#18956e] transition"
               >
                 <Phone className="h-3.5 w-3.5" />
                 Teleconsulta
@@ -353,7 +353,7 @@ export function PatientDashboard({
             {onEditClick && (
               <button
                 onClick={onEditClick}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 transition"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs min-[360px]:text-sm font-medium text-white hover:bg-blue-700 transition"
               >
                 <Edit2 className="h-3.5 w-3.5" />
                 Editar
@@ -362,39 +362,39 @@ export function PatientDashboard({
             {onDeletePatient && (
               <button
                 onClick={onDeletePatient}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 transition"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs min-[360px]:text-sm font-medium text-red-700 hover:bg-red-100 transition"
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 Excluir Paciente
               </button>
             )}
-            <div className="rounded-full bg-blue-100 p-3">
+            <div className="rounded-full bg-blue-100 p-2.5 sm:p-3">
               <User className="h-6 w-6 text-blue-600" />
             </div>
           </div>
         </div>
 
         {/* Patient Info Grid */}
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 min-[360px]:gap-3 md:gap-4 md:grid-cols-4">
           <div className="rounded-lg bg-slate-50 p-3">
-            <p className="text-xs font-medium text-slate-600">Idade</p>
-            <p className="mt-1 text-lg font-semibold text-slate-900">{patient.idade}</p>
+            <p className="text-[11px] min-[360px]:text-xs leading-tight font-medium text-slate-600">Idade</p>
+            <p className="mt-1 text-base min-[360px]:text-lg leading-tight font-semibold text-slate-900">{patient.idade}</p>
           </div>
           <div className="rounded-lg bg-slate-50 p-3">
-            <p className="text-xs font-medium text-slate-600">Sexo</p>
-            <p className="mt-1 text-lg font-semibold text-slate-900">
+            <p className="text-[11px] min-[360px]:text-xs leading-tight font-medium text-slate-600">Sexo</p>
+            <p className="mt-1 text-base min-[360px]:text-lg leading-tight font-semibold text-slate-900">
               {patient.sexo === 'M' ? 'Masculino' : patient.sexo === 'F' ? 'Feminino' : 'Outro'}
             </p>
           </div>
           <div className="rounded-lg bg-slate-50 p-3">
-            <p className="text-xs font-medium text-slate-600">Nascimento</p>
-            <p className="mt-1 text-lg font-semibold text-slate-900">
+            <p className="text-[11px] min-[360px]:text-xs leading-tight font-medium text-slate-600">Nascimento</p>
+            <p className="mt-1 text-base min-[360px]:text-lg leading-tight font-semibold text-slate-900">
               {formatDate(patient.dataNascimento)}
             </p>
           </div>
           <div className="rounded-lg bg-slate-50 p-3">
-            <p className="text-xs font-medium text-slate-600">Registros</p>
-            <p className="mt-1 text-lg font-semibold text-slate-900">
+            <p className="text-[11px] min-[360px]:text-xs leading-tight font-medium text-slate-600">Registros</p>
+            <p className="mt-1 text-base min-[360px]:text-lg leading-tight font-semibold text-slate-900">
               {records.length}
               {hasMoreRecords ? '+' : ''}
             </p>
@@ -405,13 +405,13 @@ export function PatientDashboard({
         {(patient.telefone || patient.email) && (
           <div className="mt-4 flex flex-wrap gap-4">
             {patient.telefone && (
-              <div className="flex items-center gap-2 text-sm text-slate-600">
+              <div className="flex items-center gap-2 text-xs min-[360px]:text-sm text-slate-600">
                 <Phone className="h-4 w-4 text-slate-400" />
                 {patient.telefone}
               </div>
             )}
             {patient.email && (
-              <div className="flex items-center gap-2 text-sm text-slate-600">
+              <div className="flex items-center gap-2 text-xs min-[360px]:text-sm text-slate-600">
                 <Mail className="h-4 w-4 text-slate-400" />
                 {patient.email}
               </div>
@@ -421,20 +421,20 @@ export function PatientDashboard({
       </div>
 
       {/* Timeline */}
-      <div ref={timelineRef} onScroll={handleTimelineScroll} className="flex-1 overflow-y-auto p-6">
+      <div ref={timelineRef} onScroll={handleTimelineScroll} className="flex-1 overflow-y-auto p-4 sm:p-6">
         {error && (
           <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700 border border-red-200">
             {error}
           </div>
         )}
 
-        <div className="mb-5 grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-4">
+        <div className="mb-5 grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-white p-3 min-[360px]:p-4 md:grid-cols-4">
           <select
             value={filters.tipoDocumento}
             onChange={(event) =>
               setFilters((prev) => ({ ...prev, tipoDocumento: event.target.value }))
             }
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
+            className="rounded-lg border border-slate-300 px-3 py-2 text-xs min-[360px]:text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
           >
             <option value="">Todos os tipos</option>
             {DOCUMENT_TYPE_FILTERS.map((type) => (
@@ -451,7 +451,7 @@ export function PatientDashboard({
               setFilters((prev) => ({ ...prev, profissional: event.target.value }))
             }
             placeholder="Filtrar por profissional"
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 placeholder-slate-400 focus:border-blue-500 focus:outline-none"
+            className="rounded-lg border border-slate-300 px-3 py-2 text-xs min-[360px]:text-sm text-slate-700 placeholder-slate-400 focus:border-blue-500 focus:outline-none"
           />
 
           <input
@@ -460,7 +460,7 @@ export function PatientDashboard({
             onChange={(event) =>
               setFilters((prev) => ({ ...prev, dateFrom: event.target.value }))
             }
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
+            className="rounded-lg border border-slate-300 px-3 py-2 text-xs min-[360px]:text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
           />
 
           <input
@@ -469,7 +469,7 @@ export function PatientDashboard({
             onChange={(event) =>
               setFilters((prev) => ({ ...prev, dateTo: event.target.value }))
             }
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
+            className="rounded-lg border border-slate-300 px-3 py-2 text-xs min-[360px]:text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
           />
         </div>
 
@@ -488,9 +488,9 @@ export function PatientDashboard({
           </div>
         ) : (
           <div className="space-y-6">
-            <h2 className="text-lg font-semibold text-slate-900">Histórico de Registros</h2>
+            <h2 className="text-base min-[360px]:text-lg leading-tight font-semibold text-slate-900">Histórico de Registros</h2>
 
-            <div className="relative space-y-8 pl-8">
+            <div className="relative space-y-6 min-[360px]:space-y-8 pl-7 min-[360px]:pl-8">
               {/* Vertical line */}
               <div className="absolute left-3 top-0 bottom-0 w-1 bg-gradient-to-b from-blue-200 to-slate-200" />
 
@@ -506,7 +506,7 @@ export function PatientDashboard({
                       return (
                         <div className="mb-3 flex items-center justify-end">
                           <span
-                            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${sourceBadge.className}`}
+                            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] min-[360px]:text-xs font-medium ${sourceBadge.className}`}
                             title={`Origem: ${sourceBadge.label}`}
                           >
                             {sourceBadge.label}
@@ -515,24 +515,24 @@ export function PatientDashboard({
                       );
                     })()}
 
-                    <div className="mb-3 flex items-start justify-between">
+                    <div className="mb-3 flex flex-col min-[420px]:flex-row min-[420px]:items-start min-[420px]:justify-between gap-2.5">
                       <div className="flex items-center gap-3">
                         <div className={`rounded-lg p-2 ${getDocumentColor(record.tipoDocumento)}`}>
                           {getDocumentIcon(record.tipoDocumento)}
                         </div>
                         <div>
-                          <p className="font-semibold text-slate-900">{record.tipoDocumento}</p>
-                          <p className="text-sm text-slate-600">{record.profissional}</p>
+                          <p className="text-sm min-[360px]:text-base leading-tight font-semibold text-slate-900">{record.tipoDocumento}</p>
+                          <p className="text-xs min-[360px]:text-sm leading-tight text-slate-600">{record.profissional}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] min-[360px]:text-xs font-medium text-slate-700">
                           <Calendar className="h-3 w-3" />
                           {formatDate(record.data)}
                         </span>
                         <button
                           onClick={() => handleOpenVersions(record)}
-                          className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 transition hover:bg-blue-100"
+                          className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] min-[360px]:text-xs font-medium text-blue-700 transition hover:bg-blue-100"
                           title="Ver histórico de versões"
                         >
                           <History className="h-3.5 w-3.5" />
@@ -540,7 +540,7 @@ export function PatientDashboard({
                         </button>
                         <button
                           onClick={() => handleDeleteRecord(record.id)}
-                          className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 transition hover:bg-red-100"
+                          className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-[11px] min-[360px]:text-xs font-medium text-red-700 transition hover:bg-red-100"
                           title="Deletar registro"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -550,16 +550,16 @@ export function PatientDashboard({
                     </div>
 
                     <div className="mb-3">
-                      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                      <p className="text-[11px] min-[360px]:text-xs font-medium uppercase tracking-wide text-slate-500">
                         {record.especialidade}
                       </p>
                     </div>
 
                     {record.resumo && (
-                      <p className="mb-3 text-sm font-medium text-slate-800">{record.resumo}</p>
+                      <p className="mb-3 text-xs min-[360px]:text-sm leading-relaxed font-medium text-slate-800">{record.resumo}</p>
                     )}
 
-                    <p className="text-sm leading-relaxed text-slate-700">{record.conteudo}</p>
+                    <p className="text-xs min-[360px]:text-sm leading-relaxed text-slate-700">{record.conteudo}</p>
                   </div>
                 </div>
               ))}

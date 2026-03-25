@@ -160,11 +160,11 @@ export default function CriarContaPage() {
         />
       ) : null}
       <div className="mx-auto max-w-5xl">
-        <header className="mb-10 flex items-center justify-between">
+        <header className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-white/70">OmniNote</p>
-            <h1 className="mt-2 text-3xl font-bold text-white sm:text-4xl">Crie sua conta de teste gratuita</h1>
-            <p className="mt-3 max-w-2xl text-sm text-white/80">
+            <p className="text-xs min-[360px]:text-sm font-semibold uppercase tracking-[0.14em] min-[360px]:tracking-[0.18em] text-white/70">OmniNote</p>
+            <h1 className="mt-2 text-2xl min-[360px]:text-3xl sm:text-4xl font-bold leading-tight text-white">Crie sua conta de teste gratuita</h1>
+            <p className="mt-3 max-w-2xl text-xs min-[360px]:text-sm text-white/80 leading-relaxed">
               Ative seu período de teste e avalie a transcrição clínica, a teleconsulta e o prontuário
               eletrônico em um fluxo unificado.
             </p>
@@ -172,17 +172,17 @@ export default function CriarContaPage() {
 
           <Link
             href="/login"
-            className="inline-flex h-11 items-center justify-center rounded-lg bg-white px-5 text-sm font-semibold text-[#155b79] transition hover:bg-slate-100"
+            className="inline-flex min-h-11 w-full sm:w-auto items-center justify-center rounded-lg bg-white px-5 py-2 text-center text-sm font-semibold text-[#155b79] transition hover:bg-slate-100"
           >
             Voltar ao login
           </Link>
         </header>
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-4 min-[360px]:gap-6 md:grid-cols-2">
           <section className="space-y-4 text-white">
-            <div className="rounded-2xl border border-white/20 bg-white/10 p-6 backdrop-blur-sm">
-              <h2 className="text-xl font-bold">O que está incluído no teste</h2>
-              <ul className="mt-4 space-y-3 text-sm text-white/90">
+            <div className="rounded-2xl border border-white/20 bg-white/10 p-4 min-[360px]:p-6 backdrop-blur-sm">
+              <h2 className="text-base min-[360px]:text-lg leading-tight font-bold">O que está incluído no teste</h2>
+              <ul className="mt-4 space-y-3 text-xs min-[360px]:text-sm leading-relaxed text-white/90">
                 <li>Transcrição clínica completa em modelo SOAP e em modelo clínico tradicional</li>
                 <li>Teleconsulta com sala dedicada para atendimentos remotos</li>
                 <li>Prontuário eletrônico e gestão de pacientes em um único ambiente</li>
@@ -190,9 +190,9 @@ export default function CriarContaPage() {
               </ul>
             </div>
 
-            <div className="rounded-2xl border border-white/20 bg-[#0c161c]/25 p-6 backdrop-blur-sm">
-              <h2 className="text-lg font-bold">Como funciona após o cadastro</h2>
-              <ol className="mt-4 space-y-3 text-sm text-white/85">
+            <div className="rounded-2xl border border-white/20 bg-[#0c161c]/25 p-4 min-[360px]:p-6 backdrop-blur-sm">
+              <h2 className="text-base min-[360px]:text-lg leading-tight font-bold">Como funciona após o cadastro</h2>
+              <ol className="mt-4 space-y-3 text-xs min-[360px]:text-sm leading-relaxed text-white/85">
                 <li>1. Você cria sua conta com nome, e-mail e senha.</li>
                 <li>2. Enviamos um link de confirmação para ativar o acesso.</li>
                 <li>3. Após a validação, o ambiente já fica liberado para teste.</li>
@@ -201,55 +201,55 @@ export default function CriarContaPage() {
             </div>
 
             <div className="grid gap-4 sm:grid-cols-1">
-              <article className="rounded-2xl border border-white/15 bg-white/8 p-5 backdrop-blur-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/65">Ambiente clínico</p>
-                <p className="mt-3 text-sm leading-relaxed text-white/90">
+              <article className="rounded-2xl border border-white/15 bg-white/8 p-4 min-[360px]:p-5 backdrop-blur-sm">
+                <p className="text-[11px] min-[360px]:text-xs font-semibold uppercase tracking-[0.14em] min-[360px]:tracking-[0.18em] text-white/65">Ambiente clínico</p>
+                <p className="mt-3 text-xs min-[360px]:text-sm leading-relaxed text-white/90">
                   Ideal para validar a rotina real de transcrição, teleconsulta e organização do atendimento.
                 </p>
               </article>
             </div>
 
-            <div className="rounded-2xl border border-white/20 bg-white/10 p-6 backdrop-blur-sm">
+            <div className="rounded-2xl border border-white/20 bg-white/10 p-4 min-[360px]:p-6 backdrop-blur-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/65">Planos</p>
+                  <p className="text-[11px] min-[360px]:text-xs font-semibold uppercase tracking-[0.14em] min-[360px]:tracking-[0.18em] text-white/65">Planos</p>
                   <h2 className="mt-2 text-lg font-bold"></h2>
                 </div>
                 <Link
                   href="/planos"
-                  className="inline-flex h-10 items-center justify-center rounded-lg bg-white px-4 text-xs font-semibold text-[#155b79] transition hover:bg-slate-100"
+                  className="inline-flex min-h-10 items-center justify-center rounded-lg bg-white px-4 py-2 text-[11px] min-[360px]:text-xs font-semibold text-[#155b79] transition hover:bg-slate-100"
                 >
                   Ver detalhes
                 </Link>
               </div>
 
               <div className="mt-5 grid gap-3">
-                <article className="rounded-xl border border-white/15 bg-[#0c161c]/20 p-4">
+                <article className="rounded-xl border border-white/15 bg-[#0c161c]/20 p-3 min-[360px]:p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-sm font-bold text-white">Plano Básico</h3>
-                    <span className="text-sm font-semibold text-white/85">R$ 49,90/mês</span>
+                    <h3 className="text-xs min-[360px]:text-sm leading-tight font-bold text-white">Plano Básico</h3>
+                    <span className="text-xs min-[360px]:text-sm font-semibold text-white/85">R$ 49,90/mês</span>
                   </div>
-                  <p className="mt-2 text-sm text-white/80">
+                  <p className="mt-2 text-xs min-[360px]:text-sm leading-relaxed text-white/80">
                     Indicado para quem quer focar apenas na transcrição clínica com agilidade operacional.
                   </p>
                 </article>
 
-                <article className="rounded-xl border border-[#7de4d0]/40 bg-[#117a69]/18 p-4">
+                <article className="rounded-xl border border-[#7de4d0]/40 bg-[#117a69]/18 p-3 min-[360px]:p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-sm font-bold text-white">Plano Clínico</h3>
-                    <span className="text-sm font-semibold text-white/90">R$ 74,90/mês</span>
+                    <h3 className="text-xs min-[360px]:text-sm leading-tight font-bold text-white">Plano Clínico</h3>
+                    <span className="text-xs min-[360px]:text-sm font-semibold text-white/90">R$ 74,90/mês</span>
                   </div>
-                  <p className="mt-2 text-sm text-white/85">
+                  <p className="mt-2 text-xs min-[360px]:text-sm leading-relaxed text-white/85">
                     Libera transcrição e teleconsulta para profissionais que atendem presencial e remoto.
                   </p>
                 </article>
 
-                <article className="rounded-xl border border-white/15 bg-[#0c161c]/20 p-4">
+                <article className="rounded-xl border border-white/15 bg-[#0c161c]/20 p-3 min-[360px]:p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-sm font-bold text-white">Plano Pró</h3>
-                    <span className="text-sm font-semibold text-white/85">R$ 99,90/mês</span>
+                    <h3 className="text-xs min-[360px]:text-sm leading-tight font-bold text-white">Plano Pró</h3>
+                    <span className="text-xs min-[360px]:text-sm font-semibold text-white/85">R$ 99,90/mês</span>
                   </div>
-                  <p className="mt-2 text-sm text-white/80">
+                  <p className="mt-2 text-xs min-[360px]:text-sm leading-relaxed text-white/80">
                     Estrutura completa com transcrição, teleconsulta, pacientes e prontuário eletrônico.
                   </p>
                 </article>
@@ -261,16 +261,16 @@ export default function CriarContaPage() {
             </div>
           </section>
 
-          <form onSubmit={handleSubmit} className="rounded-2xl bg-white p-6 shadow-xl space-y-4">
+          <form onSubmit={handleSubmit} className="rounded-2xl bg-white p-4 min-[360px]:p-6 shadow-xl space-y-3.5 min-[360px]:space-y-4">
             <div>
-              <label htmlFor="trial-full-name" className="block text-xs font-semibold text-[#4b6573] uppercase tracking-wide mb-2">
+              <label htmlFor="trial-full-name" className="block text-[11px] min-[360px]:text-xs font-semibold text-[#4b6573] uppercase tracking-wide mb-2">
                 Nome completo
               </label>
               <input
                 id="trial-full-name"
                 value={fullName}
                 onChange={(event) => setFullName(event.target.value)}
-                className="w-full rounded-lg border border-[#cfe0e8] px-4 py-3 text-sm focus:border-[#1ea58c] focus:outline-none"
+                className="w-full rounded-lg border border-[#cfe0e8] px-3 min-[360px]:px-4 py-2.5 min-[360px]:py-3 text-xs min-[360px]:text-sm focus:border-[#1ea58c] focus:outline-none"
                 placeholder="Ex.: Ana Souza"
                 minLength={3}
                 required
@@ -279,14 +279,14 @@ export default function CriarContaPage() {
             </div>
 
             <div>
-              <label htmlFor="trial-username" className="block text-xs font-semibold text-[#4b6573] uppercase tracking-wide mb-2">
+              <label htmlFor="trial-username" className="block text-[11px] min-[360px]:text-xs font-semibold text-[#4b6573] uppercase tracking-wide mb-2">
                 Usuário
               </label>
               <input
                 id="trial-username"
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
-                className="w-full rounded-lg border border-[#cfe0e8] px-4 py-3 text-sm focus:border-[#1ea58c] focus:outline-none"
+                className="w-full rounded-lg border border-[#cfe0e8] px-3 min-[360px]:px-4 py-2.5 min-[360px]:py-3 text-xs min-[360px]:text-sm focus:border-[#1ea58c] focus:outline-none"
                 placeholder="Ex.: anasouza"
                 minLength={3}
                 required
@@ -295,7 +295,7 @@ export default function CriarContaPage() {
             </div>
 
             <div>
-              <label htmlFor="trial-email" className="block text-xs font-semibold text-[#4b6573] uppercase tracking-wide mb-2">
+              <label htmlFor="trial-email" className="block text-[11px] min-[360px]:text-xs font-semibold text-[#4b6573] uppercase tracking-wide mb-2">
                 E-mail
               </label>
               <input
@@ -303,7 +303,7 @@ export default function CriarContaPage() {
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded-lg border border-[#cfe0e8] px-4 py-3 text-sm focus:border-[#1ea58c] focus:outline-none"
+                className="w-full rounded-lg border border-[#cfe0e8] px-3 min-[360px]:px-4 py-2.5 min-[360px]:py-3 text-xs min-[360px]:text-sm focus:border-[#1ea58c] focus:outline-none"
                 placeholder="ana@clinica.com"
                 required
                 disabled={isSubmitting}
@@ -311,7 +311,7 @@ export default function CriarContaPage() {
             </div>
 
             <div>
-              <label htmlFor="trial-password" className="block text-xs font-semibold text-[#4b6573] uppercase tracking-wide mb-2">
+              <label htmlFor="trial-password" className="block text-[11px] min-[360px]:text-xs font-semibold text-[#4b6573] uppercase tracking-wide mb-2">
                 Senha
               </label>
               <input
@@ -319,7 +319,7 @@ export default function CriarContaPage() {
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                className="w-full rounded-lg border border-[#cfe0e8] px-4 py-3 text-sm focus:border-[#1ea58c] focus:outline-none"
+                className="w-full rounded-lg border border-[#cfe0e8] px-3 min-[360px]:px-4 py-2.5 min-[360px]:py-3 text-xs min-[360px]:text-sm focus:border-[#1ea58c] focus:outline-none"
                 placeholder="Mínimo de 8 caracteres"
                 minLength={8}
                 required
@@ -328,7 +328,7 @@ export default function CriarContaPage() {
             </div>
 
             <div>
-              <label htmlFor="trial-confirm-password" className="block text-xs font-semibold text-[#4b6573] uppercase tracking-wide mb-2">
+              <label htmlFor="trial-confirm-password" className="block text-[11px] min-[360px]:text-xs font-semibold text-[#4b6573] uppercase tracking-wide mb-2">
                 Confirmar senha
               </label>
               <input
@@ -336,7 +336,7 @@ export default function CriarContaPage() {
                 type="password"
                 value={confirmPassword}
                 onChange={(event) => setConfirmPassword(event.target.value)}
-                className="w-full rounded-lg border border-[#cfe0e8] px-4 py-3 text-sm focus:border-[#1ea58c] focus:outline-none"
+                className="w-full rounded-lg border border-[#cfe0e8] px-3 min-[360px]:px-4 py-2.5 min-[360px]:py-3 text-xs min-[360px]:text-sm focus:border-[#1ea58c] focus:outline-none"
                 placeholder="Repita a senha"
                 minLength={8}
                 required
@@ -345,25 +345,25 @@ export default function CriarContaPage() {
             </div>
 
             {error && (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 min-[360px]:px-4 py-2.5 min-[360px]:py-3 text-xs min-[360px]:text-sm leading-relaxed text-red-700">
                 {error}
               </div>
             )}
 
             {successMessage && (
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 min-[360px]:px-4 py-2.5 min-[360px]:py-3 text-xs min-[360px]:text-sm leading-relaxed text-emerald-700">
                 {successMessage}
               </div>
             )}
 
             {recaptchaStatus === 'loading' && !error && (
-              <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 min-[360px]:px-4 py-2.5 min-[360px]:py-3 text-xs min-[360px]:text-sm leading-relaxed text-blue-700">
                 Preparando validação reCAPTCHA...
               </div>
             )}
 
             {recaptchaStatus === 'error' && !error && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 min-[360px]:px-4 py-2.5 min-[360px]:py-3 text-xs min-[360px]:text-sm leading-relaxed text-amber-700">
                 O reCAPTCHA não carregou corretamente. Se você usa bloqueador de anúncios ou proteção de rastreamento,
                 libere o Google para esta página e recarregue.
               </div>
@@ -376,7 +376,7 @@ export default function CriarContaPage() {
 
             <button
               type="submit"
-              className="w-full rounded-lg bg-[#1ea58c] py-3 text-sm font-bold text-white transition hover:bg-[#178a75] disabled:opacity-50"
+              className="w-full min-h-11 rounded-lg bg-[#1ea58c] py-2.5 min-[360px]:py-3 text-xs min-[360px]:text-sm font-bold text-white transition hover:bg-[#178a75] disabled:opacity-50"
               disabled={isSubmitting}
             >
               {isSubmitting ? 'Criando conta...' : 'Criar conta de teste'}

@@ -47,16 +47,16 @@ export function PatientList({
   return (
     <div className="flex h-full flex-col border-r border-slate-200 bg-white">
       {/* Header */}
-      <div className="border-b border-slate-200 p-4">
+      <div className="border-b border-slate-200 p-3 min-[360px]:p-4">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-blue-600" />
-            <h2 className="text-lg font-semibold text-slate-900">Pacientes</h2>
+            <Users className="h-4 w-4 min-[360px]:h-5 min-[360px]:w-5 text-blue-600" />
+            <h2 className="text-base min-[360px]:text-lg leading-tight font-semibold text-slate-900">Pacientes</h2>
           </div>
           {onAddClick && (
             <button
               onClick={onAddClick}
-              className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 transition"
+              className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-2.5 min-[360px]:px-3 py-1.5 text-xs min-[360px]:text-sm font-medium text-white hover:bg-blue-700 transition"
               title="Adicionar novo paciente"
             >
               <Plus className="h-4 w-4" />
@@ -73,7 +73,7 @@ export function PatientList({
             placeholder="Buscar por nome ou CPF..."
             value={searchQuery}
             onChange={(e) => onSearchQueryChange(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 bg-slate-50 py-2 pl-9 pr-3 text-sm placeholder-slate-500 transition focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-200"
+            className="w-full rounded-lg border border-slate-300 bg-slate-50 py-2 pl-9 pr-3 text-xs min-[360px]:text-sm placeholder-slate-500 transition focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-200"
           />
         </div>
       </div>
@@ -94,7 +94,7 @@ export function PatientList({
               <li key={patient.id}>
                 <button
                   onClick={() => onSelectPatient(patient)}
-                  className={`w-full px-4 py-3 text-left transition-colors hover:bg-blue-50 ${
+                  className={`w-full px-3 min-[360px]:px-4 py-2.5 min-[360px]:py-3 text-left transition-colors hover:bg-blue-50 ${
                     selectedPatient?.id === patient.id
                       ? 'border-l-4 border-blue-600 bg-blue-50'
                       : 'border-l-4 border-transparent'
@@ -102,12 +102,12 @@ export function PatientList({
                 >
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-slate-900">{patient.nome}</p>
-                      <p className="truncate text-xs text-slate-500">{patient.cpf}</p>
+                      <p className="truncate text-sm min-[360px]:text-base leading-tight font-medium text-slate-900">{patient.nome}</p>
+                      <p className="truncate text-[11px] min-[360px]:text-xs leading-tight text-slate-500">{patient.cpf}</p>
                     </div>
                     <div className="ml-2 flex-shrink-0 text-right">
-                      <p className="text-xs font-medium text-slate-600">{patient.idade}</p>
-                      <p className="text-xs text-slate-500">{patient.sexo === 'M' ? 'M' : 'F'}</p>
+                      <p className="text-[11px] min-[360px]:text-xs leading-tight font-medium text-slate-600">{patient.idade}</p>
+                      <p className="text-[11px] min-[360px]:text-xs leading-tight text-slate-500">{patient.sexo === 'M' ? 'M' : 'F'}</p>
                     </div>
                   </div>
                 </button>
@@ -130,8 +130,8 @@ export function PatientList({
       </div>
 
       {/* Footer */}
-      <div className="border-t border-slate-200 bg-slate-50 px-4 py-3">
-        <p className="text-xs text-slate-500">
+      <div className="border-t border-slate-200 bg-slate-50 px-3 min-[360px]:px-4 py-2.5 min-[360px]:py-3">
+        <p className="text-[11px] min-[360px]:text-xs text-slate-500">
           {patients.length} paciente(s) carregado(s)
         </p>
       </div>

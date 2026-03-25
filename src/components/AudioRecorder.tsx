@@ -558,7 +558,7 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
                 type="button"
                 onClick={() => setCaptureMode(option.value)}
                 disabled={isRecording || isLoading || isPrepared || isPreparing}
-                className={`rounded-xl border-2 p-5 text-left transition transform hover:scale-105 ${
+                className={`rounded-xl border-2 p-5 text-left transition sm:hover:scale-[1.02] ${
                   isSelected
                     ? 'border-[#1ea58c] bg-gradient-to-br from-[#effaf7] to-[#e5f4f8] shadow-md'
                     : 'border-[#cfe0e8] bg-white hover:border-[#155b79] hover:shadow-sm'
@@ -574,7 +574,7 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
                       <span className="text-white text-xs font-bold">✓</span>
                     )}
                   </div>
-                  <p className="font-bold text-[#155b79] text-base">{option.title}</p>
+                  <p className="font-bold text-[#155b79] text-base leading-tight break-words">{option.title}</p>
                 </div>
               </button>
             );
@@ -613,7 +613,7 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
                 <div className="flex items-center justify-between gap-3 mb-2">
                   <p className="text-sm font-medium text-[#0c161c]">{indicator.label}</p>
                   <span
-                    className={`rounded-full border px-2.5 py-1 text-xs font-medium ${SOURCE_STATUS_CLASSES[indicator.status]}`}
+                    className={`rounded-full border px-2.5 py-1 text-xs font-medium text-center leading-tight whitespace-normal ${SOURCE_STATUS_CLASSES[indicator.status]}`}
                   >
                     {SOURCE_STATUS_LABELS[indicator.status]}
                   </span>
@@ -661,7 +661,7 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
             <button
               onClick={prepareRecording}
               disabled={isLoading || isPreparing}
-              className="flex-1 sm:flex-none px-6 py-3 bg-[#1a6a8d] hover:bg-[#155b79] text-white font-medium tracking-wide rounded-md disabled:bg-gray-400 transition-all disabled:cursor-not-allowed"
+              className="flex-1 sm:flex-none px-6 py-3 bg-[#1a6a8d] hover:bg-[#155b79] text-white font-medium tracking-wide text-center leading-tight whitespace-normal rounded-md disabled:bg-gray-400 transition-all disabled:cursor-not-allowed"
             >
               {isPreparing ? 'Verificando dispositivos...' : 'Preparar'}
             </button>
@@ -670,13 +670,13 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
               <button
                 onClick={startRecording}
                 disabled={isLoading}
-                className="flex-1 sm:flex-none px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium tracking-wide rounded-md disabled:bg-gray-400 transition-all disabled:cursor-not-allowed"
+                className="flex-1 sm:flex-none px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium tracking-wide text-center leading-tight whitespace-normal rounded-md disabled:bg-gray-400 transition-all disabled:cursor-not-allowed"
               >
                 {captureMode === 'inPerson' ? 'Iniciar Consulta Presencial' : 'Iniciar Teleconsulta'}
               </button>
               <button
                 onClick={cancelPrepare}
-                className="flex-1 sm:flex-none px-6 py-3 bg-gray-400 hover:bg-gray-500 text-white font-medium tracking-wide rounded-md transition-all"
+                className="flex-1 sm:flex-none px-6 py-3 bg-gray-400 hover:bg-gray-500 text-white font-medium tracking-wide text-center leading-tight whitespace-normal rounded-md transition-all"
               >
                 Cancelar
               </button>
@@ -684,7 +684,7 @@ export default function AudioRecorder({ onRecordingComplete, isLoading = false }
           ) : isRecording ? (
             <button
               onClick={stopRecording}
-              className="flex-1 sm:flex-none px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-medium tracking-wide rounded-md transition-all"
+              className="flex-1 sm:flex-none px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-medium tracking-wide text-center leading-tight whitespace-normal rounded-md transition-all"
             >
               Parar Gravação
             </button>

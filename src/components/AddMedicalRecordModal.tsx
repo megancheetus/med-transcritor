@@ -150,25 +150,25 @@ export function AddMedicalRecordModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4">
       <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg bg-white shadow-lg">
-        <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white p-6">
-          <h2 className="text-xl font-bold text-slate-900">Novo Registro Médico</h2>
+        <div className="sticky top-0 flex items-start justify-between gap-3 border-b border-slate-200 bg-white p-4 sm:p-6">
+          <h2 className="min-w-0 text-lg sm:text-xl font-bold leading-tight break-words text-slate-900">Novo Registro Médico</h2>
           <button
             onClick={onClose}
-            className="text-slate-400 transition hover:text-slate-600"
+            className="h-9 w-9 inline-flex items-center justify-center rounded-md text-slate-400 transition hover:text-slate-600 shrink-0"
             aria-label="Fechar"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 p-6">
-          <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1 md:grid-cols-4">
+        <form onSubmit={handleSubmit} className="space-y-4 p-4 sm:p-6">
+          <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1 md:grid-cols-4">
             <button
               type="button"
               onClick={() => setActiveTab('resumo')}
-              className={`rounded-md px-3 py-2 text-xs font-semibold transition ${
+              className={`min-h-11 rounded-md px-3 py-2 text-xs font-semibold text-center leading-tight whitespace-normal transition ${
                 activeTab === 'resumo'
                   ? 'bg-white text-slate-900 shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
@@ -179,7 +179,7 @@ export function AddMedicalRecordModal({
             <button
               type="button"
               onClick={() => setActiveTab('soap')}
-              className={`rounded-md px-3 py-2 text-xs font-semibold transition ${
+              className={`min-h-11 rounded-md px-3 py-2 text-xs font-semibold text-center leading-tight whitespace-normal transition ${
                 activeTab === 'soap'
                   ? 'bg-white text-slate-900 shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
@@ -190,7 +190,7 @@ export function AddMedicalRecordModal({
             <button
               type="button"
               onClick={() => setActiveTab('diagnostico')}
-              className={`rounded-md px-3 py-2 text-xs font-semibold transition ${
+              className={`min-h-11 rounded-md px-3 py-2 text-xs font-semibold text-center leading-tight whitespace-normal transition ${
                 activeTab === 'diagnostico'
                   ? 'bg-white text-slate-900 shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
@@ -201,7 +201,7 @@ export function AddMedicalRecordModal({
             <button
               type="button"
               onClick={() => setActiveTab('revisao')}
-              className={`rounded-md px-3 py-2 text-xs font-semibold transition ${
+              className={`min-h-11 rounded-md px-3 py-2 text-xs font-semibold text-center leading-tight whitespace-normal transition ${
                 activeTab === 'revisao'
                   ? 'bg-white text-slate-900 shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
@@ -213,7 +213,7 @@ export function AddMedicalRecordModal({
 
           {activeTab === 'resumo' && (
             <>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">Data *</label>
                   <input
@@ -250,7 +250,7 @@ export function AddMedicalRecordModal({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">Profissional *</label>
                   <input
@@ -419,17 +419,17 @@ export function AddMedicalRecordModal({
             </div>
           )}
 
-          <div className="flex gap-3 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-lg border border-slate-300 px-4 py-2 font-medium text-slate-700 transition hover:bg-slate-50"
+              className="w-full sm:flex-1 min-h-11 rounded-lg border border-slate-300 px-4 py-2 font-medium text-slate-700 text-center leading-tight whitespace-normal transition hover:bg-slate-50"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition hover:bg-blue-700"
+              className="w-full sm:flex-1 min-h-11 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white text-center leading-tight whitespace-normal transition hover:bg-blue-700"
             >
               Adicionar
             </button>

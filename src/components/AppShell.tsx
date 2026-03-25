@@ -192,26 +192,26 @@ export default function AppShell({ title, subtitle, children }: AppShellProps) {
       </aside>
 
       <main className="flex-1">
-        <header className="h-16 border-b border-[#cfe0e8] bg-white/90 backdrop-blur px-4 sm:px-6 lg:px-8 flex items-center justify-between sticky top-0 z-10">
-          <div className="flex items-center gap-3">
+        <header className="min-h-16 border-b border-[#cfe0e8] bg-white/90 backdrop-blur px-3 sm:px-6 lg:px-8 py-2 flex items-center justify-between gap-3 sticky top-0 z-10">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
               type="button"
               onClick={() => setIsMobileMenuOpen(true)}
-              className="lg:hidden inline-flex items-center justify-center w-9 h-9 rounded-lg border border-[#cfe0e8] text-[#4b6573] hover:text-[#155b79] hover:border-[#155b79] transition"
+              className="lg:hidden shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-lg border border-[#cfe0e8] text-[#4b6573] hover:text-[#155b79] hover:border-[#155b79] transition"
               aria-label="Abrir menu"
             >
               ☰
             </button>
 
-            <div>
-              <h2 className="text-lg sm:text-xl font-bold text-[#155b79]">{title}</h2>
+            <div className="min-w-0">
+              <h2 className="text-base min-[360px]:text-lg sm:text-xl font-bold leading-tight break-words text-[#155b79]">{title}</h2>
               <p className="text-xs text-[#4b6573] hidden sm:block">{subtitle}</p>
             </div>
           </div>
 
           <button
             onClick={handleLogout}
-            className="text-sm font-medium text-[#4b6573] hover:text-[#155b79] transition"
+            className="shrink-0 text-xs min-[360px]:text-sm font-medium text-[#4b6573] hover:text-[#155b79] transition"
           >
             Sair
           </button>

@@ -52,14 +52,14 @@ export function EditPatientModal({ isOpen, patient, onClose, onSave }: EditPatie
   if (!isOpen || !formData) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-3 sm:p-4">
       <div className="bg-white rounded-lg shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 flex items-center justify-between p-6 border-b border-slate-200 bg-white">
-          <h2 className="text-xl font-bold text-slate-900">Editar Paciente</h2>
+        <div className="sticky top-0 flex items-start justify-between gap-3 p-4 sm:p-6 border-b border-slate-200 bg-white">
+          <h2 className="min-w-0 text-lg sm:text-xl font-bold leading-tight break-words text-slate-900">Editar Paciente</h2>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 transition"
+            className="h-9 w-9 inline-flex items-center justify-center rounded-md text-slate-400 hover:text-slate-600 transition shrink-0"
             aria-label="Fechar"
           >
             <X className="h-5 w-5" />
@@ -67,7 +67,7 @@ export function EditPatientModal({ isOpen, patient, onClose, onSave }: EditPatie
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Nome *</label>
             <input
@@ -96,7 +96,7 @@ export function EditPatientModal({ isOpen, patient, onClose, onSave }: EditPatie
             {errors.nomeCompleto && <p className="text-xs text-red-600 mt-1">{errors.nomeCompleto}</p>}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Idade *</label>
               <input
@@ -180,17 +180,17 @@ export function EditPatientModal({ isOpen, patient, onClose, onSave }: EditPatie
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 transition font-medium"
+              className="w-full sm:flex-1 min-h-11 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 transition font-medium text-center leading-tight whitespace-normal"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+              className="w-full sm:flex-1 min-h-11 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-center leading-tight whitespace-normal"
             >
               Salvar
             </button>
