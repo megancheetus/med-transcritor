@@ -12,12 +12,13 @@ interface AppShellProps {
 }
 
 const BASE_MENU_ITEMS = [
+  { href: '/agenda', label: 'Agenda' },
   { href: '/dashboard', label: 'Dashboard' },
-  { href: '/transcricao', label: 'Transcrição', module: 'transcricao' as const },
-  { href: '/prontuario', label: 'Prontuário', module: 'prontuario' as const },
-  { href: '/teleconsulta', label: 'Teleconsulta', module: 'teleconsulta' as const },
   { href: '/historico', label: 'Histórico' },
   { href: '/perfil', label: 'Perfil' },
+  { href: '/prontuario', label: 'Prontuário', module: 'prontuario' as const },
+  { href: '/teleconsulta', label: 'Teleconsulta', module: 'teleconsulta' as const },
+  { href: '/transcricao', label: 'Transcrição', module: 'transcricao' as const },
 ];
 
 const ADMIN_MENU_ITEM = { href: '/admin', label: 'Administração' };
