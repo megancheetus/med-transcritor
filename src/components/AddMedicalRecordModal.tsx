@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { MedicalRecord } from '@/lib/types';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ComplementaryExamStatus, MedicalRecord } from '@/lib/types';
 import { X } from 'lucide-react';
+import CID10Autocomplete from './CID10Autocomplete';
 
 interface AddMedicalRecordModalProps {
   isOpen: boolean;
@@ -12,7 +13,72 @@ interface AddMedicalRecordModalProps {
 }
 
 type TipoDocumento = 'Consulta' | 'Exame' | 'Procedimento' | 'Prescrição' | 'Internação';
-type ModalTab = 'resumo' | 'soap' | 'diagnostico' | 'bioimpedancia' | 'revisao';
+type ModalTab = 'resumo' | 'clinico' | 'bioimpedancia' | 'revisao';
+
+interface ComplementaryExamFormItem {
+  nome: string;
+  data: string;
+  resultado: string;
+  status: ComplementaryExamStatus;
+}
+
+const EXAM_STATUS_OPTIONS: Array<{ value: ComplementaryExamStatus; label: string }> = [
+  { value: 'nao_informado', label: 'Não informado' },
+  { value: 'solicitado', label: 'Solicitado' },
+  { value: 'pendente', label: 'Pendente' },
+  { value: 'realizado', label: 'Realizado' },
+  { value: 'cancelado', label: 'Cancelado' },
+];
+
+const createEmptyExamItem = (): ComplementaryExamFormItem => ({
+  nome: '',
+  data: '',
+  resultado: '',
+  status: 'nao_informado',
+});
+
+const createInitialFormState = () => ({
+  data: new Date().toISOString().split('T')[0],
+  tipoDocumento: 'Consulta' as TipoDocumento,
+  profissional: '',
+  especialidade: '',
+  conteudo: '',
+  resumo: '',
+  soapSubjetivo: '',
+  soapObjetivo: '',
+  soapAvaliacao: '',
+  soapPlano: '',
+  cid10Codes: '',
+  complementaryExams: '',
+  complementaryExamItems: [createEmptyExamItem()],
+  medications: '',
+  allergies: '',
+  followUpDate: '',
+  bioMeasuredAt: '',
+  bioSource: '',
+  bioScore: '',
+  bioAlturaCm: '',
+  bioPesoKg: '',
+  bioImc: '',
+  bioGorduraPercent: '',
+  bioMassaGorduraKg: '',
+  bioMassaMagraKg: '',
+  bioMusculoEsqueleticoKg: '',
+  bioAguaCorporalL: '',
+  bioGorduraVisceral: '',
+  bioTmbKcal: '',
+  bioLeanLeftArmKg: '',
+  bioLeanRightArmKg: '',
+  bioLeanTrunkKg: '',
+  bioLeanLeftLegKg: '',
+  bioLeanRightLegKg: '',
+  bioFatLeftArmKg: '',
+  bioFatRightArmKg: '',
+  bioFatTrunkKg: '',
+  bioFatLeftLegKg: '',
+  bioFatRightLegKg: '',
+  bioObservacoes: '',
+});
 
 function parseOptionalNumber(value: string): number | undefined {
   const normalized = value.replace(',', '.').trim();
@@ -58,50 +124,57 @@ export function AddMedicalRecordModal({
   onClose,
   onAdd,
 }: AddMedicalRecordModalProps) {
+  const formRef = useRef<HTMLFormElement | null>(null);
   const [activeTab, setActiveTab] = useState<ModalTab>('resumo');
-  const [formData, setFormData] = useState({
-    data: new Date().toISOString().split('T')[0],
-    tipoDocumento: 'Consulta' as TipoDocumento,
-    profissional: '',
-    especialidade: '',
-    conteudo: '',
-    resumo: '',
-    soapSubjetivo: '',
-    soapObjetivo: '',
-    soapAvaliacao: '',
-    soapPlano: '',
-    cid10Codes: '',
-    medications: '',
-    allergies: '',
-    followUpDate: '',
-    bioMeasuredAt: '',
-    bioSource: '',
-    bioScore: '',
-    bioAlturaCm: '',
-    bioPesoKg: '',
-    bioImc: '',
-    bioGorduraPercent: '',
-    bioMassaGorduraKg: '',
-    bioMassaMagraKg: '',
-    bioMusculoEsqueleticoKg: '',
-    bioAguaCorporalL: '',
-    bioGorduraVisceral: '',
-    bioTmbKcal: '',
-    bioLeanLeftArmKg: '',
-    bioLeanRightArmKg: '',
-    bioLeanTrunkKg: '',
-    bioLeanLeftLegKg: '',
-    bioLeanRightLegKg: '',
-    bioFatLeftArmKg: '',
-    bioFatRightArmKg: '',
-    bioFatTrunkKg: '',
-    bioFatLeftLegKg: '',
-    bioFatRightLegKg: '',
-    bioObservacoes: '',
-  });
+  const [formData, setFormData] = useState(createInitialFormState());
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notifyPatientByEmail, setNotifyPatientByEmail] = useState(true);
+  const [draftRecovered, setDraftRecovered] = useState(false);
+  const [lastDraftSaveAt, setLastDraftSaveAt] = useState<string>('');
+
+  const draftStorageKey = useMemo(
+    () => `medical-record-draft:v2:${patientId}`,
+    [patientId]
+  );
+
+  const tabProgress = useMemo(() => {
+    const resumoFilled = [
+      formData.data,
+      formData.tipoDocumento,
+      formData.profissional,
+      formData.especialidade,
+      formData.resumo,
+    ].filter((value) => String(value).trim().length > 0).length;
+
+    const structuredExamCount = formData.complementaryExamItems.filter((item) => item.nome.trim().length > 0).length;
+    const clinicoFilled = [
+      formData.soapSubjetivo,
+      formData.soapObjetivo,
+      formData.soapAvaliacao,
+      formData.soapPlano,
+      formData.cid10Codes,
+      formData.medications,
+      formData.allergies,
+      formData.followUpDate,
+      structuredExamCount > 0 ? 'ok' : '',
+    ].filter((value) => String(value).trim().length > 0).length;
+
+    const bioFilled = [
+      formData.bioMeasuredAt,
+      formData.bioSource,
+      formData.bioPesoKg,
+      formData.bioAlturaCm,
+      formData.bioGorduraPercent,
+      formData.bioObservacoes,
+    ].filter((value) => value.trim().length > 0).length;
+
+    return {
+      resumo: Math.round((resumoFilled / 5) * 100),
+      clinico: Math.round((clinicoFilled / 9) * 100),
+      bioimpedancia: Math.round((bioFilled / 6) * 100),
+    };
+  }, [formData]);
 
   useEffect(() => {
     const peso = parseOptionalNumber(formData.bioPesoKg);
@@ -122,6 +195,138 @@ export function AddMedicalRecordModal({
       setFormData((prev) => ({ ...prev, bioImc: normalizedImc }));
     }
   }, [formData.bioAlturaCm, formData.bioPesoKg, formData.bioImc]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const rawDraft = window.localStorage.getItem(draftStorageKey);
+    if (!rawDraft) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(rawDraft) as Partial<typeof formData> & {
+        activeTab?: ModalTab;
+        notifyPatientByEmail?: boolean;
+      };
+
+      setFormData((prev) => ({
+        ...prev,
+        ...parsed,
+        complementaryExamItems:
+          Array.isArray(parsed.complementaryExamItems) && parsed.complementaryExamItems.length > 0
+            ? parsed.complementaryExamItems.map((item) => ({
+                nome: item?.nome || '',
+                data: item?.data || '',
+                resultado: item?.resultado || '',
+                status: item?.status || 'nao_informado',
+              }))
+            : prev.complementaryExamItems,
+      }));
+
+      if (parsed.activeTab) {
+        const tab = parsed.activeTab as string;
+        setActiveTab(tab === 'soap' || tab === 'diagnostico' ? 'clinico' : tab as ModalTab);
+      }
+
+      if (typeof parsed.notifyPatientByEmail === 'boolean') {
+        setNotifyPatientByEmail(parsed.notifyPatientByEmail);
+      }
+
+      setDraftRecovered(true);
+    } catch {
+      window.localStorage.removeItem(draftStorageKey);
+    }
+  }, [draftStorageKey, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      const payload = {
+        ...formData,
+        activeTab,
+        notifyPatientByEmail,
+      };
+
+      window.localStorage.setItem(draftStorageKey, JSON.stringify(payload));
+      setLastDraftSaveAt(new Date().toLocaleTimeString('pt-BR'));
+    }, 450);
+
+    return () => clearTimeout(timeoutId);
+  }, [activeTab, draftStorageKey, formData, isOpen, notifyPatientByEmail]);
+
+  const buildStructuredExamItems = (): Array<{
+    nome: string;
+    data?: string;
+    resultado?: string;
+    status?: ComplementaryExamStatus;
+  }> => {
+    const structured = formData.complementaryExamItems
+      .map((item) => ({
+        nome: item.nome.trim(),
+        data: item.data || undefined,
+        resultado: item.resultado.trim() || undefined,
+        status: item.status || undefined,
+      }))
+      .filter((item) => item.nome.length > 0);
+
+    if (structured.length > 0) {
+      return structured;
+    }
+
+    const csvFallback = parseCsvField(formData.complementaryExams) || [];
+    return csvFallback.map((nome) => ({
+      nome,
+      status: 'nao_informado' as ComplementaryExamStatus,
+    }));
+  };
+
+  const handleFormKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+      event.preventDefault();
+      formRef.current?.requestSubmit();
+    }
+  };
+
+  const updateComplementaryExamItem = (
+    index: number,
+    field: keyof ComplementaryExamFormItem,
+    value: string
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      complementaryExamItems: prev.complementaryExamItems.map((item, itemIndex) =>
+        itemIndex === index
+          ? {
+              ...item,
+              [field]: value,
+            }
+          : item
+      ),
+    }));
+  };
+
+  const addComplementaryExamItem = () => {
+    setFormData((prev) => ({
+      ...prev,
+      complementaryExamItems: [...prev.complementaryExamItems, createEmptyExamItem()],
+    }));
+  };
+
+  const removeComplementaryExamItem = (index: number) => {
+    setFormData((prev) => {
+      const nextItems = prev.complementaryExamItems.filter((_, itemIndex) => itemIndex !== index);
+      return {
+        ...prev,
+        complementaryExamItems: nextItems.length > 0 ? nextItems : [createEmptyExamItem()],
+      };
+    });
+  };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -162,6 +367,7 @@ export function AddMedicalRecordModal({
     });
 
     const finalConteudo = formData.conteudo.trim() || generatedConteudo;
+  const structuredExamItems = buildStructuredExamItems();
 
     onAdd({
       patientId,
@@ -176,6 +382,11 @@ export function AddMedicalRecordModal({
       soapAvaliacao: formData.soapAvaliacao.trim() || undefined,
       soapPlano: formData.soapPlano.trim() || undefined,
       cid10Codes: parseCsvField(formData.cid10Codes),
+      complementaryExamItems: structuredExamItems.length > 0 ? structuredExamItems : undefined,
+      complementaryExams:
+        structuredExamItems.length > 0
+          ? structuredExamItems.map((item) => item.nome)
+          : parseCsvField(formData.complementaryExams),
       medications: parseCsvField(formData.medications),
       allergies: parseCsvField(formData.allergies),
       followUpDate: formData.followUpDate || undefined,
@@ -212,49 +423,13 @@ export function AddMedicalRecordModal({
       notifyPatientByEmail,
     });
 
-    setFormData({
-      data: new Date().toISOString().split('T')[0],
-      tipoDocumento: 'Consulta',
-      profissional: '',
-      especialidade: '',
-      conteudo: '',
-      resumo: '',
-      soapSubjetivo: '',
-      soapObjetivo: '',
-      soapAvaliacao: '',
-      soapPlano: '',
-      cid10Codes: '',
-      medications: '',
-      allergies: '',
-      followUpDate: '',
-      bioMeasuredAt: '',
-      bioSource: '',
-      bioScore: '',
-      bioAlturaCm: '',
-      bioPesoKg: '',
-      bioImc: '',
-      bioGorduraPercent: '',
-      bioMassaGorduraKg: '',
-      bioMassaMagraKg: '',
-      bioMusculoEsqueleticoKg: '',
-      bioAguaCorporalL: '',
-      bioGorduraVisceral: '',
-      bioTmbKcal: '',
-      bioLeanLeftArmKg: '',
-      bioLeanRightArmKg: '',
-      bioLeanTrunkKg: '',
-      bioLeanLeftLegKg: '',
-      bioLeanRightLegKg: '',
-      bioFatLeftArmKg: '',
-      bioFatRightArmKg: '',
-      bioFatTrunkKg: '',
-      bioFatLeftLegKg: '',
-      bioFatRightLegKg: '',
-      bioObservacoes: '',
-    });
+    window.localStorage.removeItem(draftStorageKey);
+    setFormData(createInitialFormState());
     setActiveTab('resumo');
     setErrors({});
     setNotifyPatientByEmail(true);
+    setDraftRecovered(false);
+    setLastDraftSaveAt('');
     onClose();
   };
 
@@ -274,7 +449,15 @@ export function AddMedicalRecordModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 p-4 sm:p-6">
+        <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="space-y-4 p-4 sm:p-6">
+          {(draftRecovered || lastDraftSaveAt) && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              {draftRecovered
+                ? 'Rascunho local recuperado automaticamente.'
+                : `Rascunho salvo localmente as ${lastDraftSaveAt}.`}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1 md:grid-cols-4">
             <button
               type="button"
@@ -285,29 +468,24 @@ export function AddMedicalRecordModal({
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Resumo
+              <span className="inline-flex items-center gap-1">
+                <span>Resumo</span>
+                <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">{tabProgress.resumo}%</span>
+              </span>
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('soap')}
+              onClick={() => setActiveTab('clinico')}
               className={`min-h-11 rounded-md px-3 py-2 text-xs font-semibold text-center leading-tight whitespace-normal transition ${
-                activeTab === 'soap'
+                activeTab === 'clinico'
                   ? 'bg-white text-slate-900 shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              SOAP
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('diagnostico')}
-              className={`min-h-11 rounded-md px-3 py-2 text-xs font-semibold text-center leading-tight whitespace-normal transition ${
-                activeTab === 'diagnostico'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Diagnóstico/Conduta
+              <span className="inline-flex items-center gap-1">
+                <span>Clínico</span>
+                <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">{tabProgress.clinico}%</span>
+              </span>
             </button>
             <button
               type="button"
@@ -318,7 +496,10 @@ export function AddMedicalRecordModal({
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Bioimpedancia
+              <span className="inline-flex items-center gap-1">
+                <span>Bioimpedância</span>
+                <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">{tabProgress.bioimpedancia}%</span>
+              </span>
             </button>
             <button
               type="button"
@@ -527,8 +708,9 @@ export function AddMedicalRecordModal({
             </>
           )}
 
-          {activeTab === 'soap' && (
+          {activeTab === 'clinico' && (
             <>
+              {/* S — Subjetivo */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">Subjetivo</label>
                 <textarea
@@ -538,6 +720,84 @@ export function AddMedicalRecordModal({
                   className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
                 />
               </div>
+
+              {/* Exames complementares (entre S e O) */}
+              <details className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                <summary className="cursor-pointer text-sm font-semibold text-slate-800">
+                  Exames complementares
+                </summary>
+
+                <div className="mt-3 space-y-3">
+                  {formData.complementaryExamItems.map((item, index) => (
+                    <div key={`exam-item-${index}`} className="rounded-lg border border-slate-200 bg-white p-3">
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
+                        <div className="md:col-span-4">
+                          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Nome do exame</label>
+                          <input
+                            type="text"
+                            value={item.nome}
+                            onChange={(e) => updateComplementaryExamItem(index, 'nome', e.target.value)}
+                            placeholder="Ex.: Hemograma completo"
+                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                          />
+                        </div>
+                        <div className="md:col-span-3">
+                          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Data</label>
+                          <input
+                            type="date"
+                            value={item.data}
+                            onChange={(e) => updateComplementaryExamItem(index, 'data', e.target.value)}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                          />
+                        </div>
+                        <div className="md:col-span-3">
+                          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Status</label>
+                          <select
+                            value={item.status}
+                            onChange={(e) => updateComplementaryExamItem(index, 'status', e.target.value)}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                          >
+                            {EXAM_STATUS_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="md:col-span-2 flex items-end justify-end">
+                          <button
+                            type="button"
+                            onClick={() => removeComplementaryExamItem(index)}
+                            className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100"
+                          >
+                            Remover
+                          </button>
+                        </div>
+                        <div className="md:col-span-12">
+                          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">Resultado resumido</label>
+                          <textarea
+                            value={item.resultado}
+                            onChange={(e) => updateComplementaryExamItem(index, 'resultado', e.target.value)}
+                            rows={2}
+                            placeholder="Principais achados ou conclusão"
+                            className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={addComplementaryExamItem}
+                    className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                  >
+                    + Adicionar exame
+                  </button>
+                </div>
+              </details>
+
+              {/* O — Objetivo */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">Objetivo</label>
                 <textarea
@@ -547,6 +807,20 @@ export function AddMedicalRecordModal({
                   className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
                 />
               </div>
+
+              {/* Alergias (antes da Avaliação) */}
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Alergias (separadas por vírgula)</label>
+                <input
+                  type="text"
+                  value={formData.allergies}
+                  onChange={(e) => setFormData({ ...formData, allergies: e.target.value })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  placeholder="Ex.: Dipirona, Penicilina"
+                />
+              </div>
+
+              {/* A — Avaliação */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">Avaliação</label>
                 <textarea
@@ -556,6 +830,32 @@ export function AddMedicalRecordModal({
                   className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
                 />
               </div>
+
+              {/* Diagnóstico e seguimento (entre A e P) */}
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="mb-3 text-sm font-semibold text-slate-800">Diagnóstico e seguimento</p>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">CIDs</label>
+                    <CID10Autocomplete
+                      value={formData.cid10Codes}
+                      onChange={(val) => setFormData({ ...formData, cid10Codes: val })}
+                      placeholder="Buscar CID-10 por código ou nome..."
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">Próxima consulta</label>
+                    <input
+                      type="date"
+                      value={formData.followUpDate}
+                      onChange={(e) => setFormData({ ...formData, followUpDate: e.target.value })}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* P — Plano */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">Plano</label>
                 <textarea
@@ -565,32 +865,8 @@ export function AddMedicalRecordModal({
                   className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
                 />
               </div>
-            </>
-          )}
 
-          {activeTab === 'diagnostico' && (
-            <>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">CIDs (separados por vírgula)</label>
-                  <input
-                    type="text"
-                    value={formData.cid10Codes}
-                    onChange={(e) => setFormData({ ...formData, cid10Codes: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Follow-up</label>
-                  <input
-                    type="date"
-                    value={formData.followUpDate}
-                    onChange={(e) => setFormData({ ...formData, followUpDate: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                  />
-                </div>
-              </div>
-
+              {/* Conduta: Medicações (após Plano) */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">Medicações (separadas por vírgula)</label>
                 <input
@@ -598,25 +874,17 @@ export function AddMedicalRecordModal({
                   value={formData.medications}
                   onChange={(e) => setFormData({ ...formData, medications: e.target.value })}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  placeholder="Ex.: Metformina 850mg 2x/dia, Losartana 50mg 1x/dia"
                 />
               </div>
 
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Alergias (separadas por vírgula)</label>
-                <input
-                  type="text"
-                  value={formData.allergies}
-                  onChange={(e) => setFormData({ ...formData, allergies: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                />
-              </div>
-
+              {/* Conteúdo livre */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">Conteúdo livre</label>
                 <textarea
                   value={formData.conteudo}
                   onChange={(e) => setFormData({ ...formData, conteudo: e.target.value })}
-                  rows={6}
+                  rows={4}
                   className={`w-full resize-none rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 ${
                     errors.conteudo
                       ? 'border-red-500 focus:ring-red-200'
@@ -639,7 +907,13 @@ export function AddMedicalRecordModal({
                   <p><span className="font-medium">Profissional:</span> {formData.profissional || '-'}</p>
                   <p><span className="font-medium">Especialidade:</span> {formData.especialidade || '-'}</p>
                   <p><span className="font-medium">CIDs:</span> {formData.cid10Codes || '-'}</p>
-                  <p><span className="font-medium">Follow-up:</span> {formData.followUpDate || '-'}</p>
+                  <p>
+                    <span className="font-medium">Exames complementares:</span>{' '}
+                    {buildStructuredExamItems().length > 0
+                      ? buildStructuredExamItems().map((item) => item.nome).join(', ')
+                      : formData.complementaryExams || '-'}
+                  </p>
+                  <p><span className="font-medium">Próxima consulta:</span> {formData.followUpDate || '-'}</p>
                   <p><span className="font-medium">Bioimpedancia:</span> {formData.bioPesoKg || formData.bioImc || formData.bioGorduraPercent ? 'Preenchida' : 'Nao preenchida'}</p>
                 </div>
               </div>
@@ -671,6 +945,8 @@ export function AddMedicalRecordModal({
               Adicionar
             </button>
           </div>
+
+          <p className="text-[11px] text-slate-500">Atalho: use Ctrl+Enter (ou Cmd+Enter) para salvar rapidamente.</p>
         </form>
       </div>
     </div>

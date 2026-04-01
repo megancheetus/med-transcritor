@@ -7,6 +7,8 @@ import {
   getLatestBioimpedanceByPatientId,
   getMedicalRecordsForPatientPortal,
 } from '@/lib/medicalRecordManager';
+import { listPatientPortalMessages } from '@/lib/patientPortalMessageManager';
+import PatientUnreadMessagesToast from '@/components/PatientUnreadMessagesToast';
 
 function formatDate(dateString?: string): string {
   if (!dateString) {
@@ -74,6 +76,8 @@ export default async function PacienteDashboard() {
 
   const records = await getMedicalRecordsForPatientPortal(patient.id, 200);
   const latestBioimpedance = await getLatestBioimpedanceByPatientId(patient.id);
+  const portalMessages = await listPatientPortalMessages(patient.id, 5);
+  const latestUnreadMessage = portalMessages.messages.find((message) => !message.readAt);
 
   const latestMedicationRecord = records.find(
     (record) => record.medications && record.medications.length > 0
@@ -117,8 +121,8 @@ export default async function PacienteDashboard() {
     : latestProblemRecord?.soapAvaliacao?.trim() || latestProblemRecord?.resumo?.trim() || 'Sem CID/problema registrado';
 
   const followUpStatus = latestProblemRecord?.followUpDate
-    ? `Follow-up em ${formatDate(latestProblemRecord.followUpDate)}`
-    : 'Sem follow-up pendente';
+    ? `Próxima consulta em ${formatDate(latestProblemRecord.followUpDate)}`
+    : 'Sem próxima consulta agendada';
 
   return (
     <PatientPortalShell
@@ -127,7 +131,38 @@ export default async function PacienteDashboard() {
       patientName={patient.nomeCompleto}
       patientCpf={patient.cpf}
     >
+      <PatientUnreadMessagesToast
+        unreadCount={portalMessages.unreadCount}
+        latestUnreadMessageId={latestUnreadMessage?.id}
+        latestUnreadMessageTitle={latestUnreadMessage?.title}
+      />
+
       <div className="space-y-6">
+        {portalMessages.unreadCount > 0 && (
+          <div className="rounded-xl border border-[#f1d69a] bg-[#fff8e8] p-4 sm:p-5 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#9a640b]">Aviso de mensagem</p>
+                <h3 className="mt-1 text-base sm:text-lg font-bold text-[#7a4b00]">
+                  Você tem {portalMessages.unreadCount} mensagem(ns) não lida(s) da equipe de saúde.
+                </h3>
+                {latestUnreadMessage && (
+                  <p className="mt-1 text-sm text-[#8b5c12] line-clamp-2">
+                    Última: {latestUnreadMessage.title}
+                  </p>
+                )}
+              </div>
+
+              <Link
+                href="/paciente/mensagens"
+                className="inline-flex w-full sm:w-auto justify-center items-center rounded-lg bg-[#a16508] px-4 py-2 text-sm font-semibold text-white hover:bg-[#8d5707] transition"
+              >
+                Ver mensagens
+              </Link>
+            </div>
+          </div>
+        )}
+
         <div className="bg-gradient-to-r from-[#e8f5fb] via-[#f1fbf7] to-[#fff8e8] border border-[#cfe0e8] rounded-xl p-4 sm:p-6 shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div>

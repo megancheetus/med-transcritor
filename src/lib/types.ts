@@ -28,6 +28,8 @@ export interface MedicalRecord {
   soapAvaliacao?: string;
   soapPlano?: string;
   cid10Codes?: string[];
+  complementaryExamItems?: ComplementaryExamItem[];
+  complementaryExams?: string[];
   medications?: string[];
   allergies?: string[];
   followUpDate?: string;
@@ -37,6 +39,15 @@ export interface MedicalRecord {
   aiGenerated?: boolean;
   clinicianReviewed?: boolean;
   reviewedAt?: string;
+}
+
+export type ComplementaryExamStatus = 'solicitado' | 'realizado' | 'pendente' | 'cancelado' | 'nao_informado';
+
+export interface ComplementaryExamItem {
+  nome: string;
+  data?: string;
+  resultado?: string;
+  status?: ComplementaryExamStatus;
 }
 
 export interface BioimpedanceSegmentalData {

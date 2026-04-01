@@ -16,6 +16,15 @@ const optionalTrimmedString = z
 const optionalStringArray = z.array(z.string().trim().min(1)).optional();
 const optionalNumber = z.coerce.number().finite().optional();
 
+const complementaryExamItemSchema = z.object({
+  nome: z.string().trim().min(1),
+  data: optionalTrimmedString,
+  resultado: optionalTrimmedString,
+  status: z.enum(['solicitado', 'realizado', 'pendente', 'cancelado', 'nao_informado']).optional(),
+});
+
+const complementaryExamItemsSchema = z.array(complementaryExamItemSchema).optional();
+
 const bioimpedanceSegmentalSchema = z
   .object({
     leftArmKg: optionalNumber,
@@ -60,6 +69,8 @@ export const medicalRecordCreateSchema = z.object({
   soapAvaliacao: optionalTrimmedString,
   soapPlano: optionalTrimmedString,
   cid10Codes: optionalStringArray,
+  complementaryExamItems: complementaryExamItemsSchema,
+  complementaryExams: optionalStringArray,
   medications: optionalStringArray,
   allergies: optionalStringArray,
   followUpDate: optionalTrimmedString,
@@ -80,6 +91,8 @@ export const medicalRecordPatchSchema = z
     soapAvaliacao: optionalTrimmedString,
     soapPlano: optionalTrimmedString,
     cid10Codes: optionalStringArray,
+    complementaryExamItems: complementaryExamItemsSchema,
+    complementaryExams: optionalStringArray,
     medications: optionalStringArray,
     allergies: optionalStringArray,
     followUpDate: optionalTrimmedString,
@@ -110,6 +123,10 @@ export const medicalRecordFromTranscriptionSchema = z.object({
   especialidade: z.string().trim().optional(),
   resumo: z.string().trim().optional(),
   conteudo: z.string().trim().min(1, 'Conteúdo clínico é obrigatório'),
+  soapSubjetivo: optionalTrimmedString,
+  soapObjetivo: optionalTrimmedString,
+  soapAvaliacao: optionalTrimmedString,
+  soapPlano: optionalTrimmedString,
   sourceRefId: z.string().trim().optional(),
   clinicianReviewed: z.boolean().optional(),
   notifyPatientByEmail: z.boolean().optional().default(true),

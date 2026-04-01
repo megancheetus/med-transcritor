@@ -11,6 +11,21 @@ export interface PatientPortalUser {
   telefone: string | null;
 }
 
+export interface ProfessionalPatientPortalAccount {
+  patientId: string;
+  nomeCompleto: string;
+  email: string | null;
+  telefone: string | null;
+  portalAccountCreatedAt: string;
+  lastLoginAt: string | null;
+}
+
+export interface ProfessionalPatientPortalSummary {
+  totalPatients: number;
+  patientsWithPortalAccount: number;
+  patientsWithoutPortalAccount: number;
+}
+
 function normalizeCpf(cpf: string): string {
   return cpf.replace(/\D/g, '');
 }
@@ -221,4 +236,81 @@ export async function getPatientPortalUserById(patientId: string): Promise<Patie
       cpf_normalized: string;
     }
   );
+}
+
+export async function listPatientPortalAccountsByProfessional(
+  username: string
+): Promise<{
+  accounts: ProfessionalPatientPortalAccount[];
+  summary: ProfessionalPatientPortalSummary;
+}> {
+  await ensurePatientPortalAccountsTable();
+
+  const pool = getPostgresPool();
+
+  const summaryResult = await pool.query(
+    `
+      SELECT
+        COUNT(*)::int AS total_patients,
+        COUNT(a.patient_id)::int AS patients_with_portal_account
+      FROM patients p
+      LEFT JOIN patient_portal_accounts a ON a.patient_id = p.id
+      WHERE p.username = $1
+    `,
+    [username]
+  );
+
+  const summaryRow = summaryResult.rows[0] as {
+    total_patients: number;
+    patients_with_portal_account: number;
+  };
+
+  const accountsResult = await pool.query(
+    `
+      SELECT
+        p.id AS patient_id,
+        p.nome_completo,
+        p.email,
+        p.telefone,
+        a.created_at AS portal_account_created_at,
+        a.last_login_at
+      FROM patients p
+      INNER JOIN patient_portal_accounts a ON a.patient_id = p.id
+      WHERE p.username = $1
+      ORDER BY COALESCE(a.last_login_at, a.created_at) DESC
+    `,
+    [username]
+  );
+
+  const accounts = accountsResult.rows.map((row) => {
+    const typedRow = row as {
+      patient_id: string;
+      nome_completo: string;
+      email: string | null;
+      telefone: string | null;
+      portal_account_created_at: string | Date;
+      last_login_at: string | Date | null;
+    };
+
+    return {
+      patientId: typedRow.patient_id,
+      nomeCompleto: typedRow.nome_completo,
+      email: typedRow.email,
+      telefone: typedRow.telefone,
+      portalAccountCreatedAt: new Date(typedRow.portal_account_created_at).toISOString(),
+      lastLoginAt: typedRow.last_login_at ? new Date(typedRow.last_login_at).toISOString() : null,
+    } satisfies ProfessionalPatientPortalAccount;
+  });
+
+  const patientsWithPortalAccount = summaryRow?.patients_with_portal_account ?? 0;
+  const totalPatients = summaryRow?.total_patients ?? 0;
+
+  return {
+    accounts,
+    summary: {
+      totalPatients,
+      patientsWithPortalAccount,
+      patientsWithoutPortalAccount: Math.max(totalPatients - patientsWithPortalAccount, 0),
+    },
+  };
 }

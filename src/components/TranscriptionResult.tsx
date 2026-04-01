@@ -1,6 +1,18 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import { getModelById, TranscriptionModelType } from '@/lib/transcriptionModels';
+
+function parsePatientInstructions(text: string): { mainContent: string; instructions: string } {
+  const marker = /ORIENTAÇÕES AO PACIENTE:\s*/i;
+  const match = marker.exec(text);
+  if (!match) {
+    return { mainContent: text, instructions: '' };
+  }
+  const mainContent = text.slice(0, match.index).trimEnd();
+  const instructions = text.slice(match.index + match[0].length).trim();
+  return { mainContent, instructions };
+}
 
 interface TranscriptionResultProps {
   content: string;
@@ -19,9 +31,21 @@ export default function TranscriptionResult({
 }: TranscriptionResultProps) {
   const transcriptionModel = getModelById(model);
 
-  const copyToClipboard = (text: string) => {
+  const { mainContent, instructions } = useMemo(
+    () => parsePatientInstructions(content),
+    [content]
+  );
+
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, field?: string) => {
     navigator.clipboard.writeText(text);
-    alert('Copiado para a área de transferência!');
+    if (field) {
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2000);
+    } else {
+      alert('Copiado para a área de transferência!');
+    }
   };
 
   return (
@@ -44,7 +68,7 @@ export default function TranscriptionResult({
               </button>
             )}
             <button
-              onClick={() => copyToClipboard(content)}
+              onClick={() => copyToClipboard(mainContent)}
               className="w-full sm:w-auto px-4 py-2 bg-[#1a6a8d] hover:bg-[#155b79] text-white rounded-md transition font-medium text-sm tracking-wide"
             >
               Copiar tudo
@@ -71,15 +95,43 @@ export default function TranscriptionResult({
       )}
 
       {!isLoading && !errorMessage && content && (
-        <div className="w-full border border-[#cfe0e8] bg-[#f7fbfc] rounded-lg overflow-hidden">
-          <div className="bg-[#edf4f6] border-b border-[#cfe0e8] px-5 py-3.5">
-            <h3 className="font-semibold text-[#155b79] text-base tracking-tight">Transcrição completa</h3>
-          </div>
-          <div className="p-5">
-            <div className="text-[#0c161c] leading-relaxed text-base whitespace-pre-wrap break-words min-h-[220px]">
-              {content}
+        <div className="space-y-5">
+          <div className="w-full border border-[#cfe0e8] bg-[#f7fbfc] rounded-lg overflow-hidden">
+            <div className="bg-[#edf4f6] border-b border-[#cfe0e8] px-5 py-3.5">
+              <h3 className="font-semibold text-[#155b79] text-base tracking-tight">Transcrição completa</h3>
+            </div>
+            <div className="p-5">
+              <div className="text-[#0c161c] leading-relaxed text-base whitespace-pre-wrap break-words min-h-[220px]">
+                {mainContent}
+              </div>
             </div>
           </div>
+
+          {instructions && (
+            <div className="w-full border-2 border-[#1ea58c]/40 bg-emerald-50/60 rounded-lg overflow-hidden">
+              <div className="bg-emerald-100/80 border-b border-[#1ea58c]/30 px-5 py-3.5 flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-emerald-900 text-base tracking-tight">
+                    Orientações ao Paciente
+                  </h3>
+                  <p className="text-xs text-emerald-700 mt-0.5">
+                    Extraído do áudio — copie para receituário ou documento ao paciente
+                  </p>
+                </div>
+                <button
+                  onClick={() => copyToClipboard(instructions, 'instructions')}
+                  className="shrink-0 ml-3 px-4 py-2 bg-[#1ea58c] hover:bg-[#18956e] text-white rounded-md transition font-medium text-sm tracking-wide"
+                >
+                  {copiedField === 'instructions' ? '✓ Copiado' : 'Copiar orientações'}
+                </button>
+              </div>
+              <div className="p-5">
+                <div className="text-emerald-950 leading-relaxed text-base whitespace-pre-wrap break-words">
+                  {instructions}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

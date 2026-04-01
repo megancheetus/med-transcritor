@@ -23,6 +23,10 @@ interface FromTranscriptionPayload {
   especialidade?: unknown;
   resumo?: unknown;
   conteudo?: unknown;
+  soapSubjetivo?: unknown;
+  soapObjetivo?: unknown;
+  soapAvaliacao?: unknown;
+  soapPlano?: unknown;
   sourceRefId?: unknown;
   clinicianReviewed?: unknown;
   notifyPatientByEmail?: unknown;
@@ -53,6 +57,10 @@ function parsePayload(payload: FromTranscriptionPayload) {
   const especialidade = typeof payload.especialidade === 'string' ? payload.especialidade.trim() : 'Clínica Geral';
   const resumo = typeof payload.resumo === 'string' ? payload.resumo.trim() : '';
   const conteudo = typeof payload.conteudo === 'string' ? payload.conteudo.trim() : '';
+  const soapSubjetivo = typeof payload.soapSubjetivo === 'string' ? payload.soapSubjetivo.trim() : '';
+  const soapObjetivo = typeof payload.soapObjetivo === 'string' ? payload.soapObjetivo.trim() : '';
+  const soapAvaliacao = typeof payload.soapAvaliacao === 'string' ? payload.soapAvaliacao.trim() : '';
+  const soapPlano = typeof payload.soapPlano === 'string' ? payload.soapPlano.trim() : '';
   const sourceRefId = typeof payload.sourceRefId === 'string' ? payload.sourceRefId.trim() : '';
   const clinicianReviewed = payload.clinicianReviewed === false ? false : true;
   const notifyPatientByEmail = payload.notifyPatientByEmail === false ? false : true;
@@ -82,6 +90,10 @@ function parsePayload(payload: FromTranscriptionPayload) {
       especialidade: especialidade || 'Clínica Geral',
       resumo: resumo || undefined,
       conteudo,
+      soapSubjetivo: soapSubjetivo || undefined,
+      soapObjetivo: soapObjetivo || undefined,
+      soapAvaliacao: soapAvaliacao || undefined,
+      soapPlano: soapPlano || undefined,
       sourceRefId: sourceRefId || undefined,
       clinicianReviewed,
       notifyPatientByEmail,
@@ -151,6 +163,10 @@ export async function POST(request: NextRequest) {
       especialidade: payload.especialidade,
       resumo: payload.resumo,
       conteudo: payload.conteudo,
+      soapSubjetivo: payload.soapSubjetivo,
+      soapObjetivo: payload.soapObjetivo,
+      soapAvaliacao: payload.soapAvaliacao,
+      soapPlano: payload.soapPlano,
       sourceType: 'transcription',
       sourceRefId: payload.sourceRefId,
       aiGenerated: true,

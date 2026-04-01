@@ -1,5 +1,11 @@
 import { getPostgresPool } from './postgres';
-import { BioimpedanceData, MedicalRecord, MedicalRecordVersion } from './types';
+import {
+  BioimpedanceData,
+  ComplementaryExamItem,
+  ComplementaryExamStatus,
+  MedicalRecord,
+  MedicalRecordVersion,
+} from './types';
 
 interface MedicalRecordAuditInput {
   username: string;
@@ -17,10 +23,52 @@ interface ClinicalData {
   soapAvaliacao?: string;
   soapPlano?: string;
   cid10Codes?: string[];
+  complementaryExamItems?: ComplementaryExamItem[];
+  complementaryExams?: string[];
   medications?: string[];
   allergies?: string[];
   followUpDate?: string;
   bioimpedance?: BioimpedanceData;
+}
+
+function isComplementaryExamStatus(value: unknown): value is ComplementaryExamStatus {
+  return (
+    value === 'solicitado' ||
+    value === 'realizado' ||
+    value === 'pendente' ||
+    value === 'cancelado' ||
+    value === 'nao_informado'
+  );
+}
+
+function sanitizeComplementaryExamItems(value: unknown): ComplementaryExamItem[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const parsed = value
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => {
+      const exam = item as Record<string, unknown>;
+      const nome = typeof exam.nome === 'string' ? exam.nome.trim() : '';
+
+      if (!nome) {
+        return null;
+      }
+
+      const data = typeof exam.data === 'string' ? exam.data.trim() : '';
+      const resultado = typeof exam.resultado === 'string' ? exam.resultado.trim() : '';
+
+      return {
+        nome,
+        data: data || undefined,
+        resultado: resultado || undefined,
+        status: isComplementaryExamStatus(exam.status) ? exam.status : undefined,
+      } satisfies ComplementaryExamItem;
+    })
+    .filter((item): item is ComplementaryExamItem => item !== null);
+
+  return parsed.length > 0 ? parsed : undefined;
 }
 
 interface MedicalRecordCursorData {
@@ -149,12 +197,21 @@ function mapBioimpedanceData(value: unknown): BioimpedanceData | undefined {
 }
 
 function buildClinicalDataFromRecord(record: Partial<MedicalRecord>): ClinicalData {
+  const normalizedComplementaryExamItems =
+    sanitizeComplementaryExamItems(record.complementaryExamItems) ||
+    sanitizeStringArray(record.complementaryExams)?.map((nome) => ({
+      nome,
+      status: 'nao_informado' as ComplementaryExamStatus,
+    }));
+
   return {
     soapSubjetivo: record.soapSubjetivo?.trim() || undefined,
     soapObjetivo: record.soapObjetivo?.trim() || undefined,
     soapAvaliacao: record.soapAvaliacao?.trim() || undefined,
     soapPlano: record.soapPlano?.trim() || undefined,
     cid10Codes: sanitizeStringArray(record.cid10Codes),
+    complementaryExamItems: normalizedComplementaryExamItems,
+    complementaryExams: normalizedComplementaryExamItems?.map((item) => item.nome),
     medications: sanitizeStringArray(record.medications),
     allergies: sanitizeStringArray(record.allergies),
     followUpDate: record.followUpDate?.trim() || undefined,
@@ -168,6 +225,12 @@ function mapClinicalData(value: unknown): ClinicalData {
   }
 
   const clinicalData = value as Record<string, unknown>;
+  const complementaryExamItems =
+    sanitizeComplementaryExamItems(clinicalData.complementaryExamItems) ||
+    sanitizeStringArray(clinicalData.complementaryExams)?.map((nome) => ({
+      nome,
+      status: 'nao_informado' as ComplementaryExamStatus,
+    }));
 
   return {
     soapSubjetivo:
@@ -187,6 +250,8 @@ function mapClinicalData(value: unknown): ClinicalData {
         ? clinicalData.soapPlano
         : undefined,
     cid10Codes: sanitizeStringArray(clinicalData.cid10Codes),
+    complementaryExamItems,
+    complementaryExams: complementaryExamItems?.map((item) => item.nome),
     medications: sanitizeStringArray(clinicalData.medications),
     allergies: sanitizeStringArray(clinicalData.allergies),
     followUpDate:
@@ -236,6 +301,8 @@ function mapMedicalRecordRow(
     soapAvaliacao: mappedClinicalData.soapAvaliacao,
     soapPlano: mappedClinicalData.soapPlano,
     cid10Codes: mappedClinicalData.cid10Codes,
+    complementaryExamItems: mappedClinicalData.complementaryExamItems,
+    complementaryExams: mappedClinicalData.complementaryExams,
     medications: mappedClinicalData.medications,
     allergies: mappedClinicalData.allergies,
     followUpDate: mappedClinicalData.followUpDate,

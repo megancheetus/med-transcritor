@@ -25,8 +25,8 @@ INSTRUÇÕES DE ESTILO E LIMITES (CRÍTICO):
 ESTRUTURA SOAP ESPERADA:
 S (Subjetivo): Sintetize o motivo da consulta, história clínica e vivência do paciente (sentimentos, ideias, impacto funcional e expectativas). Inclua aspectos familiares, sociais e econômicos apenas se tiverem impacto clínico direto.
 O (Objetivo): Descreva dados de exame físico, sinais vitais e exames complementares em texto corrido, com foco no que é clinicamente relevante.
-A (Avaliação): Redija impressão diagnóstica, problemas ativos e avaliação concisa do contexto biopsicossocial.
-P (Plano): Descreva conduta terapêutica, prescrições, orientações e seguimento/retorno de forma direta.
+A (Avaliação): Liste de forma objetiva os problemas identificados e a impressão diagnóstica. NÃO faça reflexões, julgamentos de valor ou comentários qualificadores (como "são tranquilizadores", "é apropriada", "é adequado"). Apenas descreva os achados e hipóteses diagnósticas de forma factual e direta.
+P (Plano): Redija a conduta terapêutica em PRIMEIRA PESSOA (eu como médico), usando verbos como "mantenho", "reforço", "oriento", "solicito", "prescrevo", "recomendo", "encaminho". NUNCA use infinitivo impessoal (manter, reforçar, orientar) nem terceira pessoa. Inclua prescrições, orientações e seguimento/retorno.
 
 REGRAS DE TRANSCRIÇÃO:
 - Ignore conversas paralelas ou amenidades sem valor clínico.
@@ -38,7 +38,10 @@ Formate EXATAMENTE assim:
 S (Subjetivo): [texto]
 O (Objetivo): [texto]
 A (Avaliação): [texto]
-P (Plano): [texto]`,
+P (Plano): [texto]
+
+ORIENTAÇÕES AO PACIENTE:
+[Texto em linguagem acessível e empática, direcionado ao paciente, com as orientações, recomendações e cuidados mencionados durante a consulta. Use frases claras e diretas que o paciente consiga entender facilmente. Inclua: cuidados gerais, uso de medicações (se mencionadas), sinais de alerta para retorno, restrições alimentares ou de atividade, e orientações de retorno. Se nenhuma orientação foi mencionada no áudio, escreva: "Nenhuma orientação específica foi registrada no áudio da consulta."]`,
   },
   clinicaMedica: {
     id: 'clinicaMedica',
@@ -79,7 +82,10 @@ HP (Histórico Pessoal): [parágrafos com conteúdo completo aqui]
 HF (Histórico Familiar): [parágrafos com conteúdo completo aqui]
 EF (Exame Físico): [parágrafos com conteúdo completo aqui]
 HD (Hipóteses Diagnósticas): [parágrafos com conteúdo completo aqui]
-CONDUTA: [parágrafos com conteúdo completo aqui]`,
+CONDUTA: [parágrafos com conteúdo completo aqui]
+
+ORIENTAÇÕES AO PACIENTE:
+[Texto em linguagem acessível e empática, direcionado ao paciente, com as orientações, recomendações e cuidados mencionados durante a consulta. Use frases claras e diretas que o paciente consiga entender facilmente. Inclua: cuidados gerais, uso de medicações (se mencionadas), sinais de alerta para retorno, restrições alimentares ou de atividade, e orientações de retorno. Se nenhuma orientação foi mencionada no áudio, escreva: "Nenhuma orientação específica foi registrada no áudio da consulta."]`,
   },
 };
 

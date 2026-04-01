@@ -16,6 +16,7 @@ const BASE_MENU_ITEMS = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/historico', label: 'Histórico' },
   { href: '/perfil', label: 'Perfil' },
+  { href: '/configuracoes', label: 'Painel de Pacientes' },
   { href: '/prontuario', label: 'Prontuário', module: 'prontuario' as const },
   { href: '/teleconsulta', label: 'Teleconsulta', module: 'teleconsulta' as const },
   { href: '/transcricao', label: 'Transcrição', module: 'transcricao' as const },
@@ -117,13 +118,6 @@ export default function AppShell({ title, subtitle, children }: AppShellProps) {
         );
       })}
 
-      <button
-        type="button"
-        disabled
-        className="w-full text-left px-3 py-2.5 rounded-lg text-[#96a8b2] bg-[#f8fbfc] cursor-not-allowed"
-      >
-        Configuração (em breve)
-      </button>
     </nav>
   );
 

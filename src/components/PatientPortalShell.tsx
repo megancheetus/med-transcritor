@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface PatientPortalShellProps {
   title: string;
@@ -15,6 +15,7 @@ interface PatientPortalShellProps {
 
 const MENU_ITEMS = [
   { href: '/paciente/dashboard', label: 'Dashboard' },
+  { href: '/paciente/mensagens', label: 'Mensagens' },
   { href: '/paciente/composicao-corporal', label: 'Composição Corporal' },
   { href: '/paciente/prontuario', label: 'Prontuário' },
   { href: '/paciente/medicamentos', label: 'Medicamentos' },
@@ -25,6 +26,52 @@ export default function PatientPortalShell({ title, subtitle, patientName, patie
   const pathname = usePathname();
   const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadUnreadCount = async () => {
+      try {
+        const response = await fetch('/api/paciente/messages?limit=1', {
+          cache: 'no-store',
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = await response.json();
+
+        if (isMounted && typeof data?.unreadCount === 'number') {
+          setUnreadMessagesCount(data.unreadCount);
+        }
+      } catch {
+        // Mantém UX silenciosa no menu em caso de falha pontual
+      }
+    };
+
+    void loadUnreadCount();
+
+    const handleUnreadCountEvent = (event: Event) => {
+      const customEvent = event as CustomEvent<{ unreadCount?: number }>;
+      if (typeof customEvent.detail?.unreadCount === 'number') {
+        setUnreadMessagesCount(customEvent.detail.unreadCount);
+      }
+    };
+
+    window.addEventListener('patient-messages-unread-updated', handleUnreadCountEvent as EventListener);
+
+    const interval = setInterval(() => {
+      void loadUnreadCount();
+    }, 60_000);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('patient-messages-unread-updated', handleUnreadCountEvent as EventListener);
+      clearInterval(interval);
+    };
+  }, []);
 
   const handleLogout = async () => {
     await fetch('/api/paciente/logout', { method: 'POST' });
@@ -44,11 +91,16 @@ export default function PatientPortalShell({ title, subtitle, patientName, patie
             key={item.href}
             href={item.href}
             onClick={mobile ? closeMobileMenu : undefined}
-            className={`block px-3 py-2.5 rounded-lg font-medium transition ${
+            className={`flex items-center justify-between px-3 py-2.5 rounded-lg font-medium transition ${
               active ? 'bg-[#e5f4f8] text-[#155b79]' : 'text-[#4b6573] hover:bg-[#f2f8fa]'
             }`}
           >
-            {item.label}
+            <span>{item.label}</span>
+            {item.href === '/paciente/mensagens' && unreadMessagesCount > 0 && (
+              <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-[#d28a00] px-1.5 py-0.5 text-[10px] font-bold text-white">
+                {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
+              </span>
+            )}
           </Link>
         );
       })}

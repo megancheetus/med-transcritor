@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import CID10Autocomplete from './CID10Autocomplete';
 
 interface PatientDashboardProps {
   patient: Patient;
@@ -157,6 +158,8 @@ function EditRecordModal({
   onSave: (payload: Partial<Omit<MedicalRecord, 'id' | 'patientId'>>) => Promise<void>;
   isSaving: boolean;
 }) {
+  const initialComplementaryExamsCsv = csvFromArray(record.complementaryExams);
+
   const [formData, setFormData] = useState({
     data: record.data,
     tipoDocumento: record.tipoDocumento,
@@ -165,6 +168,7 @@ function EditRecordModal({
     resumo: record.resumo || '',
     conteudo: record.conteudo,
     cid10Codes: csvFromArray(record.cid10Codes),
+    complementaryExams: initialComplementaryExamsCsv,
     medications: csvFromArray(record.medications),
     allergies: csvFromArray(record.allergies),
     followUpDate: record.followUpDate || '',
@@ -214,6 +218,18 @@ function EditRecordModal({
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    const parsedComplementaryExams = parseCsvField(formData.complementaryExams);
+    const shouldPreserveStructuredExams =
+      formData.complementaryExams.trim() === initialComplementaryExamsCsv.trim() &&
+      !!record.complementaryExamItems?.length;
+
+    const complementaryExamItemsPayload = shouldPreserveStructuredExams
+      ? record.complementaryExamItems
+      : parsedComplementaryExams?.map((nome) => ({
+          nome,
+          status: 'nao_informado' as const,
+        }));
+
     await onSave({
       data: formData.data,
       tipoDocumento: formData.tipoDocumento,
@@ -222,6 +238,8 @@ function EditRecordModal({
       resumo: formData.resumo.trim() || undefined,
       conteudo: formData.conteudo.trim(),
       cid10Codes: parseCsvField(formData.cid10Codes),
+      complementaryExamItems: complementaryExamItemsPayload,
+      complementaryExams: parsedComplementaryExams,
       medications: parseCsvField(formData.medications),
       allergies: parseCsvField(formData.allergies),
       followUpDate: formData.followUpDate || undefined,
@@ -283,10 +301,17 @@ function EditRecordModal({
           <textarea value={formData.conteudo} onChange={(e) => setFormData((prev) => ({ ...prev, conteudo: e.target.value }))} rows={6} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <input type="text" value={formData.cid10Codes} onChange={(e) => setFormData((prev) => ({ ...prev, cid10Codes: e.target.value }))} placeholder="CID-10 (separados por vírgula)" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+            <div className="md:col-span-2">
+              <CID10Autocomplete
+                value={formData.cid10Codes}
+                onChange={(val) => setFormData((prev) => ({ ...prev, cid10Codes: val }))}
+                placeholder="Buscar CID-10..."
+              />
+            </div>
+            <input type="text" value={formData.complementaryExams} onChange={(e) => setFormData((prev) => ({ ...prev, complementaryExams: e.target.value }))} placeholder="Exames complementares (separados por vírgula)" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
             <input type="text" value={formData.medications} onChange={(e) => setFormData((prev) => ({ ...prev, medications: e.target.value }))} placeholder="Medicações (separadas por vírgula)" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
             <input type="text" value={formData.allergies} onChange={(e) => setFormData((prev) => ({ ...prev, allergies: e.target.value }))} placeholder="Alergias (separadas por vírgula)" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-            <input type="date" value={formData.followUpDate} onChange={(e) => setFormData((prev) => ({ ...prev, followUpDate: e.target.value }))} className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+            <input type="date" value={formData.followUpDate} onChange={(e) => setFormData((prev) => ({ ...prev, followUpDate: e.target.value }))} title="Próxima consulta" aria-label="Próxima consulta" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
           </div>
 
           <div className="rounded-lg border border-slate-200 p-3 space-y-3">
@@ -897,6 +922,31 @@ export function PatientDashboard({
                             </div>
                           )}
 
+                          {record.complementaryExamItems && record.complementaryExamItems.length > 0 && (
+                            <div>
+                              <p className="text-[11px] font-semibold text-slate-500">Exames complementares</p>
+                              <div className="space-y-1">
+                                {record.complementaryExamItems.map((exam, index) => (
+                                  <p key={`exam-${record.id}-${index}`} className="text-xs min-[360px]:text-sm text-slate-800">
+                                    {exam.nome}
+                                    {exam.status && exam.status !== 'nao_informado' ? ` (${exam.status})` : ''}
+                                    {exam.data ? ` - ${formatDate(exam.data)}` : ''}
+                                    {exam.resultado ? `: ${exam.resultado}` : ''}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {(!record.complementaryExamItems || record.complementaryExamItems.length === 0) &&
+                            record.complementaryExams &&
+                            record.complementaryExams.length > 0 && (
+                              <div>
+                                <p className="text-[11px] font-semibold text-slate-500">Exames complementares</p>
+                                <p className="text-xs min-[360px]:text-sm text-slate-800">{record.complementaryExams.join(', ')}</p>
+                              </div>
+                            )}
+
                           {record.allergies && record.allergies.length > 0 && (
                             <div>
                               <p className="text-[11px] font-semibold text-slate-500">Alergias</p>
@@ -906,7 +956,7 @@ export function PatientDashboard({
 
                           {record.followUpDate && (
                             <div>
-                              <p className="text-[11px] font-semibold text-slate-500">Follow-up</p>
+                              <p className="text-[11px] font-semibold text-slate-500">Próxima consulta</p>
                               <p className="text-xs min-[360px]:text-sm text-slate-800">{formatDate(record.followUpDate)}</p>
                             </div>
                           )}

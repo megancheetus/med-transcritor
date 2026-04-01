@@ -379,7 +379,7 @@ export default function TranscriberPage() {
           <button className="w-full text-left px-3 py-2.5 rounded-lg bg-[#e5f4f8] text-[#155b79] font-semibold">Dashboard</button>
           <button className="w-full text-left px-3 py-2.5 rounded-lg text-[#4b6573] hover:bg-[#f2f8fa] transition">Pacientes</button>
           <button className="w-full text-left px-3 py-2.5 rounded-lg text-[#4b6573] hover:bg-[#f2f8fa] transition">Histórico</button>
-          <button className="w-full text-left px-3 py-2.5 rounded-lg text-[#4b6573] hover:bg-[#f2f8fa] transition">Configurações</button>
+          <button className="w-full text-left px-3 py-2.5 rounded-lg text-[#4b6573] hover:bg-[#f2f8fa] transition">Painel de Pacientes</button>
         </nav>
 
         <div className="p-4 mt-auto">

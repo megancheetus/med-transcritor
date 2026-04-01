@@ -7,8 +7,13 @@ interface SOAPResponseProps {
 }
 
 export default function SOAPResponse({ content, isLoading = false, errorMessage = '' }: SOAPResponseProps) {
-  // Parse o conteúdo em secções SOAP
+  // Parse o conteúdo em secções SOAP (exclui "Orientações ao Paciente")
   const parseSOAP = (text: string) => {
+    // Remove a seção de orientações antes de parsear SOAP
+    const orientacoesMarker = /ORIENTAÇÕES AO PACIENTE:\s*/i;
+    const orientacoesMatch = orientacoesMarker.exec(text);
+    const soapText = orientacoesMatch ? text.slice(0, orientacoesMatch.index) : text;
+
     const sections = {
       S: '',
       O: '',
@@ -19,7 +24,7 @@ export default function SOAPResponse({ content, isLoading = false, errorMessage 
     const soapRegex = /([SOAP])\s*\(([^)]+)\):\s*([\s\S]*?)(?=[SOAP]\s*\([^)]+\)|$)/g;
     let match;
 
-    while ((match = soapRegex.exec(text)) !== null) {
+    while ((match = soapRegex.exec(soapText)) !== null) {
       const letter = match[1];
       const content = match[3].trim();
       if (letter in sections) {

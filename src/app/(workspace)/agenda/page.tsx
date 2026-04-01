@@ -153,38 +153,41 @@ export default function AgendaPage() {
       title="Agenda de Consultas"
       subtitle="Gerencie seus agendamentos de pacientes"
     >
-      {/* Controls - View Mode */}
-      <div className="mb-6 flex gap-4 items-center">
-        <label className="text-sm font-medium text-gray-700">Visualizar:</label>
-        <div className="flex gap-2">
+      <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50/80 p-4 shadow-sm">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <label className="text-sm font-medium text-slate-700">Visualizar:</label>
+            <div className="inline-flex w-fit rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
+              <button
+                onClick={() => setViewMode("week")}
+                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  viewMode === "week"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-slate-700 hover:bg-slate-100"
+                }`}
+              >
+                Semana
+              </button>
+              <button
+                onClick={() => setViewMode("month")}
+                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  viewMode === "month"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-slate-700 hover:bg-slate-100"
+                }`}
+              >
+                Mês
+              </button>
+            </div>
+          </div>
+
           <button
-            onClick={() => setViewMode("week")}
-            className={`px-4 py-2 rounded-md transition-colors ${
-              viewMode === "week"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-            }`}
+            onClick={() => handleSelectDate(new Date())}
+            className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
           >
-            Semana
-          </button>
-          <button
-            onClick={() => setViewMode("month")}
-            className={`px-4 py-2 rounded-md transition-colors ${
-              viewMode === "month"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-            }`}
-          >
-            Mês
+            + Novo Agendamento
           </button>
         </div>
-        <div className="flex-1" />
-        <button
-          onClick={() => handleSelectDate(new Date())}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-        >
-          + Novo Agendamento
-        </button>
       </div>
 
       {/* Error Messages */}
@@ -215,32 +218,31 @@ export default function AgendaPage() {
         />
       )}
 
-      {/* Stats Section */}
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
-          <div className="text-gray-500 text-sm font-medium">Total de Agendamentos</div>
-          <div className="text-3xl font-bold text-gray-900 mt-2">
+      <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total de Agendamentos</div>
+          <div className="mt-2 text-3xl font-bold text-slate-900">
             {appointments.length}
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-blue-400">
-          <div className="text-gray-500 text-sm font-medium">Agendado</div>
-          <div className="text-3xl font-bold text-blue-600 mt-2">
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Agendado</div>
+          <div className="mt-2 text-3xl font-bold text-blue-600">
             {appointments.filter((a) => a.status === "scheduled").length}
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
-          <div className="text-gray-500 text-sm font-medium">Confirmado</div>
-          <div className="text-3xl font-bold text-green-600 mt-2">
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Confirmado</div>
+          <div className="mt-2 text-3xl font-bold text-green-600">
             {appointments.filter((a) => a.status === "confirmed").length}
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-red-500">
-          <div className="text-gray-500 text-sm font-medium">Cancelado</div>
-          <div className="text-3xl font-bold text-red-600 mt-2">
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Cancelado</div>
+          <div className="mt-2 text-3xl font-bold text-red-600">
             {appointments.filter((a) => a.status === "cancelled").length}
           </div>
         </div>
