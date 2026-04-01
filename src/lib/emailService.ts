@@ -37,9 +37,48 @@ interface PatientProfileUpdateEmailParams {
   professionalName?: string | null;
   loginUrl: string;
   dashboardUrl: string;
-  recordDate?: string;
+  recordDate?: string | Date;
   recordType?: string;
   summary?: string;
+}
+
+function normalizeOptionalText(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function normalizeOptionalDateLabel(value: unknown): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) {
+      return undefined;
+    }
+
+    return value.toLocaleDateString('pt-BR');
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+
+    const parsed = new Date(trimmed);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleDateString('pt-BR');
+    }
+
+    return trimmed;
+  }
+
+  return undefined;
 }
 
 function getEmailConfig() {
@@ -51,6 +90,42 @@ function getEmailConfig() {
   }
 
   return { apiKey, from };
+}
+
+function normalizeBaseUrl(url: string): string {
+  const trimmed = url.trim().replace(/\/+$/, '');
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+
+  return `https://${trimmed}`;
+}
+
+function isLocalUrl(url: string): boolean {
+  return /localhost|127\.0\.0\.1/i.test(url);
+}
+
+export function resolveEmailAppBaseUrl(): string {
+  const appUrl = process.env.APP_URL?.trim();
+  const publicAppUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  const configured = appUrl || publicAppUrl;
+
+  if (configured) {
+    const normalizedConfigured = normalizeBaseUrl(configured);
+    const isProd = process.env.NODE_ENV === 'production';
+
+    // Em produção, ignora configuração local acidental (localhost).
+    if (!(isProd && isLocalUrl(normalizedConfigured))) {
+      return normalizedConfigured;
+    }
+  }
+
+  const vercelProductionUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  if (vercelProductionUrl) {
+    return normalizeBaseUrl(vercelProductionUrl);
+  }
+
+  return 'https://omninote.com.br';
 }
 
 export async function sendTrialVerificationEmail(params: TrialVerificationEmailParams): Promise<void> {
@@ -320,15 +395,20 @@ export async function sendPatientPortalWelcomeEmail(params: PatientPortalWelcome
 
 export async function sendPatientProfileUpdatedEmail(params: PatientProfileUpdateEmailParams): Promise<void> {
   const { apiKey, from } = getEmailConfig();
-  const greeting = params.patientName?.trim() ? `Olá, ${params.patientName.trim()}!` : 'Olá!';
-  const professionalLine = params.professionalName?.trim()
-    ? `Seu profissional ${params.professionalName.trim()} registrou novas informações no seu perfil.`
+  const patientName = normalizeOptionalText(params.patientName);
+  const professionalName = normalizeOptionalText(params.professionalName);
+  const recordType = normalizeOptionalText(params.recordType);
+  const summary = normalizeOptionalText(params.summary);
+  const dateLabel = normalizeOptionalDateLabel(params.recordDate);
+
+  const greeting = patientName ? `Olá, ${patientName}!` : 'Olá!';
+  const professionalLine = professionalName
+    ? `Seu profissional ${professionalName} registrou novas informações no seu perfil.`
     : 'Novas informações foram registradas no seu perfil.';
-  const updateLine = params.recordType?.trim()
-    ? `Tipo de atualização: ${params.recordType.trim()}`
+  const updateLine = recordType
+    ? `Tipo de atualização: ${recordType}`
     : 'Seu prontuário recebeu uma nova atualização.';
-  const dateLine = params.recordDate?.trim() ? `Data do registro: ${params.recordDate.trim()}` : undefined;
-  const summary = params.summary?.trim();
+  const dateLine = dateLabel ? `Data do registro: ${dateLabel}` : undefined;
 
   const subject = 'Seu perfil clínico foi atualizado no OmniNote';
   const text = `${greeting}\n\n${professionalLine}\n${updateLine}${dateLine ? `\n${dateLine}` : ''}${summary ? `\nResumo: ${summary}` : ''}\n\nPara consultar os detalhes, acesse: ${params.dashboardUrl}\nCaso precise, faça login primeiro em: ${params.loginUrl}`;

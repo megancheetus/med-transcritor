@@ -5,7 +5,7 @@ import {
   getMedicalRecordsByPatientPaginated,
   initializeMedicalRecordsTable,
 } from '@/lib/medicalRecordManager';
-import { sendPatientProfileUpdatedEmail } from '@/lib/emailService';
+import { resolveEmailAppBaseUrl, sendPatientProfileUpdatedEmail } from '@/lib/emailService';
 import { rateLimitMiddleware } from '@/lib/rateLimit';
 import { routeIdSchema } from '@/lib/schemas/patients';
 import { parseWithSchema } from '@/lib/schemas/apiValidation';
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           undefined
         : undefined;
 
-      const appBaseUrl = process.env.APP_URL || request.nextUrl.origin;
+      const appBaseUrl = resolveEmailAppBaseUrl();
       const loginUrl = `${appBaseUrl}/paciente/login`;
       const dashboardUrl = `${appBaseUrl}/paciente/dashboard`;
 
@@ -100,9 +100,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         };
       } catch (emailError) {
         console.error('[patients/:id/send-profile-update-email] email error:', emailError);
+        const errorMessage = emailError instanceof Error ? emailError.message : 'erro desconhecido';
         emailNotification = {
           status: 'failed',
-          message: 'Falha ao enviar o e-mail de atualização do perfil.',
+          message: `Falha ao enviar o e-mail de atualização do perfil (${errorMessage}).`,
         };
       }
     }

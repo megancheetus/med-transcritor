@@ -5,7 +5,7 @@ import {
   createPatient,
   initializePatientsTable,
 } from '@/lib/patientManager';
-import { sendPatientPortalWelcomeEmail } from '@/lib/emailService';
+import { resolveEmailAppBaseUrl, sendPatientPortalWelcomeEmail } from '@/lib/emailService';
 import { rateLimitMiddleware } from '@/lib/rateLimit';
 import { patientCreateSchema, patientListQuerySchema } from '@/lib/schemas/patients';
 import { parseWithSchema } from '@/lib/schemas/apiValidation';
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
         message: 'Paciente sem e-mail cadastrado. Nenhum e-mail foi enviado.',
       };
     } else {
-      const appBaseUrl = process.env.APP_URL || request.nextUrl.origin;
+      const appBaseUrl = resolveEmailAppBaseUrl();
       const firstAccessUrl = `${appBaseUrl}/paciente/primeiro-acesso`;
       const loginUrl = `${appBaseUrl}/paciente/login`;
 

@@ -15,6 +15,7 @@ import {
   medicalRecordListQuerySchema,
 } from '@/lib/schemas/medicalRecords';
 import { parseWithSchema } from '@/lib/schemas/apiValidation';
+import { resolveEmailAppBaseUrl } from '@/lib/emailService';
 
 export const runtime = 'nodejs';
 
@@ -187,7 +188,7 @@ export async function POST(request: NextRequest) {
           message: 'Paciente sem e-mail cadastrado. Nenhum e-mail foi enviado.',
         };
       } else {
-        const appBaseUrl = process.env.APP_URL || request.nextUrl.origin;
+        const appBaseUrl = resolveEmailAppBaseUrl();
         const loginUrl = `${appBaseUrl}/paciente/login`;
         const dashboardUrl = `${appBaseUrl}/paciente/dashboard`;
         const summary =

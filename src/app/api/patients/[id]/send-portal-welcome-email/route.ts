@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUserFromRequest } from '@/lib/authSession';
 import { getPatientById } from '@/lib/patientManager';
-import { sendPatientPortalWelcomeEmail } from '@/lib/emailService';
+import { resolveEmailAppBaseUrl, sendPatientPortalWelcomeEmail } from '@/lib/emailService';
 import { rateLimitMiddleware } from '@/lib/rateLimit';
 import { routeIdSchema } from '@/lib/schemas/patients';
 import { parseWithSchema } from '@/lib/schemas/apiValidation';
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         message: 'Paciente sem e-mail cadastrado. Nenhum e-mail foi enviado.',
       };
     } else {
-      const appBaseUrl = process.env.APP_URL || request.nextUrl.origin;
+      const appBaseUrl = resolveEmailAppBaseUrl();
       const firstAccessUrl = `${appBaseUrl}/paciente/primeiro-acesso`;
       const loginUrl = `${appBaseUrl}/paciente/login`;
 
@@ -78,9 +78,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         };
       } catch (emailError) {
         console.error('[patients/:id/send-portal-welcome-email] email error:', emailError);
+        const errorMessage = emailError instanceof Error ? emailError.message : 'erro desconhecido';
         emailNotification = {
           status: 'failed',
-          message: 'Falha ao enviar o e-mail de boas-vindas.',
+          message: `Falha ao enviar o e-mail de boas-vindas (${errorMessage}).`,
         };
       }
     }

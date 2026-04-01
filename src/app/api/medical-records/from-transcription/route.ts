@@ -11,7 +11,7 @@ import { getRequestAuditContext } from '@/lib/requestAudit';
 import { rateLimitMiddleware } from '@/lib/rateLimit';
 import { parseWithSchema } from '@/lib/schemas/apiValidation';
 import { medicalRecordFromTranscriptionSchema } from '@/lib/schemas/medicalRecords';
-import { sendPatientProfileUpdatedEmail } from '@/lib/emailService';
+import { resolveEmailAppBaseUrl, sendPatientProfileUpdatedEmail } from '@/lib/emailService';
 
 export const runtime = 'nodejs';
 
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (payload.notifyPatientByEmail && patient.email) {
-      const appBaseUrl = process.env.APP_URL || request.nextUrl.origin;
+      const appBaseUrl = resolveEmailAppBaseUrl();
       const loginUrl = `${appBaseUrl}/paciente/login`;
       const dashboardUrl = `${appBaseUrl}/paciente/dashboard`;
 
