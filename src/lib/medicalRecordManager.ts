@@ -66,7 +66,7 @@ function sanitizeComplementaryExamItems(value: unknown): ComplementaryExamItem[]
         status: isComplementaryExamStatus(exam.status) ? exam.status : undefined,
       } satisfies ComplementaryExamItem;
     })
-    .filter((item): item is ComplementaryExamItem => item !== null);
+    .filter((item) => item !== null) as ComplementaryExamItem[];
 
   return parsed.length > 0 ? parsed : undefined;
 }
