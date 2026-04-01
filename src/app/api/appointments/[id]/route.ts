@@ -7,6 +7,8 @@ import {
   initializeAppointmentsTable,
 } from "@/lib/appointmentManager";
 import { getAuthenticatedUserFromRequest } from "@/lib/authSession";
+import { sendAppointmentConfirmationEmail } from "@/lib/emailService";
+import { getPostgresPool } from "@/lib/postgres";
 
 export async function GET(
   request: NextRequest,
@@ -87,6 +89,45 @@ export async function PATCH(
         status,
         sala_videoconsulta_id
       );
+
+      // Send confirmation email if status changed to 'confirmed' (async, non-blocking)
+      if (status === "confirmed") {
+        try {
+          const pool = getPostgresPool();
+          
+          const patientResult = await pool.query(
+            `SELECT nome, email FROM patients WHERE id = $1`,
+            [appointment.patient_id]
+          );
+          
+          const professionalResult = await pool.query(
+            `SELECT full_name FROM app_users WHERE username = $1`,
+            [user.username]
+          );
+
+          const patient = patientResult.rows[0];
+          const professional = professionalResult.rows[0];
+
+          if (patient?.email && professional?.full_name) {
+            // Send email asynchronously without blocking
+            sendAppointmentConfirmationEmail({
+              to: patient.email,
+              patientName: patient.nome,
+              professionalName: professional.full_name,
+              appointmentDate: new Date(appointment.scheduled_at),
+              appointmentType: appointment.tipo,
+              appointmentDuration: appointment.duracao_minutos,
+              appointmentNotes: appointment.notas,
+            }).catch((err) => {
+              console.error("Failed to send status update email:", err);
+            });
+          }
+        } catch (emailError) {
+          console.error("Error preparing status update email:", emailError);
+          // Don't throw - email is secondary to appointment update
+        }
+      }
+
       return NextResponse.json({
         success: true,
         message: "Appointment updated successfully",

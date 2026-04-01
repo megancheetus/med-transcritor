@@ -8,6 +8,8 @@ import {
   getAppointmentById,
 } from "@/lib/appointmentManager";
 import { getAuthenticatedUserFromRequest } from "@/lib/authSession";
+import { sendAppointmentConfirmationEmail } from "@/lib/emailService";
+import { getPostgresPool } from "@/lib/postgres";
 
 export async function GET(request: NextRequest) {
   try {
@@ -122,6 +124,43 @@ export async function POST(request: NextRequest) {
       duracaoMinutos,
       notas
     );
+
+    // Send confirmation email (async, don't await to not block response)
+    try {
+      // Get patient and professional data
+      const pool = getPostgresPool();
+      
+      const patientResult = await pool.query(
+        `SELECT nome, email FROM patients WHERE id = $1`,
+        [patientId]
+      );
+      
+      const professionalResult = await pool.query(
+        `SELECT full_name FROM app_users WHERE username = $1`,
+        [user.username]
+      );
+
+      const patient = patientResult.rows[0];
+      const professional = professionalResult.rows[0];
+
+      if (patient?.email && professional?.full_name) {
+        // Send email asynchronously without blocking
+        sendAppointmentConfirmationEmail({
+          to: patient.email,
+          patientName: patient.nome,
+          professionalName: professional.full_name,
+          appointmentDate: appointment_date,
+          appointmentType: tipo,
+          appointmentDuration: duracaoMinutos,
+          appointmentNotes: notas,
+        }).catch((err) => {
+          console.error("Failed to send appointment confirmation email:", err);
+        });
+      }
+    } catch (emailError) {
+      console.error("Error preparing appointment confirmation email:", emailError);
+      // Don't throw - email is secondary to appointment creation
+    }
 
     return NextResponse.json(
       {

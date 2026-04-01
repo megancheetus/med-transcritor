@@ -5,7 +5,7 @@ export default async function Home() {
   const user = await getAuthenticatedUserFromCookies();
 
   if (!user) {
-    redirect('/login');
+    redirect('/login-escolha');
   }
 
   redirect('/dashboard');

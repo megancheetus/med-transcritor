@@ -1,5 +1,5 @@
 import { getPostgresPool } from './postgres';
-import { MedicalRecord, MedicalRecordVersion } from './types';
+import { BioimpedanceData, MedicalRecord, MedicalRecordVersion } from './types';
 
 interface MedicalRecordAuditInput {
   username: string;
@@ -20,6 +20,7 @@ interface ClinicalData {
   medications?: string[];
   allergies?: string[];
   followUpDate?: string;
+  bioimpedance?: BioimpedanceData;
 }
 
 interface MedicalRecordCursorData {
@@ -84,6 +85,69 @@ function sanitizeStringArray(value: unknown): string[] | undefined {
   return sanitized.length > 0 ? sanitized : undefined;
 }
 
+function sanitizeNumber(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined;
+  }
+
+  return value;
+}
+
+function mapBioimpedanceSegmental(value: unknown): BioimpedanceData['segmentalLean'] | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const segmental = value as Record<string, unknown>;
+
+  const mapped = {
+    leftArmKg: sanitizeNumber(segmental.leftArmKg),
+    rightArmKg: sanitizeNumber(segmental.rightArmKg),
+    trunkKg: sanitizeNumber(segmental.trunkKg),
+    leftLegKg: sanitizeNumber(segmental.leftLegKg),
+    rightLegKg: sanitizeNumber(segmental.rightLegKg),
+  };
+
+  if (Object.values(mapped).every((item) => item === undefined)) {
+    return undefined;
+  }
+
+  return mapped;
+}
+
+function mapBioimpedanceData(value: unknown): BioimpedanceData | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const data = value as Record<string, unknown>;
+
+  const mapped: BioimpedanceData = {
+    measuredAt: typeof data.measuredAt === 'string' ? data.measuredAt : undefined,
+    source: typeof data.source === 'string' ? data.source : undefined,
+    score: sanitizeNumber(data.score),
+    alturaCm: sanitizeNumber(data.alturaCm),
+    pesoKg: sanitizeNumber(data.pesoKg),
+    imc: sanitizeNumber(data.imc),
+    gorduraCorporalPercent: sanitizeNumber(data.gorduraCorporalPercent),
+    massaGorduraKg: sanitizeNumber(data.massaGorduraKg),
+    massaMagraKg: sanitizeNumber(data.massaMagraKg),
+    musculoEsqueleticoKg: sanitizeNumber(data.musculoEsqueleticoKg),
+    aguaCorporalTotalL: sanitizeNumber(data.aguaCorporalTotalL),
+    gorduraVisceralNivel: sanitizeNumber(data.gorduraVisceralNivel),
+    taxaMetabolicaBasalKcal: sanitizeNumber(data.taxaMetabolicaBasalKcal),
+    segmentalLean: mapBioimpedanceSegmental(data.segmentalLean),
+    segmentalFat: mapBioimpedanceSegmental(data.segmentalFat),
+    observacoes: typeof data.observacoes === 'string' ? data.observacoes : undefined,
+  };
+
+  if (Object.values(mapped).every((item) => item === undefined)) {
+    return undefined;
+  }
+
+  return mapped;
+}
+
 function buildClinicalDataFromRecord(record: Partial<MedicalRecord>): ClinicalData {
   return {
     soapSubjetivo: record.soapSubjetivo?.trim() || undefined,
@@ -94,6 +158,7 @@ function buildClinicalDataFromRecord(record: Partial<MedicalRecord>): ClinicalDa
     medications: sanitizeStringArray(record.medications),
     allergies: sanitizeStringArray(record.allergies),
     followUpDate: record.followUpDate?.trim() || undefined,
+    bioimpedance: mapBioimpedanceData(record.bioimpedance),
   };
 }
 
@@ -128,6 +193,7 @@ function mapClinicalData(value: unknown): ClinicalData {
       typeof clinicalData.followUpDate === 'string'
         ? clinicalData.followUpDate
         : undefined,
+    bioimpedance: mapBioimpedanceData(clinicalData.bioimpedance),
   };
 }
 
@@ -173,6 +239,7 @@ function mapMedicalRecordRow(
     medications: mappedClinicalData.medications,
     allergies: mappedClinicalData.allergies,
     followUpDate: mappedClinicalData.followUpDate,
+    bioimpedance: mappedClinicalData.bioimpedance,
   };
 }
 
@@ -460,6 +527,7 @@ export async function createMedicalRecord(
       medications: mappedClinicalData.medications,
       allergies: mappedClinicalData.allergies,
       followUpDate: mappedClinicalData.followUpDate,
+      bioimpedance: mappedClinicalData.bioimpedance,
     };
   } finally {
     client.release();
@@ -640,6 +708,7 @@ export async function getMedicalRecordById(
       medications: mappedClinicalData.medications,
       allergies: mappedClinicalData.allergies,
       followUpDate: mappedClinicalData.followUpDate,
+      bioimpedance: mappedClinicalData.bioimpedance,
     };
   } finally {
     client.release();
@@ -735,6 +804,9 @@ export async function updateMedicalRecord(
     if (recordData.followUpDate !== undefined) {
       clinicalDataPatch.followUpDate = recordData.followUpDate;
     }
+    if (recordData.bioimpedance !== undefined) {
+      clinicalDataPatch.bioimpedance = mapBioimpedanceData(recordData.bioimpedance);
+    }
 
     if (Object.keys(clinicalDataPatch).length > 0) {
       updateFields.push(
@@ -809,6 +881,7 @@ export async function updateMedicalRecord(
       medications: mappedClinicalData.medications,
       allergies: mappedClinicalData.allergies,
       followUpDate: mappedClinicalData.followUpDate,
+      bioimpedance: mappedClinicalData.bioimpedance,
     };
   } catch (error) {
     if (hasTransaction) {
@@ -860,4 +933,142 @@ export async function deleteMedicalRecord(
   } finally {
     client.release();
   }
+}
+
+export async function getLatestBioimpedanceByPatientId(patientId: string): Promise<{
+  recordDate: string;
+  profissional: string;
+  especialidade: string;
+  bioimpedance: BioimpedanceData;
+} | null> {
+  const pool = getPostgresPool();
+
+  const result = await pool.query(
+    `SELECT data, profissional, especialidade, clinical_data
+     FROM medical_records
+     WHERE patient_id = $1
+       AND clinical_data IS NOT NULL
+       AND clinical_data ? 'bioimpedance'
+     ORDER BY data DESC, id DESC
+     LIMIT 1`,
+    [patientId]
+  );
+
+  if (!result.rowCount) {
+    return null;
+  }
+
+  const row = result.rows[0] as {
+    data: string;
+    profissional: string;
+    especialidade: string;
+    clinical_data: unknown;
+  };
+
+  const mappedClinicalData = mapClinicalData(row.clinical_data);
+
+  if (!mappedClinicalData.bioimpedance) {
+    return null;
+  }
+
+  return {
+    recordDate: row.data,
+    profissional: row.profissional,
+    especialidade: row.especialidade,
+    bioimpedance: mappedClinicalData.bioimpedance,
+  };
+}
+
+export async function getBioimpedanceTimelineByPatientId(patientId: string): Promise<
+  Array<{
+    recordDate: string;
+    imc?: number;
+    pgc?: number;
+    massaMagraKg?: number;
+    massaGorduraKg?: number;
+  }>
+> {
+  const pool = getPostgresPool();
+
+  const result = await pool.query(
+    `SELECT data, clinical_data
+     FROM medical_records
+     WHERE patient_id = $1
+       AND clinical_data IS NOT NULL
+       AND clinical_data ? 'bioimpedance'
+     ORDER BY data ASC, id ASC`,
+    [patientId]
+  );
+
+  return result.rows
+    .map((row) => {
+      const mappedClinicalData = mapClinicalData((row as { clinical_data: unknown }).clinical_data);
+      const bio = mappedClinicalData.bioimpedance;
+
+      if (!bio) {
+        return null;
+      }
+
+      return {
+        recordDate: String((row as { data: string }).data),
+        imc: bio.imc,
+        pgc: bio.gorduraCorporalPercent,
+        massaMagraKg: bio.massaMagraKg,
+        massaGorduraKg: bio.massaGorduraKg,
+      };
+    })
+    .filter(
+      (item): item is {
+        recordDate: string;
+        imc?: number;
+        pgc?: number;
+        massaMagraKg?: number;
+        massaGorduraKg?: number;
+      } =>
+        !!item &&
+        [item.imc, item.pgc, item.massaMagraKg, item.massaGorduraKg].some(
+          (value) => value !== undefined && Number.isFinite(value)
+        )
+    );
+}
+
+export async function getMedicalRecordsForPatientPortal(
+  patientId: string,
+  limit = 200
+): Promise<MedicalRecord[]> {
+  const pool = getPostgresPool();
+
+  const safeLimit = Math.min(Math.max(limit, 1), 500);
+
+  const result = await pool.query(
+    `SELECT id, patient_id, data, tipo_documento, profissional,
+            especialidade, conteudo, resumo, source_type, source_ref_id,
+            ai_generated, clinician_reviewed, reviewed_at, clinical_data
+     FROM medical_records
+     WHERE patient_id = $1
+     ORDER BY data DESC, id DESC
+     LIMIT $2`,
+    [patientId, safeLimit]
+  );
+
+  return result.rows.map((row) =>
+    mapMedicalRecordRow(
+      row as {
+        id: string;
+        patient_id: string;
+        data: string;
+        tipo_documento: MedicalRecord['tipoDocumento'];
+        profissional: string;
+        especialidade: string;
+        conteudo: string;
+        resumo: string | null;
+        source_type: MedicalRecord['sourceType'];
+        source_ref_id: string | null;
+        ai_generated: boolean;
+        clinician_reviewed: boolean;
+        reviewed_at: string | null;
+        clinical_data: unknown;
+      }
+    )
+  );
 }

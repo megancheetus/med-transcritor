@@ -111,6 +111,239 @@ function formatDateTime(dateString: string): string {
   });
 }
 
+function formatNumber(value?: number, suffix?: string): string {
+  if (value === undefined || value === null || Number.isNaN(value)) {
+    return '--';
+  }
+
+  return `${value.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}${suffix || ''}`;
+}
+
+function parseOptionalNumber(value: string): number | undefined {
+  const normalized = value.replace(',', '.').trim();
+  if (!normalized) {
+    return undefined;
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseCsvField(value: string): string[] | undefined {
+  const parsed = value
+    .split(',')
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+
+  return parsed.length > 0 ? parsed : undefined;
+}
+
+function csvFromArray(values?: string[]): string {
+  return values && values.length > 0 ? values.join(', ') : '';
+}
+
+function EditRecordModal({
+  record,
+  onClose,
+  onSave,
+  isSaving,
+}: {
+  record: MedicalRecord;
+  onClose: () => void;
+  onSave: (payload: Partial<Omit<MedicalRecord, 'id' | 'patientId'>>) => Promise<void>;
+  isSaving: boolean;
+}) {
+  const [formData, setFormData] = useState({
+    data: record.data,
+    tipoDocumento: record.tipoDocumento,
+    profissional: record.profissional,
+    especialidade: record.especialidade,
+    resumo: record.resumo || '',
+    conteudo: record.conteudo,
+    cid10Codes: csvFromArray(record.cid10Codes),
+    medications: csvFromArray(record.medications),
+    allergies: csvFromArray(record.allergies),
+    followUpDate: record.followUpDate || '',
+    bioAlturaCm: record.bioimpedance?.alturaCm?.toString() || '',
+    bioPesoKg: record.bioimpedance?.pesoKg?.toString() || '',
+    bioImc: record.bioimpedance?.imc?.toString() || '',
+    bioGorduraPercent: record.bioimpedance?.gorduraCorporalPercent?.toString() || '',
+    bioMassaMagraKg: record.bioimpedance?.massaMagraKg?.toString() || '',
+    bioMassaGorduraKg: record.bioimpedance?.massaGorduraKg?.toString() || '',
+    bioMusculoEsqueleticoKg: record.bioimpedance?.musculoEsqueleticoKg?.toString() || '',
+    bioAguaCorporalL: record.bioimpedance?.aguaCorporalTotalL?.toString() || '',
+    bioGorduraVisceralNivel: record.bioimpedance?.gorduraVisceralNivel?.toString() || '',
+    bioTmbKcal: record.bioimpedance?.taxaMetabolicaBasalKcal?.toString() || '',
+    bioObservacoes: record.bioimpedance?.observacoes || '',
+    leanLeftArm: record.bioimpedance?.segmentalLean?.leftArmKg?.toString() || '',
+    leanRightArm: record.bioimpedance?.segmentalLean?.rightArmKg?.toString() || '',
+    leanTrunk: record.bioimpedance?.segmentalLean?.trunkKg?.toString() || '',
+    leanLeftLeg: record.bioimpedance?.segmentalLean?.leftLegKg?.toString() || '',
+    leanRightLeg: record.bioimpedance?.segmentalLean?.rightLegKg?.toString() || '',
+    fatLeftArm: record.bioimpedance?.segmentalFat?.leftArmKg?.toString() || '',
+    fatRightArm: record.bioimpedance?.segmentalFat?.rightArmKg?.toString() || '',
+    fatTrunk: record.bioimpedance?.segmentalFat?.trunkKg?.toString() || '',
+    fatLeftLeg: record.bioimpedance?.segmentalFat?.leftLegKg?.toString() || '',
+    fatRightLeg: record.bioimpedance?.segmentalFat?.rightLegKg?.toString() || '',
+  });
+
+  useEffect(() => {
+    const peso = parseOptionalNumber(formData.bioPesoKg);
+    const alturaCm = parseOptionalNumber(formData.bioAlturaCm);
+
+    if (!peso || !alturaCm || alturaCm <= 0) {
+      if (formData.bioImc !== '') {
+        setFormData((prev) => ({ ...prev, bioImc: '' }));
+      }
+      return;
+    }
+
+    const alturaM = alturaCm / 100;
+    const calculatedImc = peso / (alturaM * alturaM);
+    const normalizedImc = calculatedImc.toFixed(2);
+
+    if (formData.bioImc !== normalizedImc) {
+      setFormData((prev) => ({ ...prev, bioImc: normalizedImc }));
+    }
+  }, [formData.bioAlturaCm, formData.bioPesoKg, formData.bioImc]);
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    await onSave({
+      data: formData.data,
+      tipoDocumento: formData.tipoDocumento,
+      profissional: formData.profissional,
+      especialidade: formData.especialidade,
+      resumo: formData.resumo.trim() || undefined,
+      conteudo: formData.conteudo.trim(),
+      cid10Codes: parseCsvField(formData.cid10Codes),
+      medications: parseCsvField(formData.medications),
+      allergies: parseCsvField(formData.allergies),
+      followUpDate: formData.followUpDate || undefined,
+      bioimpedance: {
+        alturaCm: parseOptionalNumber(formData.bioAlturaCm),
+        pesoKg: parseOptionalNumber(formData.bioPesoKg),
+        imc: parseOptionalNumber(formData.bioImc),
+        gorduraCorporalPercent: parseOptionalNumber(formData.bioGorduraPercent),
+        massaMagraKg: parseOptionalNumber(formData.bioMassaMagraKg),
+        massaGorduraKg: parseOptionalNumber(formData.bioMassaGorduraKg),
+        musculoEsqueleticoKg: parseOptionalNumber(formData.bioMusculoEsqueleticoKg),
+        aguaCorporalTotalL: parseOptionalNumber(formData.bioAguaCorporalL),
+        gorduraVisceralNivel: parseOptionalNumber(formData.bioGorduraVisceralNivel),
+        taxaMetabolicaBasalKcal: parseOptionalNumber(formData.bioTmbKcal),
+        observacoes: formData.bioObservacoes.trim() || undefined,
+        segmentalLean: {
+          leftArmKg: parseOptionalNumber(formData.leanLeftArm),
+          rightArmKg: parseOptionalNumber(formData.leanRightArm),
+          trunkKg: parseOptionalNumber(formData.leanTrunk),
+          leftLegKg: parseOptionalNumber(formData.leanLeftLeg),
+          rightLegKg: parseOptionalNumber(formData.leanRightLeg),
+        },
+        segmentalFat: {
+          leftArmKg: parseOptionalNumber(formData.fatLeftArm),
+          rightArmKg: parseOptionalNumber(formData.fatRightArm),
+          trunkKg: parseOptionalNumber(formData.fatTrunk),
+          leftLegKg: parseOptionalNumber(formData.fatLeftLeg),
+          rightLegKg: parseOptionalNumber(formData.fatRightLeg),
+        },
+      },
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-xl bg-white shadow-xl">
+        <div className="sticky top-0 border-b border-slate-200 bg-white p-4 sm:p-5 flex items-center justify-between">
+          <h3 className="text-base sm:text-lg font-bold text-slate-900">Editar registro</h3>
+          <button onClick={onClose} className="rounded-md p-1 text-slate-500 hover:bg-slate-100" aria-label="Fechar edição">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <input type="date" value={formData.data} onChange={(e) => setFormData((prev) => ({ ...prev, data: e.target.value }))} className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+            <select value={formData.tipoDocumento} onChange={(e) => setFormData((prev) => ({ ...prev, tipoDocumento: e.target.value as MedicalRecord['tipoDocumento'] }))} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+              <option value="Consulta">Consulta</option>
+              <option value="Exame">Exame</option>
+              <option value="Procedimento">Procedimento</option>
+              <option value="Prescrição">Prescrição</option>
+              <option value="Internação">Internação</option>
+            </select>
+            <input type="text" value={formData.profissional} onChange={(e) => setFormData((prev) => ({ ...prev, profissional: e.target.value }))} placeholder="Profissional" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+            <input type="text" value={formData.especialidade} onChange={(e) => setFormData((prev) => ({ ...prev, especialidade: e.target.value }))} placeholder="Especialidade" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+          </div>
+
+          <input type="text" value={formData.resumo} onChange={(e) => setFormData((prev) => ({ ...prev, resumo: e.target.value }))} placeholder="Resumo" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+          <textarea value={formData.conteudo} onChange={(e) => setFormData((prev) => ({ ...prev, conteudo: e.target.value }))} rows={6} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <input type="text" value={formData.cid10Codes} onChange={(e) => setFormData((prev) => ({ ...prev, cid10Codes: e.target.value }))} placeholder="CID-10 (separados por vírgula)" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+            <input type="text" value={formData.medications} onChange={(e) => setFormData((prev) => ({ ...prev, medications: e.target.value }))} placeholder="Medicações (separadas por vírgula)" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+            <input type="text" value={formData.allergies} onChange={(e) => setFormData((prev) => ({ ...prev, allergies: e.target.value }))} placeholder="Alergias (separadas por vírgula)" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+            <input type="date" value={formData.followUpDate} onChange={(e) => setFormData((prev) => ({ ...prev, followUpDate: e.target.value }))} className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+          </div>
+
+          <div className="rounded-lg border border-slate-200 p-3 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Bioimpedância</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <input type="text" value={formData.bioAlturaCm} onChange={(e) => setFormData((prev) => ({ ...prev, bioAlturaCm: e.target.value }))} placeholder="Altura (cm)" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+              <input type="text" value={formData.bioPesoKg} onChange={(e) => setFormData((prev) => ({ ...prev, bioPesoKg: e.target.value }))} placeholder="Peso (kg)" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+              <input type="text" value={formData.bioImc} readOnly placeholder="IMC automático" className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm" />
+              <input type="text" value={formData.bioGorduraPercent} onChange={(e) => setFormData((prev) => ({ ...prev, bioGorduraPercent: e.target.value }))} placeholder="PGC (%)" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+              <input type="text" value={formData.bioMassaMagraKg} onChange={(e) => setFormData((prev) => ({ ...prev, bioMassaMagraKg: e.target.value }))} placeholder="Massa magra (kg)" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+              <input type="text" value={formData.bioMassaGorduraKg} onChange={(e) => setFormData((prev) => ({ ...prev, bioMassaGorduraKg: e.target.value }))} placeholder="Massa gordura (kg)" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+              <input type="text" value={formData.bioMusculoEsqueleticoKg} onChange={(e) => setFormData((prev) => ({ ...prev, bioMusculoEsqueleticoKg: e.target.value }))} placeholder="Músculo esquelético (kg)" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+              <input type="text" value={formData.bioAguaCorporalL} onChange={(e) => setFormData((prev) => ({ ...prev, bioAguaCorporalL: e.target.value }))} placeholder="Água corporal (L)" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <input type="text" value={formData.bioGorduraVisceralNivel} onChange={(e) => setFormData((prev) => ({ ...prev, bioGorduraVisceralNivel: e.target.value }))} placeholder="Gordura visceral" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+              <input type="text" value={formData.bioTmbKcal} onChange={(e) => setFormData((prev) => ({ ...prev, bioTmbKcal: e.target.value }))} placeholder="TMB (kcal)" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="rounded-lg border border-slate-200 p-3">
+                <p className="text-xs font-semibold text-slate-600 mb-2">Massa magra segmentar (kg)</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <input type="text" value={formData.leanLeftArm} onChange={(e) => setFormData((prev) => ({ ...prev, leanLeftArm: e.target.value }))} placeholder="Braço E" className="rounded border border-slate-300 px-2 py-1.5 text-xs" />
+                  <input type="text" value={formData.leanRightArm} onChange={(e) => setFormData((prev) => ({ ...prev, leanRightArm: e.target.value }))} placeholder="Braço D" className="rounded border border-slate-300 px-2 py-1.5 text-xs" />
+                  <input type="text" value={formData.leanLeftLeg} onChange={(e) => setFormData((prev) => ({ ...prev, leanLeftLeg: e.target.value }))} placeholder="Perna E" className="rounded border border-slate-300 px-2 py-1.5 text-xs" />
+                  <input type="text" value={formData.leanRightLeg} onChange={(e) => setFormData((prev) => ({ ...prev, leanRightLeg: e.target.value }))} placeholder="Perna D" className="rounded border border-slate-300 px-2 py-1.5 text-xs" />
+                  <input type="text" value={formData.leanTrunk} onChange={(e) => setFormData((prev) => ({ ...prev, leanTrunk: e.target.value }))} placeholder="Tronco" className="col-span-2 rounded border border-slate-300 px-2 py-1.5 text-xs" />
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 p-3">
+                <p className="text-xs font-semibold text-slate-600 mb-2">Massa de gordura segmentar (kg)</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <input type="text" value={formData.fatLeftArm} onChange={(e) => setFormData((prev) => ({ ...prev, fatLeftArm: e.target.value }))} placeholder="Braço E" className="rounded border border-slate-300 px-2 py-1.5 text-xs" />
+                  <input type="text" value={formData.fatRightArm} onChange={(e) => setFormData((prev) => ({ ...prev, fatRightArm: e.target.value }))} placeholder="Braço D" className="rounded border border-slate-300 px-2 py-1.5 text-xs" />
+                  <input type="text" value={formData.fatLeftLeg} onChange={(e) => setFormData((prev) => ({ ...prev, fatLeftLeg: e.target.value }))} placeholder="Perna E" className="rounded border border-slate-300 px-2 py-1.5 text-xs" />
+                  <input type="text" value={formData.fatRightLeg} onChange={(e) => setFormData((prev) => ({ ...prev, fatRightLeg: e.target.value }))} placeholder="Perna D" className="rounded border border-slate-300 px-2 py-1.5 text-xs" />
+                  <input type="text" value={formData.fatTrunk} onChange={(e) => setFormData((prev) => ({ ...prev, fatTrunk: e.target.value }))} placeholder="Tronco" className="col-span-2 rounded border border-slate-300 px-2 py-1.5 text-xs" />
+                </div>
+              </div>
+            </div>
+
+            <textarea value={formData.bioObservacoes} onChange={(e) => setFormData((prev) => ({ ...prev, bioObservacoes: e.target.value }))} rows={3} placeholder="Observações de bioimpedância" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+          </div>
+
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+            <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              Cancelar
+            </button>
+            <button type="submit" disabled={isSaving} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+              {isSaving ? 'Salvando...' : 'Salvar alterações'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function getSourceBadge(sourceType?: MedicalRecord['sourceType']): {
   label: string;
   className: string;
@@ -160,6 +393,8 @@ export function PatientDashboard({
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
   const [versionsError, setVersionsError] = useState<string | null>(null);
   const [selectedRecordForVersions, setSelectedRecordForVersions] = useState<MedicalRecord | null>(null);
+  const [selectedRecordForEdit, setSelectedRecordForEdit] = useState<MedicalRecord | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const timelineRef = useRef<HTMLDivElement | null>(null);
 
   const normalizedFilters = useMemo(
@@ -320,6 +555,46 @@ export function PatientDashboard({
     setSelectedRecordForVersions(null);
     setVersions([]);
     setVersionsError(null);
+  };
+
+  const handleOpenEditRecord = (record: MedicalRecord) => {
+    setSelectedRecordForEdit(record);
+  };
+
+  const handleCloseEditRecord = () => {
+    setSelectedRecordForEdit(null);
+  };
+
+  const handleSaveEditRecord = async (payload: Partial<Omit<MedicalRecord, 'id' | 'patientId'>>) => {
+    if (!selectedRecordForEdit) {
+      return;
+    }
+
+    try {
+      setIsSavingEdit(true);
+
+      const response = await fetch(`/api/medical-records/${selectedRecordForEdit.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || 'Erro ao atualizar registro');
+      }
+
+      const updatedRecord = (await response.json()) as MedicalRecord;
+      setRecords((prev) => prev.map((record) => (record.id === updatedRecord.id ? updatedRecord : record)));
+      setSelectedRecordForEdit(null);
+    } catch (err) {
+      console.error('Erro ao editar registro:', err);
+      alert(err instanceof Error ? err.message : 'Erro ao editar registro');
+    } finally {
+      setIsSavingEdit(false);
+    }
   };
 
   return (
@@ -539,6 +814,14 @@ export function PatientDashboard({
                           Versões
                         </button>
                         <button
+                          onClick={() => handleOpenEditRecord(record)}
+                          className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] min-[360px]:text-xs font-medium text-indigo-700 transition hover:bg-indigo-100"
+                          title="Editar registro"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                          Editar
+                        </button>
+                        <button
                           onClick={() => handleDeleteRecord(record.id)}
                           className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-[11px] min-[360px]:text-xs font-medium text-red-700 transition hover:bg-red-100"
                           title="Deletar registro"
@@ -559,7 +842,95 @@ export function PatientDashboard({
                       <p className="mb-3 text-xs min-[360px]:text-sm leading-relaxed font-medium text-slate-800">{record.resumo}</p>
                     )}
 
-                    <p className="text-xs min-[360px]:text-sm leading-relaxed text-slate-700">{record.conteudo}</p>
+                    <p className="text-xs min-[360px]:text-sm leading-relaxed text-slate-700 whitespace-pre-wrap">{record.conteudo}</p>
+
+                    {(record.cid10Codes?.length ||
+                      record.medications?.length ||
+                      record.allergies?.length ||
+                      record.followUpDate ||
+                      record.bioimpedance) && (
+                      <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <h4 className="text-[11px] min-[360px]:text-xs font-semibold uppercase tracking-wide text-slate-600">
+                          Dados clínicos estruturados
+                        </h4>
+
+                        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                          {record.cid10Codes && record.cid10Codes.length > 0 && (
+                            <div>
+                              <p className="text-[11px] font-semibold text-slate-500">CID-10</p>
+                              <p className="text-xs min-[360px]:text-sm text-slate-800">{record.cid10Codes.join(', ')}</p>
+                            </div>
+                          )}
+
+                          {record.medications && record.medications.length > 0 && (
+                            <div>
+                              <p className="text-[11px] font-semibold text-slate-500">Medicações</p>
+                              <p className="text-xs min-[360px]:text-sm text-slate-800">{record.medications.join(', ')}</p>
+                            </div>
+                          )}
+
+                          {record.allergies && record.allergies.length > 0 && (
+                            <div>
+                              <p className="text-[11px] font-semibold text-slate-500">Alergias</p>
+                              <p className="text-xs min-[360px]:text-sm text-slate-800">{record.allergies.join(', ')}</p>
+                            </div>
+                          )}
+
+                          {record.followUpDate && (
+                            <div>
+                              <p className="text-[11px] font-semibold text-slate-500">Follow-up</p>
+                              <p className="text-xs min-[360px]:text-sm text-slate-800">{formatDate(record.followUpDate)}</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {record.bioimpedance && (
+                          <div className="mt-3 border-t border-slate-200 pt-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">Bioimpedância</p>
+                            <div className="mt-2 grid grid-cols-2 gap-2 text-xs min-[360px]:text-sm">
+                              <p className="text-slate-700"><span className="font-medium">Altura:</span> {formatNumber(record.bioimpedance.alturaCm, ' cm')}</p>
+                              <p className="text-slate-700"><span className="font-medium">Peso:</span> {formatNumber(record.bioimpedance.pesoKg, ' kg')}</p>
+                              <p className="text-slate-700"><span className="font-medium">IMC:</span> {formatNumber(record.bioimpedance.imc)}</p>
+                              <p className="text-slate-700"><span className="font-medium">PGC:</span> {formatNumber(record.bioimpedance.gorduraCorporalPercent, '%')}</p>
+                              <p className="text-slate-700"><span className="font-medium">Massa magra:</span> {formatNumber(record.bioimpedance.massaMagraKg, ' kg')}</p>
+                              <p className="text-slate-700"><span className="font-medium">Massa gordura:</span> {formatNumber(record.bioimpedance.massaGorduraKg, ' kg')}</p>
+                            </div>
+
+                            {record.bioimpedance.segmentalLean && (
+                              <div className="mt-3">
+                                <p className="text-[11px] font-semibold text-slate-500">Massa magra segmentar (kg)</p>
+                                <div className="mt-1 grid grid-cols-2 gap-2 text-xs min-[360px]:text-sm">
+                                  <p className="text-slate-700">Braço E: {formatNumber(record.bioimpedance.segmentalLean.leftArmKg, ' kg')}</p>
+                                  <p className="text-slate-700">Braço D: {formatNumber(record.bioimpedance.segmentalLean.rightArmKg, ' kg')}</p>
+                                  <p className="text-slate-700">Perna E: {formatNumber(record.bioimpedance.segmentalLean.leftLegKg, ' kg')}</p>
+                                  <p className="text-slate-700">Perna D: {formatNumber(record.bioimpedance.segmentalLean.rightLegKg, ' kg')}</p>
+                                  <p className="text-slate-700 col-span-2">Tronco: {formatNumber(record.bioimpedance.segmentalLean.trunkKg, ' kg')}</p>
+                                </div>
+                              </div>
+                            )}
+
+                            {record.bioimpedance.segmentalFat && (
+                              <div className="mt-3">
+                                <p className="text-[11px] font-semibold text-slate-500">Massa de gordura segmentar (kg)</p>
+                                <div className="mt-1 grid grid-cols-2 gap-2 text-xs min-[360px]:text-sm">
+                                  <p className="text-slate-700">Braço E: {formatNumber(record.bioimpedance.segmentalFat.leftArmKg, ' kg')}</p>
+                                  <p className="text-slate-700">Braço D: {formatNumber(record.bioimpedance.segmentalFat.rightArmKg, ' kg')}</p>
+                                  <p className="text-slate-700">Perna E: {formatNumber(record.bioimpedance.segmentalFat.leftLegKg, ' kg')}</p>
+                                  <p className="text-slate-700">Perna D: {formatNumber(record.bioimpedance.segmentalFat.rightLegKg, ' kg')}</p>
+                                  <p className="text-slate-700 col-span-2">Tronco: {formatNumber(record.bioimpedance.segmentalFat.trunkKg, ' kg')}</p>
+                                </div>
+                              </div>
+                            )}
+
+                            {record.bioimpedance.observacoes && (
+                              <p className="mt-2 text-xs min-[360px]:text-sm text-slate-700">
+                                <span className="font-medium">Observações:</span> {record.bioimpedance.observacoes}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -661,6 +1032,15 @@ export function PatientDashboard({
             </div>
           </div>
         </div>
+      )}
+
+      {selectedRecordForEdit && (
+        <EditRecordModal
+          record={selectedRecordForEdit}
+          onClose={handleCloseEditRecord}
+          onSave={handleSaveEditRecord}
+          isSaving={isSavingEdit}
+        />
       )}
     </div>
   );

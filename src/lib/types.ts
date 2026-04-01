@@ -31,11 +31,39 @@ export interface MedicalRecord {
   medications?: string[];
   allergies?: string[];
   followUpDate?: string;
+  bioimpedance?: BioimpedanceData;
   sourceType?: 'manual' | 'transcription' | 'teleconsulta';
   sourceRefId?: string;
   aiGenerated?: boolean;
   clinicianReviewed?: boolean;
   reviewedAt?: string;
+}
+
+export interface BioimpedanceSegmentalData {
+  leftArmKg?: number;
+  rightArmKg?: number;
+  trunkKg?: number;
+  leftLegKg?: number;
+  rightLegKg?: number;
+}
+
+export interface BioimpedanceData {
+  measuredAt?: string;
+  source?: string;
+  score?: number;
+  alturaCm?: number;
+  pesoKg?: number;
+  imc?: number;
+  gorduraCorporalPercent?: number;
+  massaGorduraKg?: number;
+  massaMagraKg?: number;
+  musculoEsqueleticoKg?: number;
+  aguaCorporalTotalL?: number;
+  gorduraVisceralNivel?: number;
+  taxaMetabolicaBasalKcal?: number;
+  segmentalLean?: BioimpedanceSegmentalData;
+  segmentalFat?: BioimpedanceSegmentalData;
+  observacoes?: string;
 }
 
 export interface MedicalRecordVersion {

@@ -11,10 +11,15 @@ function setNoStoreHeaders(response: NextResponse): NextResponse {
 
 export async function middleware(request: NextRequest) {
   const authToken = request.cookies.get('auth_token')?.value;
+  const patientAuthToken = request.cookies.get('patient_auth_token')?.value;
   const pathname = request.nextUrl.pathname;
   const isAuthenticated = Boolean(await getUsernameFromAuthToken(authToken));
+  const patientTokenSubject = await getUsernameFromAuthToken(patientAuthToken);
+  const isPatientAuthenticated = Boolean(patientTokenSubject?.startsWith('patient:'));
   const protectedPaths = ['/', '/dashboard', '/transcricao', '/historico', '/perfil', '/prontuario', '/teleconsulta', '/admin'];
   const isProtectedPath = protectedPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+  const isPatientArea = pathname === '/paciente' || pathname.startsWith('/paciente/');
+  const isPatientPublicPath = pathname === '/paciente/login' || pathname === '/paciente/primeiro-acesso';
 
   if (pathname === '/login') {
     if (isAuthenticated) {
@@ -24,13 +29,29 @@ export async function middleware(request: NextRequest) {
     return setNoStoreHeaders(NextResponse.next());
   }
 
+  if (isPatientArea) {
+    if (isPatientPublicPath && isPatientAuthenticated) {
+      return setNoStoreHeaders(NextResponse.redirect(new URL('/paciente/dashboard', request.url)));
+    }
+
+    if (!isPatientPublicPath && !isPatientAuthenticated) {
+      return setNoStoreHeaders(NextResponse.redirect(new URL('/paciente/login', request.url)));
+    }
+
+    return setNoStoreHeaders(NextResponse.next());
+  }
+
   if (!isAuthenticated && isProtectedPath) {
-    return setNoStoreHeaders(NextResponse.redirect(new URL('/login', request.url)));
+    if (pathname === '/' && isPatientAuthenticated) {
+      return setNoStoreHeaders(NextResponse.redirect(new URL('/paciente/dashboard', request.url)));
+    }
+
+    return setNoStoreHeaders(NextResponse.redirect(new URL('/login-escolha', request.url)));
   }
 
   return setNoStoreHeaders(NextResponse.next());
 }
 
 export const config = {
-  matcher: ['/', '/login', '/dashboard/:path*', '/transcricao/:path*', '/historico/:path*', '/perfil/:path*', '/prontuario/:path*', '/teleconsulta/:path*', '/admin/:path*'],
+  matcher: ['/', '/login', '/dashboard/:path*', '/transcricao/:path*', '/historico/:path*', '/perfil/:path*', '/prontuario/:path*', '/teleconsulta/:path*', '/admin/:path*', '/paciente/:path*'],
 };

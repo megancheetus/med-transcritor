@@ -159,6 +159,7 @@ export async function POST(request: NextRequest) {
         medications: validatedPayload.medications,
         allergies: validatedPayload.allergies,
         followUpDate: validatedPayload.followUpDate,
+        bioimpedance: validatedPayload.bioimpedance,
       }
     );
 

@@ -14,6 +14,38 @@ const optionalTrimmedString = z
   .optional();
 
 const optionalStringArray = z.array(z.string().trim().min(1)).optional();
+const optionalNumber = z.coerce.number().finite().optional();
+
+const bioimpedanceSegmentalSchema = z
+  .object({
+    leftArmKg: optionalNumber,
+    rightArmKg: optionalNumber,
+    trunkKg: optionalNumber,
+    leftLegKg: optionalNumber,
+    rightLegKg: optionalNumber,
+  })
+  .optional();
+
+const bioimpedanceSchema = z
+  .object({
+    measuredAt: optionalTrimmedString,
+    source: optionalTrimmedString,
+    score: optionalNumber,
+    alturaCm: optionalNumber,
+    pesoKg: optionalNumber,
+    imc: optionalNumber,
+    gorduraCorporalPercent: optionalNumber,
+    massaGorduraKg: optionalNumber,
+    massaMagraKg: optionalNumber,
+    musculoEsqueleticoKg: optionalNumber,
+    aguaCorporalTotalL: optionalNumber,
+    gorduraVisceralNivel: optionalNumber,
+    taxaMetabolicaBasalKcal: optionalNumber,
+    segmentalLean: bioimpedanceSegmentalSchema,
+    segmentalFat: bioimpedanceSegmentalSchema,
+    observacoes: optionalTrimmedString,
+  })
+  .optional();
 
 export const medicalRecordCreateSchema = z.object({
   patientId: z.string().trim().min(1, 'patientId é obrigatório'),
@@ -31,6 +63,7 @@ export const medicalRecordCreateSchema = z.object({
   medications: optionalStringArray,
   allergies: optionalStringArray,
   followUpDate: optionalTrimmedString,
+  bioimpedance: bioimpedanceSchema,
 });
 
 export const medicalRecordPatchSchema = z
@@ -49,6 +82,7 @@ export const medicalRecordPatchSchema = z
     medications: optionalStringArray,
     allergies: optionalStringArray,
     followUpDate: optionalTrimmedString,
+    bioimpedance: bioimpedanceSchema,
     sourceType: z.enum(['manual', 'transcription', 'teleconsulta']).optional(),
     sourceRefId: optionalTrimmedString,
     aiGenerated: z.boolean().optional(),

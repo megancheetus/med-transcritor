@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MedicalRecord } from '@/lib/types';
 import { X } from 'lucide-react';
 
@@ -12,7 +12,17 @@ interface AddMedicalRecordModalProps {
 }
 
 type TipoDocumento = 'Consulta' | 'Exame' | 'Procedimento' | 'Prescrição' | 'Internação';
-type ModalTab = 'resumo' | 'soap' | 'diagnostico' | 'revisao';
+type ModalTab = 'resumo' | 'soap' | 'diagnostico' | 'bioimpedancia' | 'revisao';
+
+function parseOptionalNumber(value: string): number | undefined {
+  const normalized = value.replace(',', '.').trim();
+  if (!normalized) {
+    return undefined;
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
 
 function parseCsvField(value: string): string[] | undefined {
   const parsed = value
@@ -64,9 +74,53 @@ export function AddMedicalRecordModal({
     medications: '',
     allergies: '',
     followUpDate: '',
+    bioMeasuredAt: '',
+    bioSource: '',
+    bioScore: '',
+    bioAlturaCm: '',
+    bioPesoKg: '',
+    bioImc: '',
+    bioGorduraPercent: '',
+    bioMassaGorduraKg: '',
+    bioMassaMagraKg: '',
+    bioMusculoEsqueleticoKg: '',
+    bioAguaCorporalL: '',
+    bioGorduraVisceral: '',
+    bioTmbKcal: '',
+    bioLeanLeftArmKg: '',
+    bioLeanRightArmKg: '',
+    bioLeanTrunkKg: '',
+    bioLeanLeftLegKg: '',
+    bioLeanRightLegKg: '',
+    bioFatLeftArmKg: '',
+    bioFatRightArmKg: '',
+    bioFatTrunkKg: '',
+    bioFatLeftLegKg: '',
+    bioFatRightLegKg: '',
+    bioObservacoes: '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const peso = parseOptionalNumber(formData.bioPesoKg);
+    const alturaCm = parseOptionalNumber(formData.bioAlturaCm);
+
+    if (!peso || !alturaCm || alturaCm <= 0) {
+      if (formData.bioImc !== '') {
+        setFormData((prev) => ({ ...prev, bioImc: '' }));
+      }
+      return;
+    }
+
+    const alturaM = alturaCm / 100;
+    const calculatedImc = peso / (alturaM * alturaM);
+    const normalizedImc = calculatedImc.toFixed(2).replace('.', ',');
+
+    if (formData.bioImc !== normalizedImc) {
+      setFormData((prev) => ({ ...prev, bioImc: normalizedImc }));
+    }
+  }, [formData.bioAlturaCm, formData.bioPesoKg, formData.bioImc]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -124,6 +178,36 @@ export function AddMedicalRecordModal({
       medications: parseCsvField(formData.medications),
       allergies: parseCsvField(formData.allergies),
       followUpDate: formData.followUpDate || undefined,
+      bioimpedance: {
+        measuredAt: formData.bioMeasuredAt || undefined,
+        source: formData.bioSource.trim() || undefined,
+        score: parseOptionalNumber(formData.bioScore),
+        alturaCm: parseOptionalNumber(formData.bioAlturaCm),
+        pesoKg: parseOptionalNumber(formData.bioPesoKg),
+        imc: parseOptionalNumber(formData.bioImc),
+        gorduraCorporalPercent: parseOptionalNumber(formData.bioGorduraPercent),
+        massaGorduraKg: parseOptionalNumber(formData.bioMassaGorduraKg),
+        massaMagraKg: parseOptionalNumber(formData.bioMassaMagraKg),
+        musculoEsqueleticoKg: parseOptionalNumber(formData.bioMusculoEsqueleticoKg),
+        aguaCorporalTotalL: parseOptionalNumber(formData.bioAguaCorporalL),
+        gorduraVisceralNivel: parseOptionalNumber(formData.bioGorduraVisceral),
+        taxaMetabolicaBasalKcal: parseOptionalNumber(formData.bioTmbKcal),
+        segmentalLean: {
+          leftArmKg: parseOptionalNumber(formData.bioLeanLeftArmKg),
+          rightArmKg: parseOptionalNumber(formData.bioLeanRightArmKg),
+          trunkKg: parseOptionalNumber(formData.bioLeanTrunkKg),
+          leftLegKg: parseOptionalNumber(formData.bioLeanLeftLegKg),
+          rightLegKg: parseOptionalNumber(formData.bioLeanRightLegKg),
+        },
+        segmentalFat: {
+          leftArmKg: parseOptionalNumber(formData.bioFatLeftArmKg),
+          rightArmKg: parseOptionalNumber(formData.bioFatRightArmKg),
+          trunkKg: parseOptionalNumber(formData.bioFatTrunkKg),
+          leftLegKg: parseOptionalNumber(formData.bioFatLeftLegKg),
+          rightLegKg: parseOptionalNumber(formData.bioFatRightLegKg),
+        },
+        observacoes: formData.bioObservacoes.trim() || undefined,
+      },
     });
 
     setFormData({
@@ -141,6 +225,30 @@ export function AddMedicalRecordModal({
       medications: '',
       allergies: '',
       followUpDate: '',
+      bioMeasuredAt: '',
+      bioSource: '',
+      bioScore: '',
+      bioAlturaCm: '',
+      bioPesoKg: '',
+      bioImc: '',
+      bioGorduraPercent: '',
+      bioMassaGorduraKg: '',
+      bioMassaMagraKg: '',
+      bioMusculoEsqueleticoKg: '',
+      bioAguaCorporalL: '',
+      bioGorduraVisceral: '',
+      bioTmbKcal: '',
+      bioLeanLeftArmKg: '',
+      bioLeanRightArmKg: '',
+      bioLeanTrunkKg: '',
+      bioLeanLeftLegKg: '',
+      bioLeanRightLegKg: '',
+      bioFatLeftArmKg: '',
+      bioFatRightArmKg: '',
+      bioFatTrunkKg: '',
+      bioFatLeftLegKg: '',
+      bioFatRightLegKg: '',
+      bioObservacoes: '',
     });
     setActiveTab('resumo');
     setErrors({});
@@ -197,6 +305,17 @@ export function AddMedicalRecordModal({
               }`}
             >
               Diagnóstico/Conduta
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('bioimpedancia')}
+              className={`min-h-11 rounded-md px-3 py-2 text-xs font-semibold text-center leading-tight whitespace-normal transition ${
+                activeTab === 'bioimpedancia'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Bioimpedancia
             </button>
             <button
               type="button"
@@ -296,6 +415,110 @@ export function AddMedicalRecordModal({
                   onChange={(e) => setFormData({ ...formData, resumo: e.target.value })}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
                   placeholder="Resumo breve do registro"
+                />
+              </div>
+            </>
+          )}
+
+          {activeTab === 'bioimpedancia' && (
+            <>
+              <div className="rounded-lg border border-[#cfe0e8] bg-[#f7fbfc] p-4">
+                <p className="text-sm font-semibold text-[#155b79]">Composicao corporal e bioimpedancia</p>
+                <p className="mt-1 text-xs text-[#4b6573]">Preencha os campos disponiveis conforme o laudo. Todos os campos sao opcionais.</p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Data/hora da medicao</label>
+                  <input
+                    type="text"
+                    value={formData.bioMeasuredAt}
+                    onChange={(e) => setFormData({ ...formData, bioMeasuredAt: e.target.value })}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                    placeholder="10/12/2025 12:30"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Equipamento/Fonte</label>
+                  <input
+                    type="text"
+                    value={formData.bioSource}
+                    onChange={(e) => setFormData({ ...formData, bioSource: e.target.value })}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                    placeholder="InBody 120"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Score InBody</label>
+                  <input
+                    type="text"
+                    value={formData.bioScore}
+                    onChange={(e) => setFormData({ ...formData, bioScore: e.target.value })}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                    placeholder="53"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                <div><label className="mb-1 block text-sm font-medium text-slate-700">Altura (cm)</label><input type="text" value={formData.bioAlturaCm} onChange={(e) => setFormData({ ...formData, bioAlturaCm: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2" /></div>
+                <div><label className="mb-1 block text-sm font-medium text-slate-700">Peso (kg)</label><input type="text" value={formData.bioPesoKg} onChange={(e) => setFormData({ ...formData, bioPesoKg: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2" /></div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">IMC (automático)</label>
+                  <input
+                    type="text"
+                    value={formData.bioImc}
+                    readOnly
+                    className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-slate-700"
+                  />
+                  <p className="mt-1 text-[11px] text-slate-500">Calculado por $peso / (altura em metros)^2$.</p>
+                </div>
+                <div><label className="mb-1 block text-sm font-medium text-slate-700">PGC (%)</label><input type="text" value={formData.bioGorduraPercent} onChange={(e) => setFormData({ ...formData, bioGorduraPercent: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2" /></div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                <div><label className="mb-1 block text-sm font-medium text-slate-700">Massa de gordura (kg)</label><input type="text" value={formData.bioMassaGorduraKg} onChange={(e) => setFormData({ ...formData, bioMassaGorduraKg: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2" /></div>
+                <div><label className="mb-1 block text-sm font-medium text-slate-700">Massa magra (kg)</label><input type="text" value={formData.bioMassaMagraKg} onChange={(e) => setFormData({ ...formData, bioMassaMagraKg: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2" /></div>
+                <div><label className="mb-1 block text-sm font-medium text-slate-700">Musculo esqueletico (kg)</label><input type="text" value={formData.bioMusculoEsqueleticoKg} onChange={(e) => setFormData({ ...formData, bioMusculoEsqueleticoKg: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2" /></div>
+                <div><label className="mb-1 block text-sm font-medium text-slate-700">Agua corporal total (L)</label><input type="text" value={formData.bioAguaCorporalL} onChange={(e) => setFormData({ ...formData, bioAguaCorporalL: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2" /></div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div><label className="mb-1 block text-sm font-medium text-slate-700">Gordura visceral (nivel)</label><input type="text" value={formData.bioGorduraVisceral} onChange={(e) => setFormData({ ...formData, bioGorduraVisceral: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2" /></div>
+                <div><label className="mb-1 block text-sm font-medium text-slate-700">Taxa metabolica basal (kcal)</label><input type="text" value={formData.bioTmbKcal} onChange={(e) => setFormData({ ...formData, bioTmbKcal: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2" /></div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="rounded-lg border border-slate-200 p-4">
+                  <p className="text-sm font-semibold text-slate-700 mb-3">Massa magra segmentar (kg)</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input type="text" value={formData.bioLeanLeftArmKg} onChange={(e) => setFormData({ ...formData, bioLeanLeftArmKg: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Braco E" />
+                    <input type="text" value={formData.bioLeanRightArmKg} onChange={(e) => setFormData({ ...formData, bioLeanRightArmKg: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Braco D" />
+                    <input type="text" value={formData.bioLeanLeftLegKg} onChange={(e) => setFormData({ ...formData, bioLeanLeftLegKg: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Perna E" />
+                    <input type="text" value={formData.bioLeanRightLegKg} onChange={(e) => setFormData({ ...formData, bioLeanRightLegKg: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Perna D" />
+                    <input type="text" value={formData.bioLeanTrunkKg} onChange={(e) => setFormData({ ...formData, bioLeanTrunkKg: e.target.value })} className="col-span-2 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Tronco" />
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-slate-200 p-4">
+                  <p className="text-sm font-semibold text-slate-700 mb-3">Gordura segmentar (kg)</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input type="text" value={formData.bioFatLeftArmKg} onChange={(e) => setFormData({ ...formData, bioFatLeftArmKg: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Braco E" />
+                    <input type="text" value={formData.bioFatRightArmKg} onChange={(e) => setFormData({ ...formData, bioFatRightArmKg: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Braco D" />
+                    <input type="text" value={formData.bioFatLeftLegKg} onChange={(e) => setFormData({ ...formData, bioFatLeftLegKg: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Perna E" />
+                    <input type="text" value={formData.bioFatRightLegKg} onChange={(e) => setFormData({ ...formData, bioFatRightLegKg: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Perna D" />
+                    <input type="text" value={formData.bioFatTrunkKg} onChange={(e) => setFormData({ ...formData, bioFatTrunkKg: e.target.value })} className="col-span-2 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Tronco" />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Observacoes</label>
+                <textarea
+                  value={formData.bioObservacoes}
+                  onChange={(e) => setFormData({ ...formData, bioObservacoes: e.target.value })}
+                  rows={3}
+                  className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
                 />
               </div>
             </>
@@ -414,6 +637,7 @@ export function AddMedicalRecordModal({
                   <p><span className="font-medium">Especialidade:</span> {formData.especialidade || '-'}</p>
                   <p><span className="font-medium">CIDs:</span> {formData.cid10Codes || '-'}</p>
                   <p><span className="font-medium">Follow-up:</span> {formData.followUpDate || '-'}</p>
+                  <p><span className="font-medium">Bioimpedancia:</span> {formData.bioPesoKg || formData.bioImc || formData.bioGorduraPercent ? 'Preenchida' : 'Nao preenchida'}</p>
                 </div>
               </div>
             </div>

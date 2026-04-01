@@ -6,6 +6,8 @@ import {
 } from "@/lib/appointmentManager";
 import { getAuthenticatedUserFromRequest } from "@/lib/authSession";
 import { createVideoConsultaRoom } from "@/lib/videoConsultationManager";
+import { sendAppointmentConfirmationEmail } from "@/lib/emailService";
+import { getPostgresPool } from "@/lib/postgres";
 
 /**
  * Start a video consultation for a scheduled appointment
@@ -90,6 +92,42 @@ export async function POST(
 
       // Update appointment with room ID and status to 'confirmed'
       await updateAppointmentStatus(params.id, "confirmed", room.id);
+
+      // Send confirmation email (async, don't await to not block response)
+      try {
+        const pool = getPostgresPool();
+        
+        const patientResult = await pool.query(
+          `SELECT nome, email FROM patients WHERE id = $1`,
+          [appointment.patient_id]
+        );
+        
+        const professionalResult = await pool.query(
+          `SELECT full_name FROM app_users WHERE username = $1`,
+          [user.username]
+        );
+
+        const patient = patientResult.rows[0];
+        const professional = professionalResult.rows[0];
+
+        if (patient?.email && professional?.full_name) {
+          // Send email asynchronously without blocking
+          sendAppointmentConfirmationEmail({
+            to: patient.email,
+            patientName: patient.nome,
+            professionalName: professional.full_name,
+            appointmentDate: new Date(appointment.scheduled_at),
+            appointmentType: appointment.tipo,
+            appointmentDuration: appointment.duracao_minutos,
+            appointmentNotes: appointment.notas,
+          }).catch((err) => {
+            console.error("Failed to send consultation confirmation email:", err);
+          });
+        }
+      } catch (emailError) {
+        console.error("Error preparing consultation confirmation email:", emailError);
+        // Don't throw - email is secondary to consultation start
+      }
 
       return NextResponse.json({
         success: true,
