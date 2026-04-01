@@ -58,7 +58,7 @@ function LoginEscolhaContent() {
               Sou Profissional
             </Link>
             <Link href="/paciente/login" className="w-full block bg-[#1ea58c] hover:bg-[#178c74] text-white text-xs min-[360px]:text-sm font-bold py-2.5 min-[360px]:py-3 rounded-lg transition text-center shadow-md hover:shadow-lg">
-              Sou Paciente (CPF)
+              Sou Paciente
             </Link>
           </div>
         </div>

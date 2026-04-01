@@ -15,11 +15,18 @@ const formatDurationLabel = (seconds: number) => {
 };
 
 const getDayKey = (date: Date) => {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
+  const year = date.getUTCFullYear();
+  const month = `${date.getUTCMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getUTCDate()}`.padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
+
+const formatDateTimeSaoPaulo = (value: string) =>
+  new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+    timeZone: 'America/Sao_Paulo',
+  }).format(new Date(value));
 
 const getHistoryDate = (entryId: string, fallbackTimestamp: string) => {
   const parsedId = Number(entryId);
@@ -97,15 +104,19 @@ export default function DashboardPage() {
   }, [sessionUser]);
 
   const totalSessionDuration = history.reduce((sum, entry) => sum + entry.duration, 0);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const now = new Date();
+  const todayUtcMidnightMs = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate()
+  );
 
   const chartSeries = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() - (6 - index));
+    const offsetDays = 6 - index;
+    const date = new Date(todayUtcMidnightMs - offsetDays * 24 * 60 * 60 * 1000);
     return {
       dayKey: getDayKey(date),
-      label: WEEKDAY_LABELS[date.getDay()],
+      label: WEEKDAY_LABELS[date.getUTCDay()],
       count: 0,
     };
   });
@@ -114,7 +125,6 @@ export default function DashboardPage() {
 
   for (const entry of history) {
     const entryDate = getHistoryDate(entry.id, entry.timestamp);
-    entryDate.setHours(0, 0, 0, 0);
     const key = getDayKey(entryDate);
     const chartDay = chartMap.get(key);
     if (chartDay) {
@@ -183,10 +193,7 @@ export default function DashboardPage() {
             <p className="mt-2 text-sm text-blue-900">
               Seu acesso de teste expira em{' '}
               <strong>
-                {new Intl.DateTimeFormat('pt-BR', {
-                  dateStyle: 'short',
-                  timeStyle: 'short',
-                }).format(new Date(sessionUser.trialExpiresAt))}
+                {formatDateTimeSaoPaulo(sessionUser.trialExpiresAt)}
               </strong>
               .
             </p>
