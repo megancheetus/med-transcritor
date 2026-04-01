@@ -9,15 +9,20 @@ import { createVideoConsultaRoom } from "@/lib/videoConsultationManager";
 import { sendAppointmentConfirmationEmail } from "@/lib/emailService";
 import { getPostgresPool } from "@/lib/postgres";
 
+interface RouteParams {
+  params: Promise<{ id: string }>;
+}
+
 /**
  * Start a video consultation for a scheduled appointment
  * POST /api/appointments/[id]/start-consultation
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: RouteParams
 ) {
   try {
+    const { id } = await params;
     // Initialize tables
     await initializeAppointmentsTable();
 
@@ -28,7 +33,7 @@ export async function POST(
     }
 
     // Get appointment
-    const appointment = await getAppointmentById(params.id);
+    const appointment = await getAppointmentById(id);
     if (!appointment) {
       return NextResponse.json(
         { error: "Appointment not found" },
@@ -91,7 +96,7 @@ export async function POST(
       );
 
       // Update appointment with room ID and status to 'confirmed'
-      await updateAppointmentStatus(params.id, "confirmed", room.id);
+      await updateAppointmentStatus(id, "confirmed", room.id);
 
       // Send confirmation email (async, don't await to not block response)
       try {

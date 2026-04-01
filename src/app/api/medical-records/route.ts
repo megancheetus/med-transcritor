@@ -6,6 +6,8 @@ import {
   initializeMedicalRecordsTable,
   logMedicalRecordAudit,
 } from '@/lib/medicalRecordManager';
+import { getPatientById, initializePatientsTable } from '@/lib/patientManager';
+import { sendPatientProfileUpdatedEmail } from '@/lib/emailService';
 import { getRequestAuditContext } from '@/lib/requestAudit';
 import { rateLimitMiddleware } from '@/lib/rateLimit';
 import {
@@ -15,6 +17,11 @@ import {
 import { parseWithSchema } from '@/lib/schemas/apiValidation';
 
 export const runtime = 'nodejs';
+
+type EmailNotificationResult = {
+  status: 'sent' | 'skipped-no-email' | 'disabled' | 'failed';
+  message: string;
+};
 
 /**
  * GET /api/medical-records?patientId=...
@@ -163,6 +170,58 @@ export async function POST(request: NextRequest) {
       }
     );
 
+    let emailNotification: EmailNotificationResult;
+
+    if (!validatedPayload.notifyPatientByEmail) {
+      emailNotification = {
+        status: 'disabled',
+        message: 'Envio de e-mail desativado pelo profissional.',
+      };
+    } else {
+      await initializePatientsTable();
+      const patient = await getPatientById(validatedPayload.patientId, user.username);
+
+      if (!patient?.email) {
+        emailNotification = {
+          status: 'skipped-no-email',
+          message: 'Paciente sem e-mail cadastrado. Nenhum e-mail foi enviado.',
+        };
+      } else {
+        const appBaseUrl = process.env.APP_URL || request.nextUrl.origin;
+        const loginUrl = `${appBaseUrl}/paciente/login`;
+        const dashboardUrl = `${appBaseUrl}/paciente/dashboard`;
+        const summary =
+          validatedPayload.cid10Codes?.join(', ') ||
+          validatedPayload.soapAvaliacao ||
+          validatedPayload.soapPlano ||
+          validatedPayload.resumo ||
+          undefined;
+
+        try {
+          await sendPatientProfileUpdatedEmail({
+            to: patient.email,
+            patientName: patient.nomeCompleto,
+            professionalName: user.fullName || user.username,
+            loginUrl,
+            dashboardUrl,
+            recordDate: validatedPayload.data,
+            recordType: validatedPayload.tipoDocumento,
+            summary,
+          });
+          emailNotification = {
+            status: 'sent',
+            message: 'E-mail de atualização enviado com sucesso para o paciente.',
+          };
+        } catch (emailError) {
+          console.error('[medical-records] profile update email error:', emailError);
+          emailNotification = {
+            status: 'failed',
+            message: 'Registro criado, mas houve falha ao enviar o e-mail de atualização.',
+          };
+        }
+      }
+    }
+
     const auditContext = getRequestAuditContext(request);
     await logMedicalRecordAudit({
       username: user.username,
@@ -177,7 +236,10 @@ export async function POST(request: NextRequest) {
       userAgent: auditContext.userAgent,
     });
 
-    return NextResponse.json(record, { status: 201 });
+    return NextResponse.json({
+      record,
+      emailNotification,
+    }, { status: 201 });
   } catch (error) {
     console.error('[medical-records] POST error:', error);
     return NextResponse.json(

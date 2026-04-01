@@ -10,11 +10,16 @@ import { getAuthenticatedUserFromRequest } from "@/lib/authSession";
 import { sendAppointmentConfirmationEmail } from "@/lib/emailService";
 import { getPostgresPool } from "@/lib/postgres";
 
+interface RouteParams {
+  params: Promise<{ id: string }>;
+}
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: RouteParams
 ) {
   try {
+    const { id } = await params;
     await initializeAppointmentsTable();
 
     const user = await getAuthenticatedUserFromRequest(request);
@@ -22,7 +27,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const appointment = await getAppointmentById(params.id);
+    const appointment = await getAppointmentById(id);
 
     if (!appointment) {
       return NextResponse.json(
@@ -51,9 +56,10 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: RouteParams
 ) {
   try {
+    const { id } = await params;
     await initializeAppointmentsTable();
 
     const user = await getAuthenticatedUserFromRequest(request);
@@ -61,7 +67,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const appointment = await getAppointmentById(params.id);
+    const appointment = await getAppointmentById(id);
 
     if (!appointment) {
       return NextResponse.json(
@@ -85,7 +91,7 @@ export async function PATCH(
     // If status is being updated to 'completed', can include room_id
     if (status) {
       const updated = await updateAppointmentStatus(
-        params.id,
+        id,
         status,
         sala_videoconsulta_id
       );
@@ -148,7 +154,7 @@ export async function PATCH(
       );
     }
 
-    const updated = await updateAppointment(params.id, updates);
+    const updated = await updateAppointment(id, updates);
 
     return NextResponse.json({
       success: true,
@@ -166,9 +172,10 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: RouteParams
 ) {
   try {
+    const { id } = await params;
     await initializeAppointmentsTable();
 
     const user = await getAuthenticatedUserFromRequest(request);
@@ -176,7 +183,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const appointment = await getAppointmentById(params.id);
+    const appointment = await getAppointmentById(id);
 
     if (!appointment) {
       return NextResponse.json(
@@ -193,7 +200,7 @@ export async function DELETE(
       );
     }
 
-    const deleted = await deleteAppointment(params.id);
+    const deleted = await deleteAppointment(id);
 
     if (!deleted) {
       return NextResponse.json(

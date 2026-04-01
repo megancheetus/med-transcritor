@@ -14,6 +14,7 @@ export const patientCreateSchema = z.object({
   dataNascimento: z.string().trim().min(1, 'Data de nascimento é obrigatória'),
   telefone: optionalTrimmedString,
   email: optionalTrimmedString,
+  notifyPatientByEmail: z.boolean().optional().default(true),
 });
 
 export const patientPatchSchema = patientCreateSchema.partial().refine((data) => Object.keys(data).length > 0, {

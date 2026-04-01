@@ -1000,36 +1000,43 @@ export async function getBioimpedanceTimelineByPatientId(patientId: string): Pro
     [patientId]
   );
 
-  return result.rows
-    .map((row) => {
-      const mappedClinicalData = mapClinicalData((row as { clinical_data: unknown }).clinical_data);
-      const bio = mappedClinicalData.bioimpedance;
+  const timeline: Array<{
+    recordDate: string;
+    imc?: number;
+    pgc?: number;
+    massaMagraKg?: number;
+    massaGorduraKg?: number;
+  }> = [];
 
-      if (!bio) {
-        return null;
-      }
+  for (const row of result.rows) {
+    const mappedClinicalData = mapClinicalData((row as { clinical_data: unknown }).clinical_data);
+    const bio = mappedClinicalData.bioimpedance;
 
-      return {
-        recordDate: String((row as { data: string }).data),
-        imc: bio.imc,
-        pgc: bio.gorduraCorporalPercent,
-        massaMagraKg: bio.massaMagraKg,
-        massaGorduraKg: bio.massaGorduraKg,
-      };
-    })
-    .filter(
-      (item): item is {
-        recordDate: string;
-        imc?: number;
-        pgc?: number;
-        massaMagraKg?: number;
-        massaGorduraKg?: number;
-      } =>
-        !!item &&
-        [item.imc, item.pgc, item.massaMagraKg, item.massaGorduraKg].some(
-          (value) => value !== undefined && Number.isFinite(value)
-        )
-    );
+    if (!bio) {
+      continue;
+    }
+
+    const hasAnyMetric = [
+      bio.imc,
+      bio.gorduraCorporalPercent,
+      bio.massaMagraKg,
+      bio.massaGorduraKg,
+    ].some((value) => value !== undefined && Number.isFinite(value));
+
+    if (!hasAnyMetric) {
+      continue;
+    }
+
+    timeline.push({
+      recordDate: String((row as { data: string }).data),
+      imc: bio.imc,
+      pgc: bio.gorduraCorporalPercent,
+      massaMagraKg: bio.massaMagraKg,
+      massaGorduraKg: bio.massaGorduraKg,
+    });
+  }
+
+  return timeline;
 }
 
 export async function getMedicalRecordsForPatientPortal(

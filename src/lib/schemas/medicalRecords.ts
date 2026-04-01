@@ -64,6 +64,7 @@ export const medicalRecordCreateSchema = z.object({
   allergies: optionalStringArray,
   followUpDate: optionalTrimmedString,
   bioimpedance: bioimpedanceSchema,
+  notifyPatientByEmail: z.boolean().optional().default(true),
 });
 
 export const medicalRecordPatchSchema = z
@@ -111,6 +112,7 @@ export const medicalRecordFromTranscriptionSchema = z.object({
   conteudo: z.string().trim().min(1, 'Conteúdo clínico é obrigatório'),
   sourceRefId: z.string().trim().optional(),
   clinicianReviewed: z.boolean().optional(),
+  notifyPatientByEmail: z.boolean().optional().default(true),
 });
 
 export const patientIdQuerySchema = z.object({

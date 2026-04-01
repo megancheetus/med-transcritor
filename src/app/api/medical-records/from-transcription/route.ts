@@ -11,6 +11,7 @@ import { getRequestAuditContext } from '@/lib/requestAudit';
 import { rateLimitMiddleware } from '@/lib/rateLimit';
 import { parseWithSchema } from '@/lib/schemas/apiValidation';
 import { medicalRecordFromTranscriptionSchema } from '@/lib/schemas/medicalRecords';
+import { sendPatientProfileUpdatedEmail } from '@/lib/emailService';
 
 export const runtime = 'nodejs';
 
@@ -24,6 +25,7 @@ interface FromTranscriptionPayload {
   conteudo?: unknown;
   sourceRefId?: unknown;
   clinicianReviewed?: unknown;
+  notifyPatientByEmail?: unknown;
 }
 
 function normalizeDate(input?: string): string {
@@ -53,6 +55,7 @@ function parsePayload(payload: FromTranscriptionPayload) {
   const conteudo = typeof payload.conteudo === 'string' ? payload.conteudo.trim() : '';
   const sourceRefId = typeof payload.sourceRefId === 'string' ? payload.sourceRefId.trim() : '';
   const clinicianReviewed = payload.clinicianReviewed === false ? false : true;
+  const notifyPatientByEmail = payload.notifyPatientByEmail === false ? false : true;
 
   if (!patientId) {
     return { error: 'Selecione um paciente válido.' };
@@ -81,6 +84,7 @@ function parsePayload(payload: FromTranscriptionPayload) {
       conteudo,
       sourceRefId: sourceRefId || undefined,
       clinicianReviewed,
+      notifyPatientByEmail,
     },
   };
 }
@@ -153,6 +157,27 @@ export async function POST(request: NextRequest) {
       clinicianReviewed: payload.clinicianReviewed,
       reviewedAt,
     });
+
+    if (payload.notifyPatientByEmail && patient.email) {
+      const appBaseUrl = process.env.APP_URL || request.nextUrl.origin;
+      const loginUrl = `${appBaseUrl}/paciente/login`;
+      const dashboardUrl = `${appBaseUrl}/paciente/dashboard`;
+
+      try {
+        await sendPatientProfileUpdatedEmail({
+          to: patient.email,
+          patientName: patient.nomeCompleto,
+          professionalName: user.fullName || user.username,
+          loginUrl,
+          dashboardUrl,
+          recordDate: payload.data,
+          recordType: payload.tipoDocumento,
+          summary: payload.resumo,
+        });
+      } catch (emailError) {
+        console.error('[medical-records/from-transcription] profile update email error:', emailError);
+      }
+    }
 
     const auditContext = getRequestAuditContext(request);
     await logMedicalRecordAudit({

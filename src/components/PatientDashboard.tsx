@@ -23,6 +23,10 @@ interface PatientDashboardProps {
   onAddMedicalRecord?: () => void;
   onStartTeleconsulta?: () => void;
   onDeletePatient?: () => void;
+  onSendPortalWelcomeEmail?: () => void;
+  onSendProfileUpdateEmail?: () => void;
+  isSendingPortalWelcomeEmail?: boolean;
+  isSendingProfileUpdateEmail?: boolean;
   refreshKey?: number;
 }
 
@@ -374,6 +378,10 @@ export function PatientDashboard({
   onAddMedicalRecord,
   onStartTeleconsulta,
   onDeletePatient,
+  onSendPortalWelcomeEmail,
+  onSendProfileUpdateEmail,
+  isSendingPortalWelcomeEmail = false,
+  isSendingProfileUpdateEmail = false,
   refreshKey = 0,
 }: PatientDashboardProps) {
   const [records, setRecords] = useState<MedicalRecord[]>([]);
@@ -632,6 +640,26 @@ export function PatientDashboard({
               >
                 <Edit2 className="h-3.5 w-3.5" />
                 Editar
+              </button>
+            )}
+            {onSendPortalWelcomeEmail && (
+              <button
+                onClick={onSendPortalWelcomeEmail}
+                disabled={isSendingPortalWelcomeEmail}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs min-[360px]:text-sm font-medium text-white hover:bg-emerald-700 transition disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Mail className="h-3.5 w-3.5" />
+                {isSendingPortalWelcomeEmail ? 'Enviando tutorial...' : 'Enviar tutorial'}
+              </button>
+            )}
+            {onSendProfileUpdateEmail && (
+              <button
+                onClick={onSendProfileUpdateEmail}
+                disabled={isSendingProfileUpdateEmail}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs min-[360px]:text-sm font-medium text-white hover:bg-teal-700 transition disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Mail className="h-3.5 w-3.5" />
+                {isSendingProfileUpdateEmail ? 'Enviando atualização...' : 'Enviar atualização'}
               </button>
             )}
             {onDeletePatient && (

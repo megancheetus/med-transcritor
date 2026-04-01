@@ -4,7 +4,7 @@
 
 ### AI/LLM Services
 ```
-GEMINI_API_KEY=AIzaSyACybdRvgCtH28-TDhRwXlVq0pdfrfAbzA
+GEMINI_API_KEY=your_gemini_api_key_here
 ```
 - **Purpose**: Google Generative AI for audio transcription processing
 - **Scope**: Server-side only (NOT exposed via NEXT_PUBLIC_)
@@ -13,7 +13,7 @@ GEMINI_API_KEY=AIzaSyACybdRvgCtH28-TDhRwXlVq0pdfrfAbzA
 
 ### Authentication
 ```
-AUTH_TOKEN_SECRET=LveluAfNq8igpjM5Xar0OYV4Wb7SPtBQRwHZEyTFUGkzcDm92xoJKh3n6ICs1d
+AUTH_TOKEN_SECRET=your_auth_token_secret_here
 ```
 - **Purpose**: JWT token signing for user authentication
 - **Scope**: Server-side only
@@ -22,7 +22,7 @@ AUTH_TOKEN_SECRET=LveluAfNq8igpjM5Xar0OYV4Wb7SPtBQRwHZEyTFUGkzcDm92xoJKh3n6ICs1d
 
 ### Database
 ```
-DATABASE_URL=postgresql://postgres.ftyzvjkulzkwbpklmbkk:Rt0M8zOTwTOvks63@aws-0-us-west-2.pooler.supabase.com:6543/postgres
+DATABASE_URL=postgresql://postgres.your-project-ref:your_db_password@aws-0-us-west-2.pooler.supabase.com:6543/postgres
 POSTGRES_SSL=true
 POSTGRES_SSL_REJECT_UNAUTHORIZED=false
 ```
@@ -33,9 +33,9 @@ POSTGRES_SSL_REJECT_UNAUTHORIZED=false
 
 ### Jitsi as a Service (JaaS/Teleconsulta)
 ```
-JAAS_APP_ID=vpaas-magic-cookie-3f7307fd623047d385bded58cb9d7549
-JAAS_KEY_ID=vpaas-magic-cookie-3f7307fd623047d385bded58cb9d7549/5c1e1d
-JAAS_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----...-----END PRIVATE KEY-----"
+JAAS_APP_ID=your_jaas_app_id_here
+JAAS_KEY_ID=your_jaas_key_id_here
+JAAS_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
 JAAS_DOMAIN=8x8.vc
 ```
 - **Purpose**: Video conferencing for teleconsulta (remote consultations)
@@ -45,7 +45,7 @@ JAAS_DOMAIN=8x8.vc
 
 ### Email Service (Resend)
 ```
-RESEND_API_KEY=re_K3zhNnPo_K2piZy4vadmg8x9SVsUXWCGi
+RESEND_API_KEY=re_your_resend_api_key_here
 EMAIL_FROM=OmniNote <no-reply@notifications.omninote.com.br>
 ```
 - **Purpose**: Transactional email sending (trial verification, appointment confirmations)
@@ -55,7 +55,7 @@ EMAIL_FROM=OmniNote <no-reply@notifications.omninote.com.br>
 
 ### Storage (Vercel Blob)
 ```
-BLOB_READ_WRITE_TOKEN=vercel_blob_rw_XEzpWNfmFnyUiYei_ai6mYdAFELE5znk0rbzNVxBPAblXcp
+BLOB_READ_WRITE_TOKEN=vercel_blob_rw_your_blob_token_here
 ```
 - **Purpose**: Direct audio file uploads (workaround for 4.5MB API limits)
 - **Scope**: Server-side only
@@ -64,8 +64,8 @@ BLOB_READ_WRITE_TOKEN=vercel_blob_rw_XEzpWNfmFnyUiYei_ai6mYdAFELE5znk0rbzNVxBPAb
 
 ### Security (reCAPTCHA)
 ```
-RECAPTCHA_SITE_KEY=6Ld51ZMsAAAAAF3z9pqiCHo2HGxkS6D5oJp4DogI
-RECAPTCHA_SECRET_KEY=6Ld51ZMsAAAAAAsmPM73TOrERb7CywrVoh7PoiHy
+RECAPTCHA_SITE_KEY=your_recaptcha_site_key_here
+RECAPTCHA_SECRET_KEY=your_recaptcha_secret_key_here
 ```
 - **Purpose**: Bot prevention on trial registration
 - **Scope**: SITE_KEY is public (NEXT_PUBLIC_); SECRET_KEY is server-side

@@ -61,6 +61,7 @@ export function SendToMedicalRecordModal({
   const [resumo, setResumo] = useState('');
   const [conteudo, setConteudo] = useState('');
   const [clinicianReviewed, setClinicianReviewed] = useState(true);
+  const [notifyPatientByEmail, setNotifyPatientByEmail] = useState(true);
 
   const selectedPatient = useMemo(
     () => patients.find((patient) => patient.id === patientId) || null,
@@ -79,6 +80,7 @@ export function SendToMedicalRecordModal({
     setTipoDocumento('Consulta');
     setEspecialidade('Clínica Geral');
     setClinicianReviewed(true);
+    setNotifyPatientByEmail(true);
 
     const loadPatients = async () => {
       try {
@@ -170,6 +172,7 @@ export function SendToMedicalRecordModal({
           conteudo: conteudo.trim(),
           sourceRefId,
           clinicianReviewed,
+          notifyPatientByEmail,
         }),
       });
 
@@ -327,6 +330,17 @@ export function SendToMedicalRecordModal({
               disabled={isSaving}
             />
             <span>Confirmo que revisei clinicamente o texto antes de salvar no prontuário.</span>
+          </label>
+
+          <label className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+            <input
+              type="checkbox"
+              checked={notifyPatientByEmail}
+              onChange={(event) => setNotifyPatientByEmail(event.target.checked)}
+              className="mt-1"
+              disabled={isSaving}
+            />
+            <span>Enviar e-mail para o paciente avisando sobre atualização no perfil.</span>
           </label>
 
           <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">

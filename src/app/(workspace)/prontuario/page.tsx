@@ -12,6 +12,39 @@ import { EditPatientModal } from '@/components/EditPatientModal';
 import { AddMedicalRecordModal } from '@/components/AddMedicalRecordModal';
 
 const PATIENTS_PAGE_SIZE = 30;
+type CreatePatientPayload = Omit<Patient, 'id'> & { notifyPatientByEmail?: boolean };
+type CreateMedicalRecordPayload = Omit<MedicalRecord, 'id'> & { notifyPatientByEmail?: boolean };
+
+type EmailNotificationStatus = 'sent' | 'skipped-no-email' | 'disabled' | 'failed';
+
+type EmailNotificationPayload = {
+  status: EmailNotificationStatus;
+  message: string;
+};
+
+type FeedbackState = {
+  type: 'success' | 'warning' | 'error';
+  text: string;
+};
+
+function buildFeedbackFromEmailNotification(
+  notification: EmailNotificationPayload | undefined,
+  defaultSuccessMessage: string
+): FeedbackState {
+  if (!notification) {
+    return { type: 'success', text: defaultSuccessMessage };
+  }
+
+  if (notification.status === 'sent') {
+    return { type: 'success', text: notification.message };
+  }
+
+  if (notification.status === 'failed') {
+    return { type: 'warning', text: notification.message };
+  }
+
+  return { type: 'warning', text: notification.message };
+}
 
 function mergeUniquePatients(current: Patient[], incoming: Patient[]): Patient[] {
   const map = new Map<string, Patient>();
@@ -41,7 +74,10 @@ export default function ProntuarioPage() {
   const [recordsRefreshKey, setRecordsRefreshKey] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMorePatients, setIsLoadingMorePatients] = useState(false);
+  const [isSendingWelcomeEmail, setIsSendingWelcomeEmail] = useState(false);
+  const [isSendingProfileUpdateEmail, setIsSendingProfileUpdateEmail] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<FeedbackState | null>(null);
   const patientsCursorRef = useRef<string | null>(null);
 
   const fetchPatients = useCallback(
@@ -129,7 +165,7 @@ export default function ProntuarioPage() {
     fetchPatients({ reset: true, search: debouncedSearchQuery });
   }, [debouncedSearchQuery, fetchPatients]);
 
-  const handleAddPatient = useCallback(async (newPatient: Omit<Patient, 'id'>) => {
+  const handleAddPatient = useCallback(async (newPatient: CreatePatientPayload) => {
     try {
       const response = await fetch('/api/patients', {
         method: 'POST',
@@ -144,10 +180,21 @@ export default function ProntuarioPage() {
         throw new Error(errorData.error || 'Erro ao criar paciente');
       }
 
-      const createdPatient = await response.json();
+      const createdPatientResponse = await response.json();
+      const emailNotification = createdPatientResponse.emailNotification as EmailNotificationPayload | undefined;
+      const { emailNotification: _, ...createdPatient } = createdPatientResponse as Patient & {
+        emailNotification?: EmailNotificationPayload;
+      };
+
       setPatients((prev) => [createdPatient, ...prev.filter((p) => p.id !== createdPatient.id)]);
       setSelectedPatient(createdPatient);
       setIsAddModalOpen(false);
+      setFeedback(
+        buildFeedbackFromEmailNotification(
+          emailNotification,
+          'Paciente criado com sucesso.'
+        )
+      );
     } catch (err) {
       console.error('Erro ao adicionar paciente:', err);
       alert(err instanceof Error ? err.message : 'Erro ao adicionar paciente');
@@ -184,7 +231,7 @@ export default function ProntuarioPage() {
   }, []);
 
   const handleAddMedicalRecord = useCallback(
-    async (record: Omit<MedicalRecord, 'id'>) => {
+    async (record: CreateMedicalRecordPayload) => {
       try {
         const response = await fetch('/api/medical-records', {
           method: 'POST',
@@ -199,8 +246,17 @@ export default function ProntuarioPage() {
           throw new Error(errorData.error || 'Erro ao criar registro médico');
         }
 
+        const createdRecordResponse = await response.json();
+        const emailNotification = createdRecordResponse.emailNotification as EmailNotificationPayload | undefined;
+
         setIsAddMedicalRecordModalOpen(false);
         setRecordsRefreshKey((prev) => prev + 1);
+        setFeedback(
+          buildFeedbackFromEmailNotification(
+            emailNotification,
+            'Registro médico criado com sucesso.'
+          )
+        );
       } catch (err) {
         console.error('Erro ao adicionar registro:', err);
         alert(err instanceof Error ? err.message : 'Erro ao adicionar registro');
@@ -208,6 +264,76 @@ export default function ProntuarioPage() {
     },
     [selectedPatient]
   );
+
+  const handleSendPortalWelcomeEmail = useCallback(async () => {
+    if (!selectedPatient) {
+      return;
+    }
+
+    try {
+      setIsSendingWelcomeEmail(true);
+      const response = await fetch(`/api/patients/${selectedPatient.id}/send-portal-welcome-email`, {
+        method: 'POST',
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Erro ao enviar e-mail de tutorial.');
+      }
+
+      const emailNotification = data?.emailNotification as EmailNotificationPayload | undefined;
+      setFeedback(
+        buildFeedbackFromEmailNotification(
+          emailNotification,
+          'Solicitação de envio do e-mail de tutorial concluída.'
+        )
+      );
+    } catch (err) {
+      console.error('Erro ao enviar tutorial do portal:', err);
+      setFeedback({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Erro ao enviar e-mail de tutorial.',
+      });
+    } finally {
+      setIsSendingWelcomeEmail(false);
+    }
+  }, [selectedPatient]);
+
+  const handleSendProfileUpdateEmail = useCallback(async () => {
+    if (!selectedPatient) {
+      return;
+    }
+
+    try {
+      setIsSendingProfileUpdateEmail(true);
+      const response = await fetch(`/api/patients/${selectedPatient.id}/send-profile-update-email`, {
+        method: 'POST',
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Erro ao enviar e-mail de atualização.');
+      }
+
+      const emailNotification = data?.emailNotification as EmailNotificationPayload | undefined;
+      setFeedback(
+        buildFeedbackFromEmailNotification(
+          emailNotification,
+          'Solicitação de envio do e-mail de atualização concluída.'
+        )
+      );
+    } catch (err) {
+      console.error('Erro ao enviar atualização de perfil:', err);
+      setFeedback({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Erro ao enviar e-mail de atualização.',
+      });
+    } finally {
+      setIsSendingProfileUpdateEmail(false);
+    }
+  }, [selectedPatient]);
 
   const handleStartTeleconsulta = useCallback(async () => {
     if (!selectedPatient) {
@@ -283,6 +409,20 @@ export default function ProntuarioPage() {
         </div>
       )}
 
+      {feedback && (
+        <div
+          className={`mb-4 rounded-lg p-4 text-sm border ${
+            feedback.type === 'success'
+              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+              : feedback.type === 'warning'
+                ? 'bg-amber-50 text-amber-800 border-amber-200'
+                : 'bg-red-50 text-red-700 border-red-200'
+          }`}
+        >
+          {feedback.text}
+        </div>
+      )}
+
       {isLoading ? (
         <div className="flex h-64 items-center justify-center rounded-xl bg-white shadow-sm border border-[#cfe0e8]">
           <div className="text-center">
@@ -323,6 +463,10 @@ export default function ProntuarioPage() {
                 onAddMedicalRecord={() => setIsAddMedicalRecordModalOpen(true)}
                 onStartTeleconsulta={handleStartTeleconsulta}
                 onDeletePatient={handleDeletePatient}
+                onSendPortalWelcomeEmail={handleSendPortalWelcomeEmail}
+                onSendProfileUpdateEmail={handleSendProfileUpdateEmail}
+                isSendingPortalWelcomeEmail={isSendingWelcomeEmail}
+                isSendingProfileUpdateEmail={isSendingProfileUpdateEmail}
                 refreshKey={recordsRefreshKey}
               />
             ) : (

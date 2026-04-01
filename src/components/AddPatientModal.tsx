@@ -7,7 +7,7 @@ import { X } from 'lucide-react';
 interface AddPatientModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (patient: Omit<Patient, 'id'>) => void;
+  onAdd: (patient: Omit<Patient, 'id'> & { notifyPatientByEmail?: boolean }) => void;
 }
 
 export function AddPatientModal({ isOpen, onClose, onAdd }: AddPatientModalProps) {
@@ -23,6 +23,7 @@ export function AddPatientModal({ isOpen, onClose, onAdd }: AddPatientModalProps
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [notifyPatientByEmail, setNotifyPatientByEmail] = useState(true);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -54,6 +55,7 @@ export function AddPatientModal({ isOpen, onClose, onAdd }: AddPatientModalProps
       dataNascimento: formData.dataNascimento,
       telefone: formData.telefone || undefined,
       email: formData.email || undefined,
+      notifyPatientByEmail,
     });
 
     setFormData({
@@ -67,6 +69,7 @@ export function AddPatientModal({ isOpen, onClose, onAdd }: AddPatientModalProps
       email: '',
     });
     setErrors({});
+    setNotifyPatientByEmail(true);
     onClose();
   };
 
@@ -199,6 +202,16 @@ export function AddPatientModal({ isOpen, onClose, onAdd }: AddPatientModalProps
             />
             {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email}</p>}
           </div>
+
+          <label className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+            <input
+              type="checkbox"
+              checked={notifyPatientByEmail}
+              onChange={(event) => setNotifyPatientByEmail(event.target.checked)}
+              className="mt-1"
+            />
+            <span>Enviar e-mail de boas-vindas com tutorial de acesso ao portal do paciente.</span>
+          </label>
 
           {/* Actions */}
           <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">

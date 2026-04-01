@@ -8,7 +8,7 @@ interface AddMedicalRecordModalProps {
   isOpen: boolean;
   patientId: string;
   onClose: () => void;
-  onAdd: (record: Omit<MedicalRecord, 'id'>) => void;
+  onAdd: (record: Omit<MedicalRecord, 'id'> & { notifyPatientByEmail?: boolean }) => void;
 }
 
 type TipoDocumento = 'Consulta' | 'Exame' | 'Procedimento' | 'Prescrição' | 'Internação';
@@ -101,6 +101,7 @@ export function AddMedicalRecordModal({
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [notifyPatientByEmail, setNotifyPatientByEmail] = useState(true);
 
   useEffect(() => {
     const peso = parseOptionalNumber(formData.bioPesoKg);
@@ -208,6 +209,7 @@ export function AddMedicalRecordModal({
         },
         observacoes: formData.bioObservacoes.trim() || undefined,
       },
+      notifyPatientByEmail,
     });
 
     setFormData({
@@ -252,6 +254,7 @@ export function AddMedicalRecordModal({
     });
     setActiveTab('resumo');
     setErrors({});
+    setNotifyPatientByEmail(true);
     onClose();
   };
 
@@ -642,6 +645,16 @@ export function AddMedicalRecordModal({
               </div>
             </div>
           )}
+
+          <label className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+            <input
+              type="checkbox"
+              checked={notifyPatientByEmail}
+              onChange={(event) => setNotifyPatientByEmail(event.target.checked)}
+              className="mt-1"
+            />
+            <span>Enviar e-mail para o paciente avisando sobre atualização do prontuário.</span>
+          </label>
 
           <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
             <button

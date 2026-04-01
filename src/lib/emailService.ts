@@ -23,6 +23,25 @@ interface AppointmentReminderEmailParams {
   hoursUntilAppointment: number;
 }
 
+interface PatientPortalWelcomeEmailParams {
+  to: string;
+  patientName?: string | null;
+  professionalName?: string | null;
+  firstAccessUrl: string;
+  loginUrl: string;
+}
+
+interface PatientProfileUpdateEmailParams {
+  to: string;
+  patientName?: string | null;
+  professionalName?: string | null;
+  loginUrl: string;
+  dashboardUrl: string;
+  recordDate?: string;
+  recordType?: string;
+  summary?: string;
+}
+
 function getEmailConfig() {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
@@ -225,6 +244,111 @@ export async function sendAppointmentReminderEmail(params: AppointmentReminderEm
         <p style="color: #999; font-size: 12px; text-align: center; margin: 0;">
           Este é um e-mail automático. Por favor, não responda.
         </p>
+      </div>
+    </div>
+  `;
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from,
+      to: [params.to],
+      subject,
+      html,
+      text,
+    }),
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(`EMAIL_SEND_FAILED: ${details}`);
+  }
+}
+
+export async function sendPatientPortalWelcomeEmail(params: PatientPortalWelcomeEmailParams): Promise<void> {
+  const { apiKey, from } = getEmailConfig();
+  const greeting = params.patientName?.trim() ? `Olá, ${params.patientName.trim()}!` : 'Olá!';
+  const professionalLine = params.professionalName?.trim()
+    ? `Seu profissional ${params.professionalName.trim()} disponibilizou seu acesso ao portal.`
+    : 'Seu profissional disponibilizou seu acesso ao portal.';
+
+  const subject = 'Bem-vindo(a) ao Portal do Paciente OmniNote';
+  const text = `${greeting}\n\n${professionalLine}\n\nPasso a passo para o primeiro acesso:\n1) Acesse: ${params.firstAccessUrl}\n2) Informe seu CPF cadastrado e crie sua senha\n3) Depois entre em: ${params.loginUrl}\n\nSempre que houver atualização no seu perfil clínico, você receberá um novo aviso por e-mail.`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0c161c; max-width: 620px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #155b79 0%, #1a6a8d 100%); padding: 28px; border-radius: 10px 10px 0 0; text-align: center;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 24px;">Portal do Paciente OmniNote</h1>
+      </div>
+      <div style="border: 1px solid #dbe7ed; border-top: none; border-radius: 0 0 10px 10px; padding: 24px; background: #f8fbfd;">
+        <p>${greeting}</p>
+        <p>${professionalLine}</p>
+        <p style="margin: 18px 0 10px; font-weight: 700; color: #155b79;">Como acessar:</p>
+        <ol style="padding-left: 18px; margin: 0 0 16px;">
+          <li style="margin-bottom: 8px;">No primeiro acesso, clique em <a href="${params.firstAccessUrl}">Criar senha</a> e informe seu CPF.</li>
+          <li style="margin-bottom: 8px;">Defina uma senha segura para ativar sua conta.</li>
+          <li>Depois, faça login em <a href="${params.loginUrl}">${params.loginUrl}</a>.</li>
+        </ol>
+        <p style="margin-top: 16px;">Você receberá um novo aviso por e-mail quando seu prontuário for atualizado.</p>
+      </div>
+    </div>
+  `;
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from,
+      to: [params.to],
+      subject,
+      html,
+      text,
+    }),
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(`EMAIL_SEND_FAILED: ${details}`);
+  }
+}
+
+export async function sendPatientProfileUpdatedEmail(params: PatientProfileUpdateEmailParams): Promise<void> {
+  const { apiKey, from } = getEmailConfig();
+  const greeting = params.patientName?.trim() ? `Olá, ${params.patientName.trim()}!` : 'Olá!';
+  const professionalLine = params.professionalName?.trim()
+    ? `Seu profissional ${params.professionalName.trim()} registrou novas informações no seu perfil.`
+    : 'Novas informações foram registradas no seu perfil.';
+  const updateLine = params.recordType?.trim()
+    ? `Tipo de atualização: ${params.recordType.trim()}`
+    : 'Seu prontuário recebeu uma nova atualização.';
+  const dateLine = params.recordDate?.trim() ? `Data do registro: ${params.recordDate.trim()}` : undefined;
+  const summary = params.summary?.trim();
+
+  const subject = 'Seu perfil clínico foi atualizado no OmniNote';
+  const text = `${greeting}\n\n${professionalLine}\n${updateLine}${dateLine ? `\n${dateLine}` : ''}${summary ? `\nResumo: ${summary}` : ''}\n\nPara consultar os detalhes, acesse: ${params.dashboardUrl}\nCaso precise, faça login primeiro em: ${params.loginUrl}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0c161c; max-width: 620px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #1ea58c 0%, #178c74 100%); padding: 28px; border-radius: 10px 10px 0 0; text-align: center;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 24px;">Atualização no seu perfil</h1>
+      </div>
+      <div style="border: 1px solid #dbe7ed; border-top: none; border-radius: 0 0 10px 10px; padding: 24px; background: #f8fbfd;">
+        <p>${greeting}</p>
+        <p>${professionalLine}</p>
+        <p><strong>${updateLine}</strong></p>
+        ${dateLine ? `<p>${dateLine}</p>` : ''}
+        ${summary ? `<p><strong>Resumo:</strong> ${summary}</p>` : ''}
+        <p style="margin: 20px 0 12px; text-align: center;">
+          <a href="${params.dashboardUrl}" style="display: inline-block; padding: 11px 18px; border-radius: 8px; background: #1ea58c; color: #fff; text-decoration: none; font-weight: 700;">
+            Acessar meu perfil
+          </a>
+        </p>
+        <p style="font-size: 13px; color: #4b6573; margin-top: 14px;">Se necessário, faça login antes em <a href="${params.loginUrl}">${params.loginUrl}</a>.</p>
       </div>
     </div>
   `;

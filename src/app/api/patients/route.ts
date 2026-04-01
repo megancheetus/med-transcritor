@@ -5,11 +5,17 @@ import {
   createPatient,
   initializePatientsTable,
 } from '@/lib/patientManager';
+import { sendPatientPortalWelcomeEmail } from '@/lib/emailService';
 import { rateLimitMiddleware } from '@/lib/rateLimit';
 import { patientCreateSchema, patientListQuerySchema } from '@/lib/schemas/patients';
 import { parseWithSchema } from '@/lib/schemas/apiValidation';
 
 export const runtime = 'nodejs';
+
+type EmailNotificationResult = {
+  status: 'sent' | 'skipped-no-email' | 'disabled' | 'failed';
+  message: string;
+};
 
 /**
  * GET /api/patients
@@ -103,10 +109,51 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = payloadValidation.data;
+    const { notifyPatientByEmail, ...patientPayload } = payload;
 
-    const patient = await createPatient(user.username, payload);
+    const patient = await createPatient(user.username, patientPayload);
+    let emailNotification: EmailNotificationResult;
 
-    return NextResponse.json(patient, { status: 201 });
+    if (!notifyPatientByEmail) {
+      emailNotification = {
+        status: 'disabled',
+        message: 'Envio de e-mail desativado pelo profissional.',
+      };
+    } else if (!patient.email) {
+      emailNotification = {
+        status: 'skipped-no-email',
+        message: 'Paciente sem e-mail cadastrado. Nenhum e-mail foi enviado.',
+      };
+    } else {
+      const appBaseUrl = process.env.APP_URL || request.nextUrl.origin;
+      const firstAccessUrl = `${appBaseUrl}/paciente/primeiro-acesso`;
+      const loginUrl = `${appBaseUrl}/paciente/login`;
+
+      try {
+        await sendPatientPortalWelcomeEmail({
+          to: patient.email,
+          patientName: patient.nomeCompleto,
+          professionalName: user.fullName || user.username,
+          firstAccessUrl,
+          loginUrl,
+        });
+        emailNotification = {
+          status: 'sent',
+          message: 'E-mail de boas-vindas enviado com sucesso para o paciente.',
+        };
+      } catch (emailError) {
+        console.error('[patients] welcome email error:', emailError);
+        emailNotification = {
+          status: 'failed',
+          message: 'Paciente criado, mas houve falha ao enviar o e-mail de boas-vindas.',
+        };
+      }
+    }
+
+    return NextResponse.json({
+      ...patient,
+      emailNotification,
+    }, { status: 201 });
   } catch (error) {
     console.error('[patients] POST error:', error);
 
