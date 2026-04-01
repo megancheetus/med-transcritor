@@ -7,6 +7,7 @@ import { Patient } from '@/lib/types';
 interface SessionUser {
   username: string;
   fullName?: string | null;
+  specialty?: string | null;
 }
 
 interface SendToMedicalRecordModalProps {
@@ -178,6 +179,9 @@ export function SendToMedicalRecordModal({
 
         setSessionUser(user);
         setProfissional(user.fullName?.trim() || user.username);
+        if (user.specialty?.trim()) {
+          setEspecialidade(user.specialty.trim());
+        }
       } catch {
         // Mantém profissional editável manualmente quando não houver sessão disponível.
       }

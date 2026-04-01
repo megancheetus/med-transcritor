@@ -1,0 +1,124 @@
+================================================================================
+  WIDGET DE BLOG — Dr. Edvaldo Jerônimo
+  Instruções para incorporar em outros sites
+================================================================================
+
+1. USO BÁSICO
+--------------------------------------------------------------------------------
+
+Cole o código abaixo no HTML de qualquer página onde deseja exibir os artigos:
+
+  <div id="edvaldo-blog-widget" data-posts="3" data-theme="auto"></div>
+  <script src="https://edvaldojeronimo.com.br/widget/edvaldo-blog-widget.js"></script>
+
+Pronto! O widget vai carregar automaticamente os artigos mais recentes do blog.
+
+
+2. OPÇÕES DE CONFIGURAÇÃO
+--------------------------------------------------------------------------------
+
+Você pode personalizar o widget usando atributos "data-" na div container:
+
+  data-posts     Quantidade de posts exibidos.
+                 Valores: 1 a 10 (padrão: 3)
+
+  data-theme     Tema visual do widget.
+                 Valores: "light", "dark" ou "auto" (padrão: "auto")
+                 "auto" segue a preferência de tema do sistema do usuário.
+
+  data-base-url  URL base do site de origem (caso mude de domínio).
+                 Padrão: detectado automaticamente pelo script.
+
+Exemplos:
+
+  <!-- Exibir 5 posts com tema escuro -->
+  <div id="edvaldo-blog-widget" data-posts="5" data-theme="dark"></div>
+  <script src="https://edvaldojeronimo.com.br/widget/edvaldo-blog-widget.js"></script>
+
+  <!-- Exibir 1 post com tema claro -->
+  <div id="edvaldo-blog-widget" data-posts="1" data-theme="light"></div>
+  <script src="https://edvaldojeronimo.com.br/widget/edvaldo-blog-widget.js"></script>
+
+
+3. COMO FUNCIONA
+--------------------------------------------------------------------------------
+
+- O script "edvaldo-blog-widget.js" é servido como arquivo estático pelo site
+  edvaldojeronimo.com.br.
+
+- Ao carregar, ele busca os dados dos posts em:
+  https://edvaldojeronimo.com.br/api/posts.json
+
+- Os posts são renderizados dentro da div container com estilos próprios
+  (prefixados com "ebw-"), sem conflitar com o CSS do site host.
+
+- Os links dos artigos abrem em nova aba, levando ao blog original.
+
+- O widget é responsivo: em telas menores exibe cards empilhados,
+  em telas maiores exibe em grid.
+
+
+4. USO EM FRAMEWORKS (React, Next.js, Vue, etc.)
+--------------------------------------------------------------------------------
+
+Em projetos React/Next.js, carregue o script via useEffect:
+
+  import { useEffect } from "react";
+
+  function BlogWidget() {
+    useEffect(() => {
+      const script = document.createElement("script");
+      script.src = "https://edvaldojeronimo.com.br/widget/edvaldo-blog-widget.js";
+      script.async = true;
+      document.body.appendChild(script);
+      return () => { document.body.removeChild(script); };
+    }, []);
+
+    return <div id="edvaldo-blog-widget" data-posts="3" data-theme="auto" />;
+  }
+
+  export default BlogWidget;
+
+Em Vue, use onMounted de forma similar.
+
+
+5. ATUALIZAÇÃO DOS POSTS
+--------------------------------------------------------------------------------
+
+O arquivo posts.json é regenerado automaticamente toda vez que o site
+edvaldojeronimo.com.br é publicado (build).
+
+Para regenerar manualmente (dentro do projeto edvaldojeronimo):
+
+  npm run generate:posts
+
+Isso lê os posts de src/data/blogPosts.ts e gera public/api/posts.json.
+
+
+6. ARQUIVOS ENVOLVIDOS (no projeto edvaldojeronimo)
+--------------------------------------------------------------------------------
+
+  public/widget/edvaldo-blog-widget.js   Widget JS auto-contido
+  public/api/posts.json                  JSON com dados dos posts
+  scripts/generate-posts-json.ts         Script que gera o posts.json
+  vercel.json                            Headers CORS para acesso externo
+
+
+7. SOLUÇÃO DE PROBLEMAS
+--------------------------------------------------------------------------------
+
+O widget não aparece?
+  - Verifique se a div tem o id "edvaldo-blog-widget".
+  - Verifique se o script está carregando (aba Network do DevTools).
+  - Confira o console do navegador para mensagens de erro.
+
+Erro de CORS?
+  - O servidor já está configurado para permitir acesso de qualquer origem.
+  - Se estiver testando localmente com file://, use um servidor local
+    (ex: npx serve) pois file:// pode bloquear fetch.
+
+Posts não atualizados?
+  - O cache do posts.json é de 1 hora. Aguarde ou limpe o cache.
+  - Verifique se o deploy mais recente rodou o prebuild.
+
+================================================================================

@@ -132,6 +132,7 @@ export function AddMedicalRecordModal({
   const [notifyPatientByEmail, setNotifyPatientByEmail] = useState(true);
   const [draftRecovered, setDraftRecovered] = useState(false);
   const [lastDraftSaveAt, setLastDraftSaveAt] = useState<string>('');
+  const [sessionLoaded, setSessionLoaded] = useState(false);
 
   const draftStorageKey = useMemo(
     () => `medical-record-draft:v2:${patientId}`,
@@ -259,6 +260,34 @@ export function AddMedicalRecordModal({
 
     return () => clearTimeout(timeoutId);
   }, [activeTab, draftStorageKey, formData, isOpen, notifyPatientByEmail]);
+
+  useEffect(() => {
+    if (!isOpen || sessionLoaded) {
+      return;
+    }
+
+    const loadSession = async () => {
+      try {
+        const response = await fetch('/api/auth/session');
+        if (!response.ok) return;
+        const data = await response.json();
+        const user = data?.user as { username: string; fullName?: string | null; specialty?: string | null } | undefined;
+        if (!user) return;
+
+        setFormData((prev) => ({
+          ...prev,
+          profissional: prev.profissional || user.fullName?.trim() || user.username,
+          especialidade: prev.especialidade || user.specialty?.trim() || '',
+        }));
+      } catch {
+        // Mantém campos editáveis manualmente
+      } finally {
+        setSessionLoaded(true);
+      }
+    };
+
+    void loadSession();
+  }, [isOpen, sessionLoaded]);
 
   const buildStructuredExamItems = (): Array<{
     nome: string;

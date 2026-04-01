@@ -24,6 +24,11 @@ export interface AppUserRecord {
   emailVerified: boolean;
   emailVerificationRequired: boolean;
   moduleAccess: ModuleAccess;
+  dateOfBirth: string | null;
+  cpf: string | null;
+  specialty: string | null;
+  councilNumber: string | null;
+  councilState: string | null;
   createdAt: string;
   updatedAt: string;
   lastLoginAt: string | null;
@@ -68,6 +73,11 @@ function mapUserRow(row: {
   trial_expires_at: Date | string | null;
   email_verified_at: Date | string | null;
   email_verification_required: boolean;
+  date_of_birth: string | null;
+  cpf: string | null;
+  specialty: string | null;
+  council_number: string | null;
+  council_state: string | null;
   created_at: Date | string;
   updated_at: Date | string;
   last_login_at: Date | string | null;
@@ -85,6 +95,11 @@ function mapUserRow(row: {
     trialExpired,
     emailVerified: !!row.email_verified_at,
     emailVerificationRequired: row.email_verification_required,
+    dateOfBirth: row.date_of_birth || null,
+    cpf: row.cpf || null,
+    specialty: row.specialty || null,
+    councilNumber: row.council_number || null,
+    councilState: row.council_state || null,
     moduleAccess: row.is_admin
       ? {
           transcricao: true,
@@ -144,6 +159,11 @@ async function ensureUsersTable(): Promise<void> {
             email_verification_required BOOLEAN NOT NULL DEFAULT FALSE,
             email_verification_token TEXT,
             email_verification_sent_at TIMESTAMPTZ,
+            date_of_birth TEXT,
+            cpf TEXT,
+            specialty TEXT,
+            council_number TEXT,
+            council_state TEXT,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             last_login_at TIMESTAMPTZ
@@ -179,6 +199,31 @@ async function ensureUsersTable(): Promise<void> {
         await pool.query(`
           ALTER TABLE app_users
           ADD COLUMN IF NOT EXISTS email_verification_sent_at TIMESTAMPTZ
+        `);
+
+        await pool.query(`
+          ALTER TABLE app_users
+          ADD COLUMN IF NOT EXISTS date_of_birth TEXT
+        `);
+
+        await pool.query(`
+          ALTER TABLE app_users
+          ADD COLUMN IF NOT EXISTS cpf TEXT
+        `);
+
+        await pool.query(`
+          ALTER TABLE app_users
+          ADD COLUMN IF NOT EXISTS specialty TEXT
+        `);
+
+        await pool.query(`
+          ALTER TABLE app_users
+          ADD COLUMN IF NOT EXISTS council_number TEXT
+        `);
+
+        await pool.query(`
+          ALTER TABLE app_users
+          ADD COLUMN IF NOT EXISTS council_state TEXT
         `);
 
         // Criar índice de forma segura
@@ -320,6 +365,7 @@ export async function getUserByUsername(username: string): Promise<AppUserRecord
     `
       SELECT username, full_name, email, is_admin, created_at, updated_at, last_login_at
       , account_plan, trial_expires_at, email_verified_at, email_verification_required
+      , date_of_birth, cpf, specialty, council_number, council_state
       FROM app_users
       WHERE username = $1
       LIMIT 1
@@ -331,19 +377,7 @@ export async function getUserByUsername(username: string): Promise<AppUserRecord
     return null;
   }
 
-  return mapUserRow(result.rows[0] as {
-    username: string;
-    full_name: string | null;
-    email: string | null;
-    is_admin: boolean;
-    account_plan: string;
-    trial_expires_at: Date | string | null;
-    email_verified_at: Date | string | null;
-    email_verification_required: boolean;
-    created_at: Date | string;
-    updated_at: Date | string;
-    last_login_at: Date | string | null;
-  });
+  return mapUserRow(result.rows[0] as Parameters<typeof mapUserRow>[0]);
 }
 
 export async function listUsers(): Promise<AppUserRecord[]> {
@@ -353,24 +387,13 @@ export async function listUsers(): Promise<AppUserRecord[]> {
   const result = await pool.query(`
     SELECT username, full_name, email, is_admin, created_at, updated_at, last_login_at
     , account_plan, trial_expires_at, email_verified_at, email_verification_required
+    , date_of_birth, cpf, specialty, council_number, council_state
     FROM app_users
     ORDER BY is_admin DESC, username ASC
   `);
 
   return result.rows.map((row) =>
-    mapUserRow(row as {
-      username: string;
-      full_name: string | null;
-      email: string | null;
-      is_admin: boolean;
-      account_plan: string;
-      trial_expires_at: Date | string | null;
-      email_verified_at: Date | string | null;
-      email_verification_required: boolean;
-      created_at: Date | string;
-      updated_at: Date | string;
-      last_login_at: Date | string | null;
-    })
+    mapUserRow(row as Parameters<typeof mapUserRow>[0])
   );
 }
 
@@ -419,7 +442,7 @@ export async function createUser(params: {
         email_verification_sent_at
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-      RETURNING username, full_name, email, is_admin, account_plan, trial_expires_at, email_verified_at, email_verification_required, created_at, updated_at, last_login_at
+      RETURNING username, full_name, email, is_admin, account_plan, trial_expires_at, email_verified_at, email_verification_required, date_of_birth, cpf, specialty, council_number, council_state, created_at, updated_at, last_login_at
     `,
     [
       username,
@@ -436,19 +459,7 @@ export async function createUser(params: {
     ]
   );
 
-  return mapUserRow(result.rows[0] as {
-    username: string;
-    full_name: string | null;
-    email: string | null;
-    is_admin: boolean;
-    account_plan: string;
-    trial_expires_at: Date | string | null;
-    email_verified_at: Date | string | null;
-    email_verification_required: boolean;
-    created_at: Date | string;
-    updated_at: Date | string;
-    last_login_at: Date | string | null;
-  });
+  return mapUserRow(result.rows[0] as Parameters<typeof mapUserRow>[0]);
 }
 
 export async function updateUserPassword(username: string, newPassword: string): Promise<void> {
@@ -482,7 +493,7 @@ export async function updateUserAccountPlan(
       UPDATE app_users
       SET account_plan = $2, trial_expires_at = $3, updated_at = NOW()
       WHERE username = $1
-      RETURNING username, full_name, email, is_admin, account_plan, trial_expires_at, email_verified_at, email_verification_required, created_at, updated_at, last_login_at
+      RETURNING username, full_name, email, is_admin, account_plan, trial_expires_at, email_verified_at, email_verification_required, date_of_birth, cpf, specialty, council_number, council_state, created_at, updated_at, last_login_at
     `,
     [normalizedUsername, normalizedPlan, trialExpiresAt]
   );
@@ -491,19 +502,54 @@ export async function updateUserAccountPlan(
     throw new Error('USER_NOT_FOUND');
   }
 
-  return mapUserRow(result.rows[0] as {
-    username: string;
-    full_name: string | null;
-    email: string | null;
-    is_admin: boolean;
-    account_plan: string;
-    trial_expires_at: Date | string | null;
-    email_verified_at: Date | string | null;
-    email_verification_required: boolean;
-    created_at: Date | string;
-    updated_at: Date | string;
-    last_login_at: Date | string | null;
-  });
+  return mapUserRow(result.rows[0] as Parameters<typeof mapUserRow>[0]);
+}
+
+export async function updateUserProfile(
+  username: string,
+  profile: {
+    fullName?: string | null;
+    dateOfBirth?: string | null;
+    cpf?: string | null;
+    specialty?: string | null;
+    councilNumber?: string | null;
+    councilState?: string | null;
+  }
+): Promise<AppUserRecord> {
+  await ensureUsersTable();
+
+  const normalizedUsername = normalizeUsername(username);
+  const pool = getPostgresPool();
+  const result = await pool.query(
+    `
+      UPDATE app_users
+      SET
+        full_name = COALESCE($2, full_name),
+        date_of_birth = COALESCE($3, date_of_birth),
+        cpf = COALESCE($4, cpf),
+        specialty = COALESCE($5, specialty),
+        council_number = COALESCE($6, council_number),
+        council_state = COALESCE($7, council_state),
+        updated_at = NOW()
+      WHERE username = $1
+      RETURNING username, full_name, email, is_admin, account_plan, trial_expires_at, email_verified_at, email_verification_required, date_of_birth, cpf, specialty, council_number, council_state, created_at, updated_at, last_login_at
+    `,
+    [
+      normalizedUsername,
+      normalizeNullableString(profile.fullName),
+      normalizeNullableString(profile.dateOfBirth),
+      normalizeNullableString(profile.cpf),
+      normalizeNullableString(profile.specialty),
+      normalizeNullableString(profile.councilNumber),
+      normalizeNullableString(profile.councilState),
+    ]
+  );
+
+  if (!result.rowCount) {
+    throw new Error('USER_NOT_FOUND');
+  }
+
+  return mapUserRow(result.rows[0] as Parameters<typeof mapUserRow>[0]);
 }
 
 export async function confirmUserEmailByToken(token: string): Promise<boolean> {

@@ -27,6 +27,8 @@ interface PatientPortalWelcomeEmailParams {
   to: string;
   patientName?: string | null;
   professionalName?: string | null;
+  professionalSpecialty?: string | null;
+  professionalCouncil?: string | null;
   firstAccessUrl: string;
   loginUrl: string;
 }
@@ -35,6 +37,8 @@ interface PatientProfileUpdateEmailParams {
   to: string;
   patientName?: string | null;
   professionalName?: string | null;
+  professionalSpecialty?: string | null;
+  professionalCouncil?: string | null;
   loginUrl: string;
   dashboardUrl: string;
   recordDate?: string | Date;
@@ -99,6 +103,17 @@ function normalizeBaseUrl(url: string): string {
   }
 
   return `https://${trimmed}`;
+}
+
+function buildProfessionalDisplay(name: string, specialty?: string | null, council?: string | null): string {
+  const parts = [name];
+  if (specialty) {
+    parts.push(specialty);
+  }
+  if (council) {
+    parts.push(council);
+  }
+  return parts.join(' — ');
 }
 
 function isLocalUrl(url: string): boolean {
@@ -347,8 +362,12 @@ export async function sendAppointmentReminderEmail(params: AppointmentReminderEm
 export async function sendPatientPortalWelcomeEmail(params: PatientPortalWelcomeEmailParams): Promise<void> {
   const { apiKey, from } = getEmailConfig();
   const greeting = params.patientName?.trim() ? `Olá, ${params.patientName.trim()}!` : 'Olá!';
-  const professionalLine = params.professionalName?.trim()
-    ? `Seu profissional ${params.professionalName.trim()} disponibilizou seu acesso ao portal.`
+  const profName = params.professionalName?.trim();
+  const profSpecialty = params.professionalSpecialty?.trim();
+  const profCouncil = params.professionalCouncil?.trim();
+  const profDisplay = profName ? buildProfessionalDisplay(profName, profSpecialty, profCouncil) : null;
+  const professionalLine = profDisplay
+    ? `Seu profissional ${profDisplay} disponibilizou seu acesso ao portal.`
     : 'Seu profissional disponibilizou seu acesso ao portal.';
 
   const subject = 'Bem-vindo(a) ao Portal do Paciente OmniNote';
@@ -397,13 +416,16 @@ export async function sendPatientProfileUpdatedEmail(params: PatientProfileUpdat
   const { apiKey, from } = getEmailConfig();
   const patientName = normalizeOptionalText(params.patientName);
   const professionalName = normalizeOptionalText(params.professionalName);
+  const profSpecialty = normalizeOptionalText(params.professionalSpecialty);
+  const profCouncil = normalizeOptionalText(params.professionalCouncil);
   const recordType = normalizeOptionalText(params.recordType);
   const summary = normalizeOptionalText(params.summary);
   const dateLabel = normalizeOptionalDateLabel(params.recordDate);
 
   const greeting = patientName ? `Olá, ${patientName}!` : 'Olá!';
-  const professionalLine = professionalName
-    ? `Seu profissional ${professionalName} registrou novas informações no seu perfil.`
+  const profDisplay = professionalName ? buildProfessionalDisplay(professionalName, profSpecialty, profCouncil) : null;
+  const professionalLine = profDisplay
+    ? `Seu profissional ${profDisplay} registrou novas informações no seu perfil.`
     : 'Novas informações foram registradas no seu perfil.';
   const updateLine = recordType
     ? `Tipo de atualização: ${recordType}`

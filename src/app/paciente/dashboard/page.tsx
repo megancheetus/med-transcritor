@@ -9,6 +9,7 @@ import {
 } from '@/lib/medicalRecordManager';
 import { listPatientPortalMessages } from '@/lib/patientPortalMessageManager';
 import PatientUnreadMessagesToast from '@/components/PatientUnreadMessagesToast';
+import BlogWidget from '@/components/BlogWidget';
 
 function formatDate(dateString?: string): string {
   if (!dateString) {
@@ -308,6 +309,11 @@ export default async function PacienteDashboard() {
               <p className="text-[11px] min-[360px]:text-xs leading-relaxed text-[#1ea58c] mt-2">Sem atendimentos registrados até o momento.</p>
             )}
           </div>
+        </div>
+
+        <div className="rounded-xl border border-[#cfe0e8] bg-white p-4 sm:p-6 shadow-sm">
+          <h3 className="text-lg font-bold text-[#155b79] mb-4">Artigos do Blog</h3>
+          <BlogWidget />
         </div>
       </div>
     </PatientPortalShell>

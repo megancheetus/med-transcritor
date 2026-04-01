@@ -43,6 +43,8 @@ const connectSources = [
   'https://*.supabase.co',
   'https://vercel.com',
   'https://*.vercel-storage.com',
+  'https://edvaldojeronimo.com.br',
+  'https://www.edvaldojeronimo.com.br',
   ...recaptchaDomains,
   ...meetDomains,
   ...jaasDomains,
@@ -54,7 +56,7 @@ const contentSecurityPolicy = process.env.NODE_ENV === 'production'
       "default-src 'self'",
       `script-src ${scriptSources.join(' ')}`,
       "style-src 'self' 'unsafe-inline'",
-      `img-src 'self' data: blob: ${recaptchaDomains.join(' ')}`,
+      `img-src 'self' data: blob: https: ${recaptchaDomains.join(' ')}`,
       "font-src 'self' data:",
       `connect-src ${connectSources.join(' ')}`,
       `frame-src ${frameSources.join(' ')}`,
@@ -70,7 +72,7 @@ const contentSecurityPolicy = process.env.NODE_ENV === 'production'
       "default-src 'self'",
       `script-src ${[...scriptSources, "'unsafe-eval'"].join(' ')}`,
       "style-src 'self' 'unsafe-inline'",
-      `img-src 'self' data: blob: ${recaptchaDomains.join(' ')}`,
+      `img-src 'self' data: blob: https: ${recaptchaDomains.join(' ')}`,
       "font-src 'self' data:",
       `connect-src ${[...connectSources, 'localhost:*'].join(' ')}`,
       `frame-src ${frameSources.join(' ')}`,
@@ -263,6 +265,14 @@ const nextConfig: NextConfig = {
             value: 'no-store',
           },
         ],
+      },
+    ];
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/api/posts.json',
+        destination: 'https://www.edvaldojeronimo.com.br/api/posts.json',
       },
     ];
   },

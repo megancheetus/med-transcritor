@@ -203,6 +203,8 @@ export async function POST(request: NextRequest) {
             to: patient.email,
             patientName: patient.nomeCompleto,
             professionalName: user.fullName || user.username,
+            professionalSpecialty: user.specialty,
+            professionalCouncil: [user.councilNumber, user.councilState].filter(Boolean).join('/') || null,
             loginUrl,
             dashboardUrl,
             recordDate: validatedPayload.data,

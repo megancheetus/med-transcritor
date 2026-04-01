@@ -68,6 +68,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           to: patient.email,
           patientName: patient.nomeCompleto,
           professionalName: user.fullName || user.username,
+          professionalSpecialty: user.specialty,
+          professionalCouncil: [user.councilNumber, user.councilState].filter(Boolean).join('/') || null,
           firstAccessUrl,
           loginUrl,
         });
