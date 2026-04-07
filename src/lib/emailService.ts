@@ -196,6 +196,7 @@ export async function sendAppointmentConfirmationEmail(params: AppointmentConfir
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'America/Sao_Paulo',
   });
 
   const subject = `Agendamento Confirmado - Consulta com ${params.professionalName}`;
@@ -290,6 +291,7 @@ export async function sendAppointmentReminderEmail(params: AppointmentReminderEm
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'America/Sao_Paulo',
   });
 
   const subject = `Lembrete: Sua consulta é em ${params.hoursUntilAppointment} horas`;

@@ -10,6 +10,7 @@ interface AppointmentCardProps {
   onDelete: () => Promise<void>;
   expanded?: boolean;
   onStartConsultation?: () => Promise<void>;
+  onStatusChange?: (status: string) => Promise<void>;
 }
 
 export default function AppointmentCard({
@@ -18,10 +19,12 @@ export default function AppointmentCard({
   onDelete,
   expanded = false,
   onStartConsultation,
+  onStatusChange,
 }: AppointmentCardProps) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
   const [startingConsult, setStartingConsult] = useState(false);
+  const [changingStatus, setChangingStatus] = useState(false);
   const [canStart, setCanStart] = useState(false);
   const [error, setError] = useState<string>("");
 
@@ -62,6 +65,20 @@ export default function AppointmentCard({
     }
   };
 
+  const handleStatusChange = async (e: React.MouseEvent, newStatus: string) => {
+    e.stopPropagation();
+    if (!onStatusChange) return;
+    setChangingStatus(true);
+    setError("");
+    try {
+      await onStatusChange(newStatus);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao atualizar status");
+    } finally {
+      setChangingStatus(false);
+    }
+  };
+
   const handleStartConsultation = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setStartingConsult(true);
@@ -99,6 +116,7 @@ export default function AppointmentCard({
     return new Date(dateStr).toLocaleTimeString("pt-BR", {
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: "America/Sao_Paulo",
     });
   };
 
@@ -107,6 +125,7 @@ export default function AppointmentCard({
       day: "2-digit",
       month: "short",
       year: "numeric",
+      timeZone: "America/Sao_Paulo",
     });
   };
 
@@ -194,7 +213,7 @@ export default function AppointmentCard({
           </div>
         )}
 
-        <div className="flex gap-2 pt-4 border-t">
+        <div className="flex flex-wrap gap-2 pt-4 border-t">
           {canStart ? (
             <button
               onClick={handleStartConsultation}
@@ -211,6 +230,37 @@ export default function AppointmentCard({
               Não disponível
             </button>
           )}
+
+          {appointment.status === "scheduled" && onStatusChange && (
+            <button
+              onClick={(e) => handleStatusChange(e, "confirmed")}
+              disabled={changingStatus}
+              className="px-4 py-2 border border-emerald-500 text-emerald-600 rounded-md hover:bg-emerald-50 disabled:opacity-50 font-medium transition-colors"
+            >
+              {changingStatus ? "..." : "✔ Confirmar"}
+            </button>
+          )}
+
+          {(appointment.status === "scheduled" || appointment.status === "confirmed") && onStatusChange && (
+            <button
+              onClick={(e) => handleStatusChange(e, "completed")}
+              disabled={changingStatus}
+              className="px-4 py-2 border border-slate-500 text-slate-600 rounded-md hover:bg-slate-50 disabled:opacity-50 font-medium transition-colors"
+            >
+              {changingStatus ? "..." : "✅ Finalizar"}
+            </button>
+          )}
+
+          {(appointment.status === "scheduled" || appointment.status === "confirmed") && onStatusChange && (
+            <button
+              onClick={(e) => handleStatusChange(e, "no_show")}
+              disabled={changingStatus}
+              className="px-4 py-2 border border-yellow-500 text-yellow-600 rounded-md hover:bg-yellow-50 disabled:opacity-50 font-medium transition-colors"
+            >
+              {changingStatus ? "..." : "Não Compareceu"}
+            </button>
+          )}
+
           <button
             onClick={onEdit}
             className="px-4 py-2 border border-yellow-500 text-yellow-600 rounded-md hover:bg-yellow-50 transition-colors"

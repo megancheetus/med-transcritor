@@ -9,6 +9,7 @@ interface ScheduleViewProps {
   onSelectDate: (date: Date) => void;
   onEditAppointment: (appointment: AppointmentWithPatientInfo) => void;
   onDeleteAppointment: (appointmentId: string) => Promise<void>;
+  onStatusChange: (appointmentId: string, status: string) => Promise<void>;
   viewMode: "week" | "month";
 }
 
@@ -17,11 +18,13 @@ export default function ScheduleView({
   onSelectDate,
   onEditAppointment,
   onDeleteAppointment,
+  onStatusChange,
   viewMode,
 }: ScheduleViewProps) {
   const router = useRouter();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [deleting, setDeleting] = useState<string | false>(false);
+  const [updatingStatus, setUpdatingStatus] = useState<string | false>(false);
 
   const isToday = (date: Date) => {
     const today = new Date();
@@ -52,16 +55,18 @@ export default function ScheduleView({
   };
 
   const getAppointmentsForDate = (date: Date) => {
-    const dateStr = date.toISOString().split("T")[0];
-    return appointments.filter((apt) =>
-      apt.scheduled_at.startsWith(dateStr)
-    );
+    const dateStr = date.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+    return appointments.filter((apt) => {
+      const aptDate = new Date(apt.scheduled_at).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+      return aptDate === dateStr;
+    });
   };
 
   const formatTime = (dateStr: string) => {
     return new Date(dateStr).toLocaleTimeString("pt-BR", {
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: "America/Sao_Paulo",
     });
   };
 
@@ -82,6 +87,45 @@ export default function ScheduleView({
     const params = new URLSearchParams();
     params.set("patientId", patientId);
     router.push(`/prontuario?${params.toString()}`);
+  };
+
+  const handleStatusChange = async (appointmentId: string, status: string) => {
+    setUpdatingStatus(appointmentId);
+    try {
+      await onStatusChange(appointmentId, status);
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const getAppointmentBgColor = (status: string) => {
+    switch (status) {
+      case "confirmed":
+        return "border-green-600/20 bg-green-500/95";
+      case "completed":
+        return "border-slate-500/20 bg-slate-400/95";
+      case "cancelled":
+        return "border-red-600/20 bg-red-400/95";
+      case "no_show":
+        return "border-yellow-600/20 bg-yellow-500/95";
+      default:
+        return "border-emerald-600/20 bg-emerald-500/95";
+    }
+  };
+
+  const getAppointmentBgSimple = (status: string) => {
+    switch (status) {
+      case "confirmed":
+        return "bg-green-500/95";
+      case "completed":
+        return "bg-slate-400/95";
+      case "cancelled":
+        return "bg-red-400/95";
+      case "no_show":
+        return "bg-yellow-500/95";
+      default:
+        return "bg-emerald-500/95";
+    }
   };
 
   if (viewMode === "week") {
@@ -152,7 +196,7 @@ export default function ScheduleView({
                   {dayAppts.slice(0, 5).map((apt) => (
                     <div
                       key={apt.id}
-                      className="rounded-sm border border-emerald-600/20 bg-emerald-500/95 px-1.5 py-1 text-[11px] text-white"
+                      className={`rounded-sm border px-1.5 py-1 text-[11px] text-white ${getAppointmentBgColor(apt.status)}`}
                     >
                       <div className="font-semibold">{formatTime(apt.scheduled_at)}</div>
                       <button
@@ -165,7 +209,27 @@ export default function ScheduleView({
                       >
                         {apt.patient_nome}
                       </button>
-                      <div className="mt-1 flex gap-1">
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {apt.status === "scheduled" && (
+                          <button
+                            onClick={() => handleStatusChange(apt.id, "confirmed")}
+                            disabled={updatingStatus === apt.id}
+                            className="rounded bg-green-700 px-1 py-0.5 text-[10px] font-semibold text-white hover:bg-green-800 disabled:opacity-50"
+                            title="Confirmar"
+                          >
+                            Confirmar
+                          </button>
+                        )}
+                        {(apt.status === "scheduled" || apt.status === "confirmed") && (
+                          <button
+                            onClick={() => handleStatusChange(apt.id, "completed")}
+                            disabled={updatingStatus === apt.id}
+                            className="rounded bg-slate-600 px-1 py-0.5 text-[10px] font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
+                            title="Finalizar consulta"
+                          >
+                            Finalizar
+                          </button>
+                        )}
                         <button
                           onClick={() => onEditAppointment(apt)}
                           className="rounded bg-amber-500 px-1 py-0.5 text-[10px] font-semibold text-white hover:bg-amber-600"
@@ -173,14 +237,16 @@ export default function ScheduleView({
                         >
                           Editar
                         </button>
-                        <button
-                          onClick={() => handleDelete(apt.id)}
-                          disabled={deleting === apt.id}
-                          className="rounded bg-red-500 px-1 py-0.5 text-[10px] font-semibold text-white hover:bg-red-600 disabled:opacity-50"
-                          title="Cancelar"
-                        >
-                          Cancelar
-                        </button>
+                        {apt.status !== "cancelled" && apt.status !== "completed" && (
+                          <button
+                            onClick={() => handleDelete(apt.id)}
+                            disabled={deleting === apt.id}
+                            className="rounded bg-red-500 px-1 py-0.5 text-[10px] font-semibold text-white hover:bg-red-600 disabled:opacity-50"
+                            title="Cancelar"
+                          >
+                            Cancelar
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -306,9 +372,9 @@ export default function ScheduleView({
                 {dayAppts.slice(0, 3).map((apt) => (
                   <div
                     key={apt.id}
-                    className="rounded-sm bg-emerald-500/95 px-1 py-0.5 text-[10px] leading-3 text-white hover:bg-emerald-600"
+                    className={`rounded-sm px-1 py-0.5 text-[10px] leading-3 text-white hover:opacity-90 cursor-pointer ${getAppointmentBgSimple(apt.status)}`}
                     onClick={() => onEditAppointment(apt)}
-                    title={`${apt.patient_nome} - ${formatTime(apt.scheduled_at)}`}
+                    title={`${apt.patient_nome} - ${formatTime(apt.scheduled_at)} (${apt.status})`}
                   >
                     <div className="font-semibold">{formatTime(apt.scheduled_at)}</div>
                     <button

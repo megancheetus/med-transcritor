@@ -42,18 +42,37 @@ export default function AppointmentModal({
   const [availableSlots, setAvailableSlots] = useState<Date[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
 
+  /**
+   * Format a Date to a datetime-local string (YYYY-MM-DDTHH:MM) in BRT.
+   * Uses Intl to always produce the America/Sao_Paulo representation,
+   * regardless of the browser's own timezone setting.
+   */
+  const toDatetimeLocal = (d: Date) => {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(d);
+    const get = (t: string) => parts.find(p => p.type === t)?.value ?? '00';
+    return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`;
+  };
+
   useEffect(() => {
     if (appointment) {
       const date = new Date(appointment.scheduled_at);
       setFormData({
         patientId: appointment.patient_id,
-        scheduledAt: date.toISOString().slice(0, 16),
+        scheduledAt: toDatetimeLocal(date),
         tipo: appointment.tipo,
         duracaoMinutos: appointment.duracao_minutos,
         notas: appointment.notas || "",
       });
     } else if (selectedDate) {
-      const dateStr = selectedDate.toISOString().slice(0, 16);
+      const dateStr = toDatetimeLocal(selectedDate);
       setFormData((prev) => ({
         ...prev,
         scheduledAt: dateStr,
@@ -230,7 +249,7 @@ export default function AppointmentModal({
                 {availableSlots.length > 0 ? (
                   <div className="grid max-h-44 grid-cols-3 gap-2 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3 md:grid-cols-5">
                     {availableSlots.map((slot) => {
-                      const slotStr = slot.toISOString().slice(0, 16);
+                      const slotStr = toDatetimeLocal(slot);
                       return (
                         <button
                           key={slotStr}
@@ -247,6 +266,7 @@ export default function AppointmentModal({
                           {slot.toLocaleTimeString("pt-BR", {
                             hour: "2-digit",
                             minute: "2-digit",
+                            timeZone: "America/Sao_Paulo",
                           })}
                         </button>
                       );

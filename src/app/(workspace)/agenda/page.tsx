@@ -108,7 +108,10 @@ export default function AgendaPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           patientId: formData.patientId,
-          scheduledAt: new Date(formData.scheduledAt).toISOString(),
+          // datetime-local value is always in BRT (America/Sao_Paulo, UTC-3).
+          // Append the BRT offset so the server interprets it correctly
+          // regardless of the browser's own timezone.
+          scheduledAt: formData.scheduledAt + ":00-03:00",
           tipo: formData.tipo,
           duracaoMinutos: formData.duracaoMinutos,
           notas: formData.notas,
@@ -140,6 +143,25 @@ export default function AgendaPage() {
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error || "Failed to delete appointment");
+      }
+
+      await loadAppointments();
+    } catch (err: any) {
+      throw new Error(err.message);
+    }
+  };
+
+  const handleStatusChange = async (appointmentId: string, status: string) => {
+    try {
+      const response = await fetch(`/api/appointments/${appointmentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Erro ao atualizar status");
       }
 
       await loadAppointments();
@@ -214,11 +236,12 @@ export default function AgendaPage() {
           onSelectDate={handleSelectDate}
           onEditAppointment={handleEditAppointment}
           onDeleteAppointment={handleDeleteAppointment}
+          onStatusChange={handleStatusChange}
           viewMode={viewMode}
         />
       )}
 
-      <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-4">
+      <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-5">
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total de Agendamentos</div>
           <div className="mt-2 text-3xl font-bold text-slate-900">
@@ -244,6 +267,13 @@ export default function AgendaPage() {
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Cancelado</div>
           <div className="mt-2 text-3xl font-bold text-red-600">
             {appointments.filter((a) => a.status === "cancelled").length}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Concluído</div>
+          <div className="mt-2 text-3xl font-bold text-slate-600">
+            {appointments.filter((a) => a.status === "completed").length}
           </div>
         </div>
       </div>

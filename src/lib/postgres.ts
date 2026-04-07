@@ -1,4 +1,13 @@
-import { Pool } from 'pg';
+import { Pool, types } from 'pg';
+
+// Force TIMESTAMP WITHOUT TIMEZONE (OID 1114) to be returned as a raw string.
+// This prevents node-postgres from applying the server's local timezone,
+// which causes ±3h drift between local dev (BRT) and Vercel (UTC).
+// We append 'Z' so the string is always treated as UTC downstream.
+types.setTypeParser(1114, (str: string) => str + 'Z');
+
+// TIMESTAMPTZ (OID 1184) — also return as string to avoid Date coercion issues.
+types.setTypeParser(1184, (str: string) => str);
 
 declare global {
   var omninotePostgresPool: Pool | undefined;

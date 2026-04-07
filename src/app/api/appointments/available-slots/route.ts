@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get("date");
     const slotDuration = searchParams.get("slotDuration") || "30";
     const workStartHour = searchParams.get("workStartHour") || "8";
-    const workEndHour = searchParams.get("workEndHour") || "18";
+    const workEndHour = searchParams.get("workEndHour") || "21";
 
     if (!date) {
       return NextResponse.json(

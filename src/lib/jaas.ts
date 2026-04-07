@@ -28,8 +28,28 @@ export interface JaasMeetingToken {
   expiresAt: string;
 }
 
-function normalizePrivateKey(privateKey: string) {
-  return privateKey.replace(/\\n/g, '\n').trim();
+function normalizePrivateKey(raw: string): string {
+  // 1. Strip surrounding quotes (double or single) that may leak from env config
+  let key = raw.trim();
+  if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+    key = key.slice(1, -1);
+  }
+
+  // 2. Convert literal two-char sequences \n and \r\n into real newlines
+  key = key.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n');
+
+  // 3. Normalise Windows line endings that might already be real
+  key = key.replace(/\r\n/g, '\n');
+
+  // 4. Ensure the PEM has proper line breaks (the base64 body should have
+  //    newlines at most every 76 chars, but importPKCS8 tolerates long lines
+  //    as long as header/footer are on their own line).
+  //    Force header + footer onto separate lines if they aren't:
+  key = key
+    .replace(/(-----BEGIN [A-Z ]+-----)[ \t]*\n?/, '$1\n')
+    .replace(/\n?[ \t]*(-----END [A-Z ]+-----)/, '\n$1');
+
+  return key.trim();
 }
 
 export function getJaasEnvironmentStatus(): JaasEnvironmentStatus {
@@ -82,7 +102,21 @@ export async function createJaasMeetingToken({
   const roomName = `${appId}/${roomId}`;
   const now = Math.floor(Date.now() / 1000);
   const expiresAt = new Date((now + JAAS_TOKEN_TTL_SECONDS) * 1000).toISOString();
-  const signingKey = await importPKCS8(privateKey, 'RS256');
+
+  let signingKey;
+  try {
+    signingKey = await importPKCS8(privateKey, 'RS256');
+  } catch (err) {
+    const hasHeader = privateKey.includes('-----BEGIN');
+    const hasFooter = privateKey.includes('-----END');
+    const lineCount = privateKey.split('\n').length;
+    console.error(
+      '[JaaS] importPKCS8 falhou.',
+      { hasHeader, hasFooter, lineCount, firstChars: privateKey.slice(0, 40) },
+      err,
+    );
+    throw new Error('Falha ao importar chave privada JaaS. Verifique o formato da variável JAAS_PRIVATE_KEY.');
+  }
 
   const jwt = await new SignJWT({
     room: roomId,
