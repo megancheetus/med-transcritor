@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
 import { Patient, MedicalRecord } from '@/lib/types';
 import { PatientList } from '@/components/PatientList';
 import { PatientDashboard } from '@/components/PatientDashboard';
@@ -78,6 +79,7 @@ export default function ProntuarioPage() {
   const [isSendingProfileUpdateEmail, setIsSendingProfileUpdateEmail] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
+  const [showMobileDetail, setShowMobileDetail] = useState(false);
   const patientsCursorRef = useRef<string | null>(null);
 
   const fetchPatients = useCallback(
@@ -398,6 +400,11 @@ export default function ProntuarioPage() {
     }
   }, [patients, selectedPatient]);
 
+  const handleSelectPatient = useCallback((patient: Patient) => {
+    setSelectedPatient(patient);
+    setShowMobileDetail(true);
+  }, []);
+
   return (
     <AppShell
       title="Prontuário Eletrônico"
@@ -434,12 +441,12 @@ export default function ProntuarioPage() {
         </div>
       ) : (
         <div className="flex gap-6 h-full rounded-xl overflow-hidden bg-white shadow-sm border border-[#cfe0e8]">
-          {/* Master (Sidebar) */}
-          <div className="w-80 flex-shrink-0 border-r border-[#cfe0e8] bg-white overflow-hidden">
+          {/* Master (Sidebar) — hidden on mobile when detail is open */}
+          <div className={`w-full md:w-80 flex-shrink-0 md:border-r border-[#cfe0e8] bg-white overflow-hidden ${showMobileDetail && selectedPatient ? 'hidden md:block' : ''}`}>
             <PatientList
               patients={patients}
               selectedPatient={selectedPatient}
-              onSelectPatient={setSelectedPatient}
+              onSelectPatient={handleSelectPatient}
               searchQuery={searchQuery}
               onSearchQueryChange={setSearchQuery}
               onLoadMore={() => {
@@ -454,21 +461,34 @@ export default function ProntuarioPage() {
             />
           </div>
 
-          {/* Detail (Main Content) */}
-          <div className="flex-1 overflow-y-auto bg-gradient-to-b from-slate-50 to-white">
+          {/* Detail (Main Content) — full screen on mobile when a patient is selected */}
+          <div className={`flex-1 overflow-y-auto bg-gradient-to-b from-slate-50 to-white ${showMobileDetail && selectedPatient ? 'block' : 'hidden md:block'}`}>
             {selectedPatient ? (
-              <PatientDashboard 
-                patient={selectedPatient}
-                onEditClick={() => setIsEditModalOpen(true)}
-                onAddMedicalRecord={() => setIsAddMedicalRecordModalOpen(true)}
-                onStartTeleconsulta={handleStartTeleconsulta}
-                onDeletePatient={handleDeletePatient}
-                onSendPortalWelcomeEmail={handleSendPortalWelcomeEmail}
-                onSendProfileUpdateEmail={handleSendProfileUpdateEmail}
-                isSendingPortalWelcomeEmail={isSendingWelcomeEmail}
-                isSendingProfileUpdateEmail={isSendingProfileUpdateEmail}
-                refreshKey={recordsRefreshKey}
-              />
+              <>
+                {/* Mobile back button */}
+                <div className="sticky top-0 z-10 flex items-center gap-2 px-4 py-3 bg-white/95 backdrop-blur-sm border-b border-[#cfe0e8] md:hidden">
+                  <button
+                    onClick={() => setShowMobileDetail(false)}
+                    className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Voltar à lista
+                  </button>
+                  <span className="text-sm text-slate-400 truncate ml-auto">{selectedPatient.nomeCompleto}</span>
+                </div>
+                <PatientDashboard 
+                  patient={selectedPatient}
+                  onEditClick={() => setIsEditModalOpen(true)}
+                  onAddMedicalRecord={() => setIsAddMedicalRecordModalOpen(true)}
+                  onStartTeleconsulta={handleStartTeleconsulta}
+                  onDeletePatient={handleDeletePatient}
+                  onSendPortalWelcomeEmail={handleSendPortalWelcomeEmail}
+                  onSendProfileUpdateEmail={handleSendProfileUpdateEmail}
+                  isSendingPortalWelcomeEmail={isSendingWelcomeEmail}
+                  isSendingProfileUpdateEmail={isSendingProfileUpdateEmail}
+                  refreshKey={recordsRefreshKey}
+                />
+              </>
             ) : (
               <EmptyState />
             )}

@@ -5,7 +5,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isValidAuthToken } from '@/lib/auth';
 import { getModelById, TranscriptionModelType, TRANSCRIPTION_MODELS } from '@/lib/transcriptionModels';
 
-const GEMINI_MODEL = 'gemini-2.5-flash';
+// Lista ordenada de modelos Gemini para fallback.
+// Se o modelo principal estiver sobrecarregado (503/429), o sistema tenta o próximo automaticamente.
+const GEMINI_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.5-pro',
+  'gemini-2.0-flash',
+  'gemini-1.5-flash',
+  'gemini-1.5-pro',
+] as const;
+
 // Audios maiores que este limite são enviados via Files API (upload separado ao Google),
 // em vez de inline base64, evitando o erro 413 do Gemini para payloads grandes.
 // O inline base64 cresce ~33%; por isso usamos um limite conservador para evitar 413.
@@ -69,6 +78,37 @@ const isPayloadTooLargeError = (error: unknown) => {
     details.includes('request payload size') ||
     details.includes('request too large') ||
     details.includes('exceeds the limit')
+  );
+};
+
+/**
+ * Detecta erros de sobrecarga/indisponibilidade (503, 429, etc.)
+ * que indicam que o modelo pode estar temporariamente indisponível.
+ */
+const isOverloadedError = (error: unknown): boolean => {
+  if (typeof error === 'object' && error !== null) {
+    const maybeStatus = Reflect.get(error, 'status');
+    if (typeof maybeStatus === 'number' && (maybeStatus === 503 || maybeStatus === 429)) {
+      return true;
+    }
+
+    const maybeCode = Reflect.get(error, 'code');
+    if (maybeCode === 503 || maybeCode === '503' || maybeCode === 429 || maybeCode === '429') {
+      return true;
+    }
+  }
+
+  const details = getErrorDetails(error).toLowerCase();
+  return (
+    details.includes('503') ||
+    details.includes('429') ||
+    details.includes('service unavailable') ||
+    details.includes('overloaded') ||
+    details.includes('resource exhausted') ||
+    details.includes('too many requests') ||
+    details.includes('high demand') ||
+    details.includes('temporarily unavailable') ||
+    details.includes('capacity')
   );
 };
 
@@ -284,84 +324,123 @@ export async function POST(request: NextRequest) {
     const client = getGeminiClient();
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error('A chave da API Gemini não está configurada.');
-    const geminiModel = client.getGenerativeModel({ model: GEMINI_MODEL });
     const fileManager = new GoogleAIFileManager(apiKey);
     const transcriptionModel = getModelById(model);
 
-    const results: string[] = [];
-    let usedFilesApiFallback = false;
+    // Fallback entre modelos: se o modelo principal estiver sobrecarregado,
+    // tenta automaticamente o próximo da lista.
+    let lastOverloadError: unknown = null;
+    let usedModelName: string = GEMINI_MODELS[0];
 
-    // Arquivos grandes: usar Files API (sem limite inline) para evitar 413 do Gemini.
-    // Arquivos pequenos: usar inline base64 (mais rápido, sem round-trip de upload).
-    if (buffer.length > FILES_API_THRESHOLD_BYTES) {
-      console.log(`📦 Áudio grande (${buffer.length} bytes) → usando Files API`);
-      const result = await processAudioViaFilesAPI(
-        geminiModel,
-        fileManager,
-        transcriptionModel.prompt,
-        buffer,
-        mimeType
-      );
-      results.push(result);
-    } else {
-      for (let i = 0; i < chunks.length; i++) {
-        console.log(`\n🔄 Processando chunk ${i + 1}/${chunks.length} (${chunks[i].length} bytes)`);
+    for (const modelName of GEMINI_MODELS) {
+      usedModelName = modelName;
+      const geminiModel = client.getGenerativeModel({ model: modelName });
 
-        const base64Chunk = chunks[i].toString('base64');
+      console.log(`\n🤖 Tentando modelo: ${modelName}`);
 
-        try {
-          const chunkResult = await processAudioChunk(
-            client,
+      try {
+        const results: string[] = [];
+        let usedFilesApiFallback = false;
+
+        // Arquivos grandes: usar Files API (sem limite inline) para evitar 413 do Gemini.
+        // Arquivos pequenos: usar inline base64 (mais rápido, sem round-trip de upload).
+        if (buffer.length > FILES_API_THRESHOLD_BYTES) {
+          console.log(`📦 Áudio grande (${buffer.length} bytes) → usando Files API`);
+          const result = await processAudioViaFilesAPI(
             geminiModel,
+            fileManager,
             transcriptionModel.prompt,
-            base64Chunk,
-            mimeType,
-            i,
-            chunks.length
+            buffer,
+            mimeType
           );
+          results.push(result);
+        } else {
+          for (let i = 0; i < chunks.length; i++) {
+            console.log(`\n🔄 Processando chunk ${i + 1}/${chunks.length} (${chunks[i].length} bytes)`);
 
-          results.push(chunkResult);
-          console.log(`✅ Chunk ${i + 1} processado com sucesso`);
-        } catch (chunkError) {
-          if (chunks.length === 1 && isPayloadTooLargeError(chunkError)) {
-            console.warn('⚠️ Inline rejeitado por tamanho. Reprocessando com Files API...');
+            const base64Chunk = chunks[i].toString('base64');
 
             try {
-              const fallbackResult = await processAudioViaFilesAPI(
+              const chunkResult = await processAudioChunk(
+                client,
                 geminiModel,
-                fileManager,
                 transcriptionModel.prompt,
-                buffer,
-                mimeType
+                base64Chunk,
+                mimeType,
+                i,
+                chunks.length
               );
-              results.push(fallbackResult);
-              usedFilesApiFallback = true;
-              console.log('✅ Fallback via Files API concluído com sucesso');
-              break;
-            } catch (fallbackError) {
-              console.error('❌ Falha no fallback via Files API:', fallbackError);
-              throw new Error(`Falha no fallback Files API: ${getErrorDetails(fallbackError)}`);
+
+              results.push(chunkResult);
+              console.log(`✅ Chunk ${i + 1} processado com sucesso`);
+            } catch (chunkError) {
+              // Se for erro de sobrecarga, propagar para tentar próximo modelo
+              if (isOverloadedError(chunkError)) {
+                throw chunkError;
+              }
+
+              if (chunks.length === 1 && isPayloadTooLargeError(chunkError)) {
+                console.warn('⚠️ Inline rejeitado por tamanho. Reprocessando com Files API...');
+
+                try {
+                  const fallbackResult = await processAudioViaFilesAPI(
+                    geminiModel,
+                    fileManager,
+                    transcriptionModel.prompt,
+                    buffer,
+                    mimeType
+                  );
+                  results.push(fallbackResult);
+                  usedFilesApiFallback = true;
+                  console.log('✅ Fallback via Files API concluído com sucesso');
+                  break;
+                } catch (fallbackError) {
+                  // Se Files API também deu overload, propagar para tentar próximo modelo
+                  if (isOverloadedError(fallbackError)) {
+                    throw fallbackError;
+                  }
+                  console.error('❌ Falha no fallback via Files API:', fallbackError);
+                  throw new Error(`Falha no fallback Files API: ${getErrorDetails(fallbackError)}`);
+                }
+              }
+
+              console.error(`❌ Erro ao processar chunk ${i + 1}:`, chunkError);
+              throw new Error(`Falha ao processar parte ${i + 1}/${chunks.length}: ${getErrorDetails(chunkError)}`);
             }
           }
-
-          console.error(`❌ Erro ao processar chunk ${i + 1}:`, chunkError);
-          throw new Error(`Falha ao processar parte ${i + 1}/${chunks.length}: ${getErrorDetails(chunkError)}`);
         }
+
+        // Combinar resultados
+        const finalResult = combineChunkResults(results, chunks.length);
+
+        if (modelName !== GEMINI_MODELS[0]) {
+          console.log(`⚡ Modelo principal indisponível. Transcrição concluída com modelo alternativo: ${modelName}`);
+        }
+        console.log('✅ Processamento concluído com sucesso');
+
+        return NextResponse.json({
+          content: finalResult,
+          model: model,
+          geminiModel: usedModelName,
+          chunked: chunks.length > 1,
+          chunksProcessed: chunks.length,
+          usedFilesApiFallback,
+          usedFallbackModel: modelName !== GEMINI_MODELS[0],
+        });
+      } catch (modelError) {
+        if (isOverloadedError(modelError)) {
+          console.warn(`⚠️ Modelo ${modelName} sobrecarregado/indisponível. Tentando próximo...`);
+          lastOverloadError = modelError;
+          continue; // Tentar próximo modelo da lista
+        }
+        // Erro não é de sobrecarga — é um erro real, propagar imediatamente
+        throw modelError;
       }
     }
 
-    // Combinar resultados
-    const finalResult = combineChunkResults(results, chunks.length);
-
-    console.log('✅ Processamento concluído com sucesso');
-
-    return NextResponse.json({
-      content: finalResult,
-      model: model,
-      chunked: chunks.length > 1,
-      chunksProcessed: chunks.length,
-      usedFilesApiFallback,
-    });
+    // Todos os modelos falharam por sobrecarga
+    console.error('❌ Todos os modelos Gemini estão sobrecarregados.');
+    throw lastOverloadError || new Error('Todos os modelos de IA estão temporariamente indisponíveis.');
   } catch (error) {
     const details = getErrorDetails(error);
     const maybeStatus = typeof Reflect.get(error as object, 'status') === 'number'

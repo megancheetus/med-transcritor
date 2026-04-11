@@ -365,10 +365,11 @@ export function TranscriptionWorkspaceProvider({ storageNamespace, children }: T
         }
       }
 
+      const fallbackNote = data?.usedFallbackModel ? ' (modelo alternativo utilizado)' : '';
       setCompressionStatus(
         usedDirectBlobUpload
-          ? 'Transcrição concluída com sucesso (upload direto aplicado).'
-          : 'Transcrição concluída com sucesso.'
+          ? `Transcrição concluída com sucesso (upload direto aplicado).${fallbackNote}`
+          : `Transcrição concluída com sucesso.${fallbackNote}`
       );
       setProcessingMeta({
         originalBytes: audioBlob.size,
@@ -478,12 +479,13 @@ export function TranscriptionWorkspaceProvider({ storageNamespace, children }: T
         }
       }
 
+      const fallbackNote2 = data?.usedFallbackModel ? ' (modelo alternativo utilizado)' : '';
       setCompressionStatus(
         usedDirectBlobUpload
-          ? 'Transcrição concluída com sucesso (upload direto aplicado).'
+          ? `Transcrição concluída com sucesso (upload direto aplicado).${fallbackNote2}`
           : data.chunked
-            ? `Processado em ${data.chunksProcessed} partes (${formatBytes(sentBytes)})`
-            : 'Transcrição concluída com sucesso.'
+            ? `Processado em ${data.chunksProcessed} partes (${formatBytes(sentBytes)})${fallbackNote2}`
+            : `Transcrição concluída com sucesso.${fallbackNote2}`
       );
 
       setProcessingMeta({

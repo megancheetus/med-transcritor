@@ -147,7 +147,11 @@ export default function TranscriberPage() {
         }
       }
 
-      setCompressionStatus('✅ Transcrição concluída com sucesso!');
+      setCompressionStatus(
+        data?.usedFallbackModel
+          ? '✅ Transcrição concluída (modelo alternativo utilizado)'
+          : '✅ Transcrição concluída com sucesso!'
+      );
       setProcessingMeta({
         originalBytes: audioBlob.size,
         sentBytes: audioToSend.size,
@@ -291,9 +295,10 @@ export default function TranscriberPage() {
         }
       }
 
+      const fallbackNote = data?.usedFallbackModel ? ' (modelo alternativo utilizado)' : '';
       const processInfo = data.chunked
-        ? `✅ Processado em ${data.chunksProcessed} partes (${formatBytes(audioToSend.size)})`
-        : '✅ Transcrição concluída com sucesso!';
+        ? `✅ Processado em ${data.chunksProcessed} partes (${formatBytes(audioToSend.size)})${fallbackNote}`
+        : `✅ Transcrição concluída com sucesso!${fallbackNote}`;
 
       setCompressionStatus(processInfo);
       setProcessingMeta({
