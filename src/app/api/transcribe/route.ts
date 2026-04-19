@@ -6,13 +6,11 @@ import { isValidAuthToken } from '@/lib/auth';
 import { getModelById, TranscriptionModelType, TRANSCRIPTION_MODELS } from '@/lib/transcriptionModels';
 
 // Lista ordenada de modelos Gemini para fallback.
-// Se o modelo principal estiver sobrecarregado (503/429), o sistema tenta o próximo automaticamente.
+// Se o modelo principal falhar (503/429/404), o sistema tenta o próximo automaticamente.
 const GEMINI_MODELS = [
   'gemini-2.5-flash',
   'gemini-2.5-pro',
   'gemini-2.0-flash',
-  'gemini-1.5-flash',
-  'gemini-1.5-pro',
 ] as const;
 
 // Audios maiores que este limite são enviados via Files API (upload separado ao Google),
@@ -82,18 +80,19 @@ const isPayloadTooLargeError = (error: unknown) => {
 };
 
 /**
- * Detecta erros de sobrecarga/indisponibilidade (503, 429, etc.)
- * que indicam que o modelo pode estar temporariamente indisponível.
+ * Detecta erros que permitem tentar o próximo modelo:
+ * - 503/429: sobrecarga ou rate limit
+ * - 404: modelo descontinuado ou não encontrado na API
  */
-const isOverloadedError = (error: unknown): boolean => {
+const isRetryableError = (error: unknown): boolean => {
   if (typeof error === 'object' && error !== null) {
     const maybeStatus = Reflect.get(error, 'status');
-    if (typeof maybeStatus === 'number' && (maybeStatus === 503 || maybeStatus === 429)) {
+    if (typeof maybeStatus === 'number' && (maybeStatus === 503 || maybeStatus === 429 || maybeStatus === 404)) {
       return true;
     }
 
     const maybeCode = Reflect.get(error, 'code');
-    if (maybeCode === 503 || maybeCode === '503' || maybeCode === 429 || maybeCode === '429') {
+    if ([503, '503', 429, '429', 404, '404'].includes(maybeCode as string | number)) {
       return true;
     }
   }
@@ -102,13 +101,16 @@ const isOverloadedError = (error: unknown): boolean => {
   return (
     details.includes('503') ||
     details.includes('429') ||
+    details.includes('404') ||
+    details.includes('not found') ||
     details.includes('service unavailable') ||
     details.includes('overloaded') ||
     details.includes('resource exhausted') ||
     details.includes('too many requests') ||
     details.includes('high demand') ||
     details.includes('temporarily unavailable') ||
-    details.includes('capacity')
+    details.includes('capacity') ||
+    details.includes('is not supported')
   );
 };
 
@@ -374,8 +376,8 @@ export async function POST(request: NextRequest) {
               results.push(chunkResult);
               console.log(`✅ Chunk ${i + 1} processado com sucesso`);
             } catch (chunkError) {
-              // Se for erro de sobrecarga, propagar para tentar próximo modelo
-              if (isOverloadedError(chunkError)) {
+              // Se for erro retryable, propagar para tentar próximo modelo
+              if (isRetryableError(chunkError)) {
                 throw chunkError;
               }
 
@@ -395,8 +397,8 @@ export async function POST(request: NextRequest) {
                   console.log('✅ Fallback via Files API concluído com sucesso');
                   break;
                 } catch (fallbackError) {
-                  // Se Files API também deu overload, propagar para tentar próximo modelo
-                  if (isOverloadedError(fallbackError)) {
+                  // Se Files API também falhou com erro retryable, propagar para tentar próximo modelo
+                  if (isRetryableError(fallbackError)) {
                     throw fallbackError;
                   }
                   console.error('❌ Falha no fallback via Files API:', fallbackError);
@@ -428,12 +430,12 @@ export async function POST(request: NextRequest) {
           usedFallbackModel: modelName !== GEMINI_MODELS[0],
         });
       } catch (modelError) {
-        if (isOverloadedError(modelError)) {
-          console.warn(`⚠️ Modelo ${modelName} sobrecarregado/indisponível. Tentando próximo...`);
+        if (isRetryableError(modelError)) {
+          console.warn(`⚠️ Modelo ${modelName} indisponível (${getErrorDetails(modelError)}). Tentando próximo...`);
           lastOverloadError = modelError;
           continue; // Tentar próximo modelo da lista
         }
-        // Erro não é de sobrecarga — é um erro real, propagar imediatamente
+        // Erro não é retryable — é um erro real, propagar imediatamente
         throw modelError;
       }
     }
