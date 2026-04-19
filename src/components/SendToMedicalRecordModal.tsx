@@ -51,35 +51,6 @@ function buildInitialConteudo(content: string): string {
   ].join('\n');
 }
 
-interface ParsedSOAP {
-  S: string;
-  O: string;
-  A: string;
-  P: string;
-}
-
-function parseSOAPFromText(text: string): ParsedSOAP {
-  const sections: ParsedSOAP = { S: '', O: '', A: '', P: '' };
-  // Remove orientações antes de parsear SOAP
-  const marker = /ORIENTAÇÕES AO PACIENTE:\s*/i;
-  const markerMatch = marker.exec(text);
-  const soapText = markerMatch ? text.slice(0, markerMatch.index) : text;
-  const soapRegex = /([SOAP])\s*\(([^)]+)\):\s*([\s\S]*?)(?=[SOAP]\s*\([^)]+\)|$)/g;
-  let match;
-  while ((match = soapRegex.exec(soapText)) !== null) {
-    const letter = match[1];
-    const content = match[3].trim();
-    if (letter in sections) {
-      sections[letter as keyof ParsedSOAP] = content;
-    }
-  }
-  return sections;
-}
-
-function hasSOAPContent(soap: ParsedSOAP): boolean {
-  return !!(soap.S || soap.O || soap.A || soap.P);
-}
-
 export function SendToMedicalRecordModal({
   isOpen,
   transcriptionContent,
@@ -102,11 +73,6 @@ export function SendToMedicalRecordModal({
   const [conteudo, setConteudo] = useState('');
   const [clinicianReviewed, setClinicianReviewed] = useState(true);
   const [notifyPatientByEmail, setNotifyPatientByEmail] = useState(true);
-  const [soapSubjetivo, setSoapSubjetivo] = useState('');
-  const [soapObjetivo, setSoapObjetivo] = useState('');
-  const [soapAvaliacao, setSoapAvaliacao] = useState('');
-  const [soapPlano, setSoapPlano] = useState('');
-  const [soapDetected, setSoapDetected] = useState(false);
 
   const selectedPatient = useMemo(
     () => patients.find((patient) => patient.id === patientId) || null,
@@ -126,14 +92,6 @@ export function SendToMedicalRecordModal({
     setEspecialidade('Clínica Geral');
     setClinicianReviewed(true);
     setNotifyPatientByEmail(true);
-
-    const parsedSoap = parseSOAPFromText(transcriptionContent);
-    const detected = hasSOAPContent(parsedSoap);
-    setSoapDetected(detected);
-    setSoapSubjetivo(parsedSoap.S);
-    setSoapObjetivo(parsedSoap.O);
-    setSoapAvaliacao(parsedSoap.A);
-    setSoapPlano(parsedSoap.P);
 
     const loadPatients = async () => {
       try {
@@ -226,10 +184,6 @@ export function SendToMedicalRecordModal({
           especialidade: especialidade.trim() || 'Clínica Geral',
           resumo: resumo.trim() || undefined,
           conteudo: conteudo.trim(),
-          soapSubjetivo: soapSubjetivo.trim() || undefined,
-          soapObjetivo: soapObjetivo.trim() || undefined,
-          soapAvaliacao: soapAvaliacao.trim() || undefined,
-          soapPlano: soapPlano.trim() || undefined,
           sourceRefId,
           clinicianReviewed,
           notifyPatientByEmail,
@@ -368,61 +322,6 @@ export function SendToMedicalRecordModal({
               disabled={isSaving}
             />
           </div>
-
-          {soapDetected && (
-            <details className="rounded-lg border border-sky-200 bg-sky-50" open>
-              <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-sky-800 select-none">
-                Campos SOAP extraídos da transcrição
-              </summary>
-              <div className="space-y-3 px-3 pb-3 pt-1">
-                <p className="text-xs text-sky-700">Os campos abaixo foram preenchidos automaticamente a partir do texto da transcrição. Revise antes de salvar.</p>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600">S — Subjetivo</label>
-                  <textarea
-                    value={soapSubjetivo}
-                    onChange={(e) => setSoapSubjetivo(e.target.value)}
-                    rows={2}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-200"
-                    placeholder="Queixa e história da doença atual"
-                    disabled={isSaving}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600">O — Objetivo</label>
-                  <textarea
-                    value={soapObjetivo}
-                    onChange={(e) => setSoapObjetivo(e.target.value)}
-                    rows={2}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-200"
-                    placeholder="Sinais vitais e achados do exame"
-                    disabled={isSaving}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600">A — Avaliação</label>
-                  <textarea
-                    value={soapAvaliacao}
-                    onChange={(e) => setSoapAvaliacao(e.target.value)}
-                    rows={2}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-200"
-                    placeholder="Diagnóstico ou hipótese diagnóstica"
-                    disabled={isSaving}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600">P — Plano</label>
-                  <textarea
-                    value={soapPlano}
-                    onChange={(e) => setSoapPlano(e.target.value)}
-                    rows={2}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-200"
-                    placeholder="Conduta e plano terapêutico"
-                    disabled={isSaving}
-                  />
-                </div>
-              </div>
-            </details>
-          )}
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Conteúdo clínico *</label>
